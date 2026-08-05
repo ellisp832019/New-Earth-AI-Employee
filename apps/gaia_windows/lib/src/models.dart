@@ -462,6 +462,333 @@ class AskRequestBody {
       }..removeWhere((key, value) => value == null);
 }
 
+class TaskRecord {
+  TaskRecord({
+    required this.taskId,
+    required this.title,
+    required this.description,
+    required this.projectId,
+    required this.status,
+    required this.priority,
+    required this.category,
+    required this.sourceType,
+    required this.sourceIdentifier,
+    required this.sourceAgentRunId,
+    required this.evidenceReferences,
+    required this.dependencyTaskIds,
+    required this.blockerDescription,
+    required this.assignedTo,
+    required this.dueDate,
+    required this.completionCriteria,
+    required this.completionEvidence,
+    required this.approvalRequirement,
+    required this.tags,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.version,
+    required this.manualOverrideReason,
+  });
+
+  factory TaskRecord.fromJson(Map<String, dynamic> json) => TaskRecord(
+        taskId: json['task_id'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        projectId: json['project_id'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+        priority: json['priority'] as String? ?? '',
+        category: json['category'] as String? ?? '',
+        sourceType: json['source_type'] as String? ?? '',
+        sourceIdentifier: json['source_identifier'] as String?,
+        sourceAgentRunId: json['source_agent_run_id'] as String?,
+        evidenceReferences: _stringList(json['evidence_references']),
+        dependencyTaskIds: _stringList(json['dependency_task_ids']),
+        blockerDescription: json['blocker_description'] as String?,
+        assignedTo: json['assigned_to'] as String?,
+        dueDate: json['due_date'] == null ? null : DateTime.parse(json['due_date'] as String),
+        completionCriteria: json['completion_criteria'] as String? ?? '',
+        completionEvidence: _stringList(json['completion_evidence']),
+        approvalRequirement: json['approval_requirement'] as bool? ?? false,
+        tags: _stringList(json['tags']),
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        updatedAt: DateTime.parse(json['updated_at'] as String? ?? DateTime.now().toIso8601String()),
+        version: json['version'] as int? ?? 0,
+        manualOverrideReason: json['manual_override_reason'] as String?,
+      );
+
+  final String taskId;
+  final String title;
+  final String description;
+  final String projectId;
+  final String status;
+  final String priority;
+  final String category;
+  final String sourceType;
+  final String? sourceIdentifier;
+  final String? sourceAgentRunId;
+  final List<String> evidenceReferences;
+  final List<String> dependencyTaskIds;
+  final String? blockerDescription;
+  final String? assignedTo;
+  final DateTime? dueDate;
+  final String completionCriteria;
+  final List<String> completionEvidence;
+  final bool approvalRequirement;
+  final List<String> tags;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final int version;
+  final String? manualOverrideReason;
+}
+
+class TaskHistoryRecord {
+  TaskHistoryRecord({
+    required this.historyId,
+    required this.taskId,
+    required this.fromStatus,
+    required this.toStatus,
+    required this.action,
+    required this.actor,
+    required this.reason,
+    required this.createdAt,
+    required this.metadata,
+  });
+
+  factory TaskHistoryRecord.fromJson(Map<String, dynamic> json) => TaskHistoryRecord(
+        historyId: json['history_id'] as String? ?? '',
+        taskId: json['task_id'] as String? ?? '',
+        fromStatus: json['from_status'] as String?,
+        toStatus: json['to_status'] as String? ?? '',
+        action: json['action'] as String? ?? '',
+        actor: json['actor'] as String? ?? '',
+        reason: json['reason'] as String?,
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        metadata: (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{},
+      );
+
+  final String historyId;
+  final String taskId;
+  final String? fromStatus;
+  final String toStatus;
+  final String action;
+  final String actor;
+  final String? reason;
+  final DateTime createdAt;
+  final Map<String, dynamic> metadata;
+}
+
+class DraftRecord {
+  DraftRecord({
+    required this.draftId,
+    required this.title,
+    required this.draftType,
+    required this.projectId,
+    required this.sourceTaskId,
+    required this.sourceAgentRunId,
+    required this.currentRevision,
+    required this.currentContentHash,
+    required this.status,
+    required this.evidenceReferences,
+    required this.warnings,
+    required this.approvalRequirement,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+
+  factory DraftRecord.fromJson(Map<String, dynamic> json) => DraftRecord(
+        draftId: json['draft_id'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        draftType: json['draft_type'] as String? ?? '',
+        projectId: json['project_id'] as String? ?? '',
+        sourceTaskId: json['source_task_id'] as String?,
+        sourceAgentRunId: json['source_agent_run_id'] as String?,
+        currentRevision: json['current_revision'] as int? ?? 0,
+        currentContentHash: json['current_content_hash'] as String? ?? '',
+        status: json['status'] as String? ?? '',
+        evidenceReferences: _stringList(json['evidence_references']),
+        warnings: _stringList(json['warnings']),
+        approvalRequirement: json['approval_requirement'] as bool? ?? false,
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        updatedAt: DateTime.parse(json['updated_at'] as String? ?? DateTime.now().toIso8601String()),
+      );
+
+  final String draftId;
+  final String title;
+  final String draftType;
+  final String projectId;
+  final String? sourceTaskId;
+  final String? sourceAgentRunId;
+  final int currentRevision;
+  final String currentContentHash;
+  final String status;
+  final List<String> evidenceReferences;
+  final List<String> warnings;
+  final bool approvalRequirement;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+}
+
+class DraftRevisionRecord {
+  DraftRevisionRecord({
+    required this.revisionId,
+    required this.draftId,
+    required this.revisionNumber,
+    required this.content,
+    required this.contentHash,
+    required this.createdAt,
+    required this.author,
+    required this.changeReason,
+  });
+
+  factory DraftRevisionRecord.fromJson(Map<String, dynamic> json) => DraftRevisionRecord(
+        revisionId: json['revision_id'] as String? ?? '',
+        draftId: json['draft_id'] as String? ?? '',
+        revisionNumber: json['revision_number'] as int? ?? 0,
+        content: json['content'] as String? ?? '',
+        contentHash: json['content_hash'] as String? ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        author: json['author'] as String? ?? '',
+        changeReason: json['change_reason'] as String? ?? '',
+      );
+
+  final String revisionId;
+  final String draftId;
+  final int revisionNumber;
+  final String content;
+  final String contentHash;
+  final DateTime createdAt;
+  final String author;
+  final String changeReason;
+}
+
+class ApprovalRecord {
+  ApprovalRecord({
+    required this.approvalId,
+    required this.requestType,
+    required this.title,
+    required this.description,
+    required this.projectId,
+    required this.sourceTaskId,
+    required this.sourceDraftId,
+    required this.requestingSource,
+    required this.proposedAction,
+    required this.exactTargetDescription,
+    required this.writeBoundary,
+    required this.riskLevel,
+    required this.previewSummary,
+    required this.approvedContentHash,
+    required this.createdAt,
+    required this.expiryTimestamp,
+    required this.status,
+    required this.reviewer,
+    required this.decisionTimestamp,
+    required this.decisionReason,
+    required this.auditReferences,
+    required this.invalidationReason,
+    required this.version,
+  });
+
+  factory ApprovalRecord.fromJson(Map<String, dynamic> json) => ApprovalRecord(
+        approvalId: json['approval_id'] as String? ?? '',
+        requestType: json['request_type'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        projectId: json['project_id'] as String? ?? '',
+        sourceTaskId: json['source_task_id'] as String?,
+        sourceDraftId: json['source_draft_id'] as String?,
+        requestingSource: json['requesting_source'] as String? ?? '',
+        proposedAction: json['proposed_action'] as String? ?? '',
+        exactTargetDescription: json['exact_target_description'] as String? ?? '',
+        writeBoundary: json['write_boundary'] as String? ?? '',
+        riskLevel: json['risk_level'] as String? ?? '',
+        previewSummary: json['preview_summary'] as String? ?? '',
+        approvedContentHash: json['approved_content_hash'] as String? ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        expiryTimestamp: json['expiry_timestamp'] == null ? null : DateTime.parse(json['expiry_timestamp'] as String),
+        status: json['status'] as String? ?? '',
+        reviewer: json['reviewer'] as String?,
+        decisionTimestamp: json['decision_timestamp'] == null ? null : DateTime.parse(json['decision_timestamp'] as String),
+        decisionReason: json['decision_reason'] as String?,
+        auditReferences: _stringList(json['audit_references']),
+        invalidationReason: json['invalidation_reason'] as String?,
+        version: json['version'] as int? ?? 0,
+      );
+
+  final String approvalId;
+  final String requestType;
+  final String title;
+  final String description;
+  final String projectId;
+  final String? sourceTaskId;
+  final String? sourceDraftId;
+  final String requestingSource;
+  final String proposedAction;
+  final String exactTargetDescription;
+  final String writeBoundary;
+  final String riskLevel;
+  final String previewSummary;
+  final String approvedContentHash;
+  final DateTime createdAt;
+  final DateTime? expiryTimestamp;
+  final String status;
+  final String? reviewer;
+  final DateTime? decisionTimestamp;
+  final String? decisionReason;
+  final List<String> auditReferences;
+  final String? invalidationReason;
+  final int version;
+}
+
+class DailyBriefRecord {
+  DailyBriefRecord({
+    required this.briefId,
+    required this.projectId,
+    required this.title,
+    required this.createdAt,
+    required this.repositorySnapshotJson,
+    required this.verifiedFacts,
+    required this.inferences,
+    required this.recommendations,
+    required this.warnings,
+    required this.unknowns,
+    required this.markdown,
+    required this.sourceTaskIds,
+    required this.sourceApprovalIds,
+    required this.sourceRunIds,
+  });
+
+  factory DailyBriefRecord.fromJson(Map<String, dynamic> json) => DailyBriefRecord(
+        briefId: json['brief_id'] as String? ?? '',
+        projectId: json['project_id'] as String? ?? '',
+        title: json['title'] as String? ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        repositorySnapshotJson: (json['repository_snapshot_json'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{},
+        verifiedFacts: _stringList(json['verified_facts']),
+        inferences: _stringList(json['inferences']),
+        recommendations: _stringList(json['recommendations']),
+        warnings: _stringList(json['warnings']),
+        unknowns: _stringList(json['unknowns']),
+        markdown: json['markdown'] as String? ?? '',
+        sourceTaskIds: _stringList(json['source_task_ids']),
+        sourceApprovalIds: _stringList(json['source_approval_ids']),
+        sourceRunIds: _stringList(json['source_run_ids']),
+      );
+
+  final String briefId;
+  final String projectId;
+  final String title;
+  final DateTime createdAt;
+  final Map<String, dynamic> repositorySnapshotJson;
+  final List<String> verifiedFacts;
+  final List<String> inferences;
+  final List<String> recommendations;
+  final List<String> warnings;
+  final List<String> unknowns;
+  final String markdown;
+  final List<String> sourceTaskIds;
+  final List<String> sourceApprovalIds;
+  final List<String> sourceRunIds;
+}
+
 List<String> _stringList(dynamic value) {
   if (value is List) {
     return value.map((item) => item.toString()).toList();

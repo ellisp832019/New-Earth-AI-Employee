@@ -1,0 +1,91 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "GAIA: Debug FastAPI Backend",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": [
+        "gaia.api:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8765"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "GAIA: Debug CLI Doctor",
+      "type": "python",
+      "request": "launch",
+      "module": "gaia",
+      "args": [
+        "doctor"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "GAIA: Debug CLI Deterministic Question",
+      "type": "python",
+      "request": "launch",
+      "module": "gaia",
+      "args": [
+        "ask",
+        "microgrow-v1",
+        "Where exactly is MicroGrow currently?",
+        "--deterministic-only"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "GAIA: Debug Current Python Test File",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "${file}"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "GAIA: Debug Full Python Tests",
+      "type": "python",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "tests"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true
+    },
+    {
+      "name": "GAIA Windows: Debug Flutter Desktop",
+      "type": "dart",
+      "request": "launch",
+      "program": "lib/main.dart",
+      "cwd": "${workspaceFolder}/apps/gaia_windows",
+      "deviceId": "windows",
+      "args": []
+    }
+  ],
+  "compounds": [
+    {
+      "name": "GAIA: Debug Backend and Windows App",
+      "configurations": [
+        "GAIA: Debug FastAPI Backend",
+        "GAIA Windows: Debug Flutter Desktop"
+      ],
+      "stopAll": true
+    }
+  ]
+}

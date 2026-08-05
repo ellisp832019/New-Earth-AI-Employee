@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added controlled task, draft, approval and daily brief records for GAIA v0.4.
+- Added CLI, API, Flutter desktop and VS Code operator support for the v0.4 workflow foundation.
+- Added live read-only MicroGrow proof for the v0.4 workflow path.
+- Added v0.4 release, validation and pull-request documentation.
 - Added GitHub publication support and branching strategy.
 - Added v0.2 conversational scaffolding with mock and Ollama provider abstractions.
 - Added conversational ask, model status and agent-run storage support.

@@ -33,4 +33,16 @@ tmp/
 model-data/
 .ollama/
 !data/reports/.gitkeep
-.vscode/settings.json
+!.vscode/settings.json
+data/runtime/*
+data/tasks/*
+data/drafts/*
+data/approvals/*
+data/briefs/*
+data/integration/*
+!data/runtime/.gitkeep
+!data/tasks/.gitkeep
+!data/drafts/.gitkeep
+!data/approvals/.gitkeep
+!data/briefs/.gitkeep
+!data/integration/.gitkeep

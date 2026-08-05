@@ -1,0 +1,54 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.analysis.autoSearchPaths": true,
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}\\src"
+  ],
+  "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.cwd": "${workspaceFolder}",
+  "python.testing.pytestArgs": [
+    "tests"
+  ],
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "explicit"
+  },
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.eol": "\n",
+  "terminal.integrated.cwd": "${workspaceFolder}",
+  "search.exclude": {
+    "**/.dart_tool": true,
+    "**/build": true,
+    "**/.venv": true,
+    "**/data/logs": true,
+    "**/data/reports": true,
+    "**/data/approvals": true,
+    "**/data/drafts": true,
+    "**/data/tasks": true,
+    "**/data/briefs": true
+  },
+  "files.watcherExclude": {
+    "**/.dart_tool/**": true,
+    "**/build/**": true,
+    "**/.venv/**": true,
+    "**/data/logs/**": true,
+    "**/data/reports/**": true,
+    "**/data/approvals/**": true,
+    "**/data/drafts/**": true,
+    "**/data/tasks/**": true,
+    "**/data/briefs/**": true
+  },
+  "dart.flutterSdkPath": "C:\\flutter_dev\\flutter",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "redhat.vscode-yaml"
+  },
+  "[dart]": {
+    "editor.defaultFormatter": "Dart-Code.dart-code"
+  }
+}

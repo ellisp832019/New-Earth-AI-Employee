@@ -26,6 +26,11 @@ class _GaiaShellState extends State<GaiaShell> {
     _Destination('Snapshots', Icons.camera_alt_outlined, Icons.camera_alt),
     _Destination('Reports', Icons.description_outlined, Icons.description),
     _Destination('Agent Runs', Icons.timeline_outlined, Icons.timeline),
+    _Destination('Tasks', Icons.task_alt_outlined, Icons.task_alt),
+    _Destination('Drafts', Icons.note_alt_outlined, Icons.note_alt),
+    _Destination('Approvals', Icons.verified_outlined, Icons.verified),
+    _Destination('Daily Brief', Icons.event_note_outlined, Icons.event_note),
+    _Destination('VS Code Ops', Icons.code_outlined, Icons.code),
     _Destination('Audit', Icons.rule_folder_outlined, Icons.rule_folder),
     _Destination('Settings', Icons.settings_outlined, Icons.settings),
     _Destination('About', Icons.info_outline, Icons.info),
@@ -52,6 +57,11 @@ class _GaiaShellState extends State<GaiaShell> {
         SnapshotsScreen(controller: controller),
         ReportsScreen(controller: controller),
         AgentRunsScreen(controller: controller),
+        TasksScreen(controller: controller),
+        DraftsScreen(controller: controller),
+        ApprovalsScreen(controller: controller),
+        DailyBriefScreen(controller: controller),
+        VscodeOpsScreen(controller: controller),
         AuditScreen(controller: controller),
         SettingsScreen(controller: controller),
         AboutScreen(controller: controller),
@@ -294,7 +304,7 @@ class HomeScreen extends StatelessWidget {
       ...controller.backendLogs.takeLast(3),
       if (controller.lastError != null) controller.lastError!,
       if (controller.backendCompatibilityState == BackendCompatibilityState.incompatible)
-        'Backend version ${controller.health?.version ?? 'unknown'} is incompatible with the v0.3 desktop client.',
+        'Backend version ${controller.health?.version ?? 'unknown'} is incompatible with the v0.4 desktop client.',
     ].where((item) => item.trim().isNotEmpty).toList();
     if (warnings.isEmpty) {
       return const Text('No recent warnings.');
@@ -896,6 +906,639 @@ class _RunDetail extends StatelessWidget {
   }
 }
 
+class TasksScreen extends StatefulWidget {
+  const TasksScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<TasksScreen> createState() => _TasksScreenState();
+}
+
+class _TasksScreenState extends State<TasksScreen> {
+  String statusFilter = 'all';
+  String priorityFilter = 'all';
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final tasks = controller.tasks.where((task) {
+      final statusOk = statusFilter == 'all' || task.status == statusFilter;
+      final priorityOk = priorityFilter == 'all' || task.priority == priorityFilter;
+      return statusOk && priorityOk;
+    }).toList();
+    final selectedTask = controller.selectedTask ?? (tasks.isNotEmpty ? tasks.first : null);
+    if (selectedTask != null) {
+      controller.selectTask(selectedTask.taskId);
+    }
+    return _ScreenScaffold(
+      title: 'Task Centre',
+      subtitle: 'Proposals, backlog items and local task transitions',
+      child: Column(
+        children: [
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              _filterBox(
+                label: 'Status',
+                value: statusFilter,
+                values: const ['all', 'proposed', 'backlog', 'ready', 'in_progress', 'blocked', 'awaiting_approval', 'completed', 'cancelled'],
+                onChanged: (value) => setState(() => statusFilter = value ?? 'all'),
+              ),
+              _filterBox(
+                label: 'Priority',
+                value: priorityFilter,
+                values: const ['all', 'low', 'normal', 'high', 'critical'],
+                onChanged: (value) => setState(() => priorityFilter = value ?? 'all'),
+              ),
+              FilledButton(
+                onPressed: () => _createTask(context),
+                child: const Text('Create task'),
+              ),
+              OutlinedButton(
+                onPressed: controller.selectedTask == null
+                    ? null
+                    : () async {
+                        await controller.createTaskFromRun(controller.selectedTask!.sourceAgentRunId ?? controller.agentRuns.first.runId);
+                        if (mounted) {
+                          setState(() {});
+                        }
+                      },
+                child: const Text('Create from run'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: SectionCard(
+                    title: 'Tasks',
+                    child: ListView(
+                      children: [
+                        for (final task in tasks)
+                          Card(
+                            child: ListTile(
+                              selected: task.taskId == controller.selectedTaskId,
+                              onTap: () => controller.selectTask(task.taskId),
+                              title: Text(task.title),
+                              subtitle: Text('${task.projectId} • ${task.status} • ${task.priority}'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 3,
+                  child: SectionCard(
+                    title: 'Task Detail',
+                    subtitle: selectedTask?.taskId ?? 'No task selected',
+                    child: selectedTask == null ? const Text('Select a task to inspect it.') : _TaskDetail(controller: controller, task: selectedTask),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createTask(BuildContext context) async {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final criteriaController = TextEditingController();
+    String projectId = widget.controller.selectedProjectId ?? widget.controller.projects.first.projectId;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create task'),
+          content: StatefulBuilder(
+            builder: (context, setState) {
+              return SizedBox(
+                width: 520,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<String>(
+                      initialValue: projectId,
+                      items: [
+                        for (final project in widget.controller.projects)
+                          DropdownMenuItem(value: project.projectId, child: Text(project.name)),
+                      ],
+                      onChanged: (value) => setState(() => projectId = value ?? projectId),
+                      decoration: const InputDecoration(labelText: 'Project'),
+                    ),
+                    TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
+                    TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Description')),
+                    TextField(controller: criteriaController, decoration: const InputDecoration(labelText: 'Completion criteria')),
+                  ],
+                ),
+              );
+            },
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                await widget.controller.createTask(
+                  title: titleController.text.trim(),
+                  projectId: projectId,
+                  description: descriptionController.text.trim(),
+                  completionCriteria: criteriaController.text.trim(),
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+                if (mounted) {
+                  setState(() {});
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _TaskDetail extends StatelessWidget {
+  const _TaskDetail({required this.controller, required this.task});
+
+  final GaiaAppController controller;
+  final TaskRecord task;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _keyValueGrid([
+          ('Task ID', task.taskId),
+          ('Project', task.projectId),
+          ('Status', task.status),
+          ('Priority', task.priority),
+          ('Category', task.category),
+          ('Source', task.sourceType),
+          ('Version', task.version.toString()),
+        ]),
+        const SizedBox(height: 12),
+        Text(task.description.isEmpty ? 'No description.' : task.description),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton(onPressed: () => controller.acceptTask(task.taskId), child: const Text('Accept')),
+            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'ready'), child: const Text('Ready')),
+            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'in_progress'), child: const Text('In Progress')),
+            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'blocked', reason: 'blocked'), child: const Text('Blocked')),
+            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'awaiting_approval', reason: 'ready for review'), child: const Text('Awaiting approval')),
+            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'completed', completionEvidence: const ['manual verification'], manualOverrideReason: 'manual completion'), child: const Text('Complete')),
+            OutlinedButton(onPressed: () => controller.acceptTask(task.taskId), child: const Text('Backlog')),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text('Evidence: ${task.evidenceReferences.join(', ')}'),
+        Text('Dependencies: ${task.dependencyTaskIds.join(', ')}'),
+        Text('Tags: ${task.tags.join(', ')}'),
+      ],
+    );
+  }
+}
+
+class DraftsScreen extends StatefulWidget {
+  const DraftsScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<DraftsScreen> createState() => _DraftsScreenState();
+}
+
+class _DraftsScreenState extends State<DraftsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final selectedDraft = controller.selectedDraft ?? (controller.drafts.isNotEmpty ? controller.drafts.first : null);
+    if (selectedDraft != null) {
+      controller.selectDraft(selectedDraft.draftId);
+    }
+    return _ScreenScaffold(
+      title: 'Draft Centre',
+      subtitle: 'Local draft records and revisions',
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: SectionCard(
+              title: 'Drafts',
+              trailing: FilledButton(
+                onPressed: () => _createDraft(context),
+                child: const Text('Create draft'),
+              ),
+              child: ListView(
+                children: [
+                  for (final draft in controller.drafts)
+                    Card(
+                      child: ListTile(
+                        selected: draft.draftId == controller.selectedDraftId,
+                        onTap: () => controller.selectDraft(draft.draftId),
+                        title: Text(draft.title),
+                        subtitle: Text('${draft.projectId} • ${draft.draftType} • ${draft.status}'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: SectionCard(
+              title: 'Draft Detail',
+              subtitle: selectedDraft?.draftId ?? 'No draft selected',
+              child: selectedDraft == null ? const Text('Select a draft to review it.') : _DraftDetail(controller: controller, draft: selectedDraft),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createDraft(BuildContext context) async {
+    final titleController = TextEditingController();
+    final contentController = TextEditingController();
+    final taskController = TextEditingController();
+    String projectId = widget.controller.selectedProjectId ?? widget.controller.projects.first.projectId;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create draft'),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: projectId,
+                  items: [
+                    for (final project in widget.controller.projects)
+                      DropdownMenuItem(value: project.projectId, child: Text(project.name)),
+                  ],
+                  onChanged: (value) => projectId = value ?? projectId,
+                  decoration: const InputDecoration(labelText: 'Project'),
+                ),
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
+                TextField(controller: taskController, decoration: const InputDecoration(labelText: 'Source task ID')),
+                TextField(controller: contentController, maxLines: 4, decoration: const InputDecoration(labelText: 'Content')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                await widget.controller.createDraft(
+                  title: titleController.text.trim(),
+                  projectId: projectId,
+                  content: contentController.text,
+                  sourceTaskId: taskController.text.trim().isEmpty ? null : taskController.text.trim(),
+                  draftType: 'codex_prompt',
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+                if (mounted) {
+                  setState(() {});
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _DraftDetail extends StatelessWidget {
+  const _DraftDetail({required this.controller, required this.draft});
+
+  final GaiaAppController controller;
+  final DraftRecord draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final revisions = controller.drafts.where((entry) => entry.draftId == draft.draftId).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _keyValueGrid([
+          ('Draft ID', draft.draftId),
+          ('Project', draft.projectId),
+          ('Type', draft.draftType),
+          ('Status', draft.status),
+          ('Revision', draft.currentRevision.toString()),
+          ('Hash', draft.currentContentHash),
+        ]),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            CopyButton(text: draft.currentContentHash, label: 'Copy hash'),
+            const SizedBox(width: 8),
+            FilledButton(onPressed: () => controller.submitDraft(draft.draftId), child: const Text('Submit for review')),
+            const SizedBox(width: 8),
+            OutlinedButton(onPressed: () => controller.reviseDraft(draft.draftId, 'Revision based on local review.'), child: const Text('Revise')),
+          ],
+        ),
+        const SizedBox(height: 12),
+        MarkdownView(data: '### Current Draft\n\n```markdown\n${draft.currentContentHash}\n```'),
+        const SizedBox(height: 12),
+        Text('Evidence: ${draft.evidenceReferences.join(', ')}'),
+        Text('Warnings: ${draft.warnings.join(', ')}'),
+        Text('Revisions available in backend: ${revisions.length}'),
+      ],
+    );
+  }
+}
+
+class ApprovalsScreen extends StatefulWidget {
+  const ApprovalsScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<ApprovalsScreen> createState() => _ApprovalsScreenState();
+}
+
+class _ApprovalsScreenState extends State<ApprovalsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final selectedApproval = controller.selectedApproval ?? (controller.approvals.isNotEmpty ? controller.approvals.first : null);
+    if (selectedApproval != null) {
+      controller.selectApproval(selectedApproval.approvalId);
+    }
+    return _ScreenScaffold(
+      title: 'Approval Centre',
+      subtitle: 'Manual-use decisions and risk review',
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: SectionCard(
+              title: 'Approvals',
+              trailing: FilledButton(onPressed: () => _createApproval(context), child: const Text('Create approval')),
+              child: ListView(
+                children: [
+                  for (final approval in controller.approvals)
+                    Card(
+                      child: ListTile(
+                        selected: approval.approvalId == controller.selectedApprovalId,
+                        onTap: () => controller.selectApproval(approval.approvalId),
+                        title: Text(approval.title),
+                        subtitle: Text('${approval.projectId} • ${approval.riskLevel} • ${approval.status}'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: SectionCard(
+              title: 'Approval Detail',
+              subtitle: selectedApproval?.approvalId ?? 'No approval selected',
+              child: selectedApproval == null ? const Text('Select an approval to review it.') : _ApprovalDetail(controller: controller, approval: selectedApproval),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createApproval(BuildContext context) async {
+    final titleController = TextEditingController();
+    final summaryController = TextEditingController();
+    final draftController = TextEditingController();
+    final taskController = TextEditingController();
+    String projectId = widget.controller.selectedProjectId ?? widget.controller.projects.first.projectId;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create approval'),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: projectId,
+                  items: [for (final project in widget.controller.projects) DropdownMenuItem(value: project.projectId, child: Text(project.name))],
+                  onChanged: (value) => projectId = value ?? projectId,
+                  decoration: const InputDecoration(labelText: 'Project'),
+                ),
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
+                TextField(controller: draftController, decoration: const InputDecoration(labelText: 'Source draft ID')),
+                TextField(controller: taskController, decoration: const InputDecoration(labelText: 'Source task ID')),
+                TextField(controller: summaryController, decoration: const InputDecoration(labelText: 'Preview summary')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                await widget.controller.createApproval(
+                  title: titleController.text.trim(),
+                  projectId: projectId,
+                  sourceDraftId: draftController.text.trim().isEmpty ? null : draftController.text.trim(),
+                  sourceTaskId: taskController.text.trim().isEmpty ? null : taskController.text.trim(),
+                  previewSummary: summaryController.text.trim(),
+                  proposedAction: 'Manual use review',
+                  exactTargetDescription: 'GAIA draft and task review',
+                  riskLevel: 'medium',
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+                if (mounted) {
+                  setState(() {});
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ApprovalDetail extends StatelessWidget {
+  const _ApprovalDetail({required this.controller, required this.approval});
+
+  final GaiaAppController controller;
+  final ApprovalRecord approval;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _keyValueGrid([
+          ('Approval ID', approval.approvalId),
+          ('Project', approval.projectId),
+          ('Risk', approval.riskLevel),
+          ('Status', approval.status),
+          ('Preview', approval.previewSummary),
+          ('Hash', approval.approvedContentHash),
+        ]),
+        const SizedBox(height: 12),
+        Text(approval.description),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          children: [
+            FilledButton(
+              onPressed: () => controller.approveRequest(approval.approvalId, version: approval.version, reviewer: 'manual', decisionReason: 'Approved for manual use'),
+              child: const Text('Approve'),
+            ),
+            OutlinedButton(
+              onPressed: () => controller.rejectRequest(approval.approvalId, version: approval.version, reviewer: 'manual', decisionReason: 'Rejected'),
+              child: const Text('Reject'),
+            ),
+            OutlinedButton(
+              onPressed: () => controller.refreshApprovalValidation(approval.approvalId),
+              child: const Text('Refresh validation'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text('Write boundary: ${approval.writeBoundary}'),
+        Text('Requesting source: ${approval.requestingSource}'),
+        Text('Decision: ${approval.decisionReason ?? 'pending'}'),
+      ],
+    );
+  }
+}
+
+class DailyBriefScreen extends StatelessWidget {
+  const DailyBriefScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final brief = controller.selectedBrief ?? (controller.briefs.isNotEmpty ? controller.briefs.first : null);
+    if (brief != null) {
+      controller.selectBrief(brief.briefId);
+    }
+    return _ScreenScaffold(
+      title: 'Daily Operations Brief',
+      subtitle: 'Deterministic summary of tasks, approvals and repo state',
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FilledButton(
+              onPressed: controller.selectedProjectId == null ? null : () => controller.createDailyBrief(controller.selectedProjectId!),
+              child: const Text('Generate brief'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Expanded(
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: SectionCard(
+                    title: 'Briefs',
+                    child: ListView(
+                      children: [
+                        for (final item in controller.briefs)
+                          ListTile(
+                            selected: item.briefId == controller.selectedBriefId,
+                            onTap: () => controller.selectBrief(item.briefId),
+                            title: Text(item.title),
+                            subtitle: Text(item.projectId),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 3,
+                  child: SectionCard(
+                    title: 'Brief detail',
+                    subtitle: brief?.briefId ?? 'No brief selected',
+                    child: brief == null ? const Text('Generate a brief to review it here.') : MarkdownView(data: brief.markdown),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class VscodeOpsScreen extends StatelessWidget {
+  const VscodeOpsScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ScreenScaffold(
+      title: 'VS Code Operations',
+      subtitle: 'Workspace tasks and validation shortcuts',
+      child: ListView(
+        children: [
+          SectionCard(
+            title: 'Live tasks',
+            child: const Text(
+              'Use the GAIA workspace to run list/create/approve workflow commands, validation scripts and backend health checks from the repo root.',
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Recommended checks',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (final line in const [
+                  'GAIA: List Tasks',
+                  'GAIA: List Drafts',
+                  'GAIA: List Pending Approvals',
+                  'GAIA: Generate Daily Brief',
+                  'GAIA: Full Repository Validation',
+                  'GAIA: Complete v0.4 Validation',
+                  'GAIA: Release Readiness',
+                ])
+                  ListTile(leading: const Icon(Icons.checklist), title: Text(line)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class AuditScreen extends StatelessWidget {
   const AuditScreen({super.key, required this.controller});
 
@@ -1091,7 +1734,7 @@ class AboutScreen extends StatelessWidget {
       title: 'About',
       subtitle: 'Local-first, evidence-backed desktop control centre',
       child: SectionCard(
-        title: 'GAIA v0.3.0',
+        title: 'GAIA v0.4.0',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1104,7 +1747,7 @@ class AboutScreen extends StatelessWidget {
               ('Current project', controller.selectedProject?.projectId ?? 'None'),
             ]),
             const SizedBox(height: 12),
-            const Text('Future approval-centre functionality is intentionally not implemented in v0.3.'),
+            const Text('Approval, task and draft workflows are now local GAIA records rather than executions.'),
           ],
         ),
       ),
@@ -1304,6 +1947,25 @@ Widget _keyValueGrid(List<(String, String)> values) {
           ),
         ),
     ],
+  );
+}
+
+Widget _filterBox({
+  required String label,
+  required String value,
+  required List<String> values,
+  required ValueChanged<String?> onChanged,
+}) {
+  return SizedBox(
+    width: 220,
+    child: DropdownButtonFormField<String>(
+      initialValue: value,
+      items: [
+        for (final entry in values) DropdownMenuItem(value: entry, child: Text(entry)),
+      ],
+      onChanged: onChanged,
+      decoration: InputDecoration(labelText: label),
+    ),
   );
 }
 
