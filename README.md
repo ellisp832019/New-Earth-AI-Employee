@@ -1,6 +1,6 @@
 # New Earth AI Employee
 
-**GAIA v0.5 - Permissioned output workspace, receipts, rollback and integration contract**
+**GAIA v0.5.1 - Managed backend and Windows status hotfix**
 
 This repository is a local-first, read-only foundation for a controlled AI employee. Its first role is to inspect the external MicroGrow V1 repository, index approved text documents, capture Git state, produce deterministic evidence reports, and expose those capabilities through a CLI, FastAPI service, and a Windows desktop control centre.
 
@@ -14,10 +14,13 @@ GAIA v0.4 adds controlled task records, draft records, approval records, a deter
 
 GAIA v0.5 adds permission manifests, GAIA-owned output workspace enforcement, exact write previews, explicit user-triggered execution, execution receipts, backup and rollback records, a reusable integration client, and the GAIA v1 OpenAPI compatibility contract.
 
+GAIA v0.5.1 is a focused hotfix for managed backend ownership checks, safe start/stop behavior, stale PID-file handling, and UTF-8-safe Windows status output.
+
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
 Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).
 Release notes for v0.4 live under [docs/releases](docs/releases/GAIA_V0_4_0_RELEASE_NOTES.md).
 Release notes for v0.5 live under [docs/releases](docs/releases/GAIA_V0_5_0_RELEASE_NOTES.md).
+Release notes for v0.5.1 live under [docs/releases](docs/releases/GAIA_V0_5_1_RELEASE_NOTES.md).
 
 ## Repository relationship
 

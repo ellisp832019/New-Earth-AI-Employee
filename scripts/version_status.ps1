@@ -4,26 +4,41 @@ param()
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-$python = Join-Path $PWD ".venv\Scripts\python.exe"
+. "$PSScriptRoot\managed_backend_common.ps1"
+
+$repoRoot = $PWD.Path
+$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot
+$python = $paths.PythonExe
 if (-not (Test-Path $python)) {
     throw "Virtual environment missing. Run scripts\setup_windows.ps1 first."
 }
 
-$packageVersion = & $python -c "import gaia; print(gaia.__version__)"
-$flutterVersion = & flutter --version
-$branch = & git branch --show-current
-$sha = & git rev-parse HEAD
-$compatibility = "unreachable"
-try {
-    $health = Invoke-RestMethod -Uri "http://127.0.0.1:8000/health" -TimeoutSec 2
-    $compatibility = $health.version
-} catch {
-}
+$packageVersion = (& $python -c "import gaia; print(gaia.__version__)").Trim()
+$flutterMachine = (& flutter --version --machine | Out-String).Trim()
+$flutterInfo = $flutterMachine | ConvertFrom-Json
+$branch = (& git branch --show-current).Trim()
+$sha = (& git rev-parse HEAD).Trim()
+$expectedVersion = $packageVersion
+$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port 8000 -ExpectedBackendVersion $expectedVersion
+
+$flutterVersion = $flutterInfo.flutterVersion
+if (-not $flutterVersion) { $flutterVersion = $flutterInfo.frameworkVersion }
+$flutterChannel = $flutterInfo.flutterChannel
+if (-not $flutterChannel) { $flutterChannel = $flutterInfo.channel }
+$dartVersion = $flutterInfo.dartVersion
+if (-not $dartVersion) { $dartVersion = $flutterInfo.dartSdkVersion }
+$frameworkRevision = $flutterInfo.frameworkRevision
 
 [pscustomobject]@{
-    pythonPackageVersion = $packageVersion.Trim()
-    flutterVersion = ($flutterVersion | Select-Object -First 1).Trim()
-    gitBranch = $branch.Trim()
-    gitSha = $sha.Trim()
-    backendCompatibility = $compatibility
-} | Format-List
+    pythonPackageVersion = $packageVersion
+    flutterVersion = $flutterVersion
+    flutterChannel = $flutterChannel
+    dartVersion = $dartVersion
+    frameworkRevision = $frameworkRevision
+    gitBranch = $branch
+    gitSha = $sha
+    backendOwnershipState = $snapshot.State
+    backendCompatibility = $snapshot.BackendCompatibility
+    backendVersion = $snapshot.BackendVersion
+    backendManagedPid = $snapshot.ManagedPid
+} | ConvertTo-Json -Compress
