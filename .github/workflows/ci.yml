@@ -7,7 +7,6 @@ on:
   push:
     branches:
       - main
-      - gaia-v0.2-local-conversational-agent
   workflow_dispatch:
 
 permissions:
