@@ -5,6 +5,9 @@
 - Added GitHub publication support and branching strategy.
 - Added v0.2 conversational scaffolding with mock and Ollama provider abstractions.
 - Added conversational ask, model status and agent-run storage support.
+- Added a Windows desktop control centre with first-run setup, project dashboard, evidence, reports, snapshots, agent runs, audit history, and settings.
+- Added dedicated Flutter setup, run, test, build, and validation scripts for the Windows client.
+- Added v0.3 validation and Windows build proof documentation.
 
 ## v0.2.0
 
