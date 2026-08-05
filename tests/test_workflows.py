@@ -65,7 +65,7 @@ def test_database_migration_preserves_existing_data(tmp_path: Path):
 
     migrated = Database(old_db)
     try:
-        assert migrated.connection.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert migrated.connection.execute("PRAGMA user_version").fetchone()[0] == 5
         row = migrated.connection.execute("SELECT relative_path FROM documents").fetchone()
         assert row[0] == "README.md"
         migrated.connection.execute("SELECT count(*) FROM tasks").fetchone()

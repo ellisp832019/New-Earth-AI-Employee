@@ -10,7 +10,7 @@ from gaia.models import AuditEvent, DocumentRecord, RepositorySnapshot, SearchRe
 
 
 class Database:
-    SCHEMA_VERSION = 4
+    SCHEMA_VERSION = 5
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -164,7 +164,16 @@ class Database:
                 decision_reason TEXT,
                 audit_references_json TEXT NOT NULL,
                 invalidation_reason TEXT,
-                version INTEGER NOT NULL
+                version INTEGER NOT NULL,
+                action_id TEXT,
+                action_type TEXT,
+                manifest_id TEXT,
+                manifest_version INTEGER,
+                canonical_target TEXT,
+                previous_content_hash TEXT,
+                proposed_content_hash TEXT,
+                approval_binding_hash TEXT,
+                approval_scope TEXT
             );
             CREATE TABLE IF NOT EXISTS daily_briefs (
                 brief_id TEXT PRIMARY KEY,
@@ -182,6 +191,115 @@ class Database:
                 source_approval_ids_json TEXT NOT NULL,
                 source_run_ids_json TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS permission_manifests (
+                manifest_id TEXT PRIMARY KEY,
+                manifest_version INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                allowed_action_types_json TEXT NOT NULL,
+                allowed_target_roots_json TEXT NOT NULL,
+                allowed_file_extensions_json TEXT NOT NULL,
+                denied_path_patterns_json TEXT NOT NULL,
+                maximum_file_size INTEGER NOT NULL,
+                overwrite_policy TEXT NOT NULL,
+                backup_requirement INTEGER NOT NULL,
+                rollback_requirement INTEGER NOT NULL,
+                approval_requirement INTEGER NOT NULL,
+                risk_ceiling TEXT NOT NULL,
+                expiry_timestamp TEXT,
+                creation_source TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                enabled INTEGER NOT NULL,
+                reviewed_by TEXT,
+                reviewed_at TEXT,
+                review_notes TEXT
+            );
+            CREATE TABLE IF NOT EXISTS output_actions (
+                action_id TEXT PRIMARY KEY,
+                action_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                source_task_id TEXT,
+                source_draft_id TEXT,
+                source_draft_revision INTEGER,
+                source_approval_id TEXT,
+                manifest_id TEXT NOT NULL,
+                manifest_version INTEGER NOT NULL,
+                canonical_target TEXT NOT NULL,
+                proposed_content TEXT NOT NULL,
+                previous_content_hash TEXT,
+                proposed_content_hash TEXT NOT NULL,
+                preview TEXT NOT NULL,
+                diff TEXT NOT NULL,
+                risk TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expiry_timestamp TEXT,
+                execution_time TEXT,
+                execution_receipt_id TEXT,
+                approval_id TEXT,
+                approval_binding_hash TEXT,
+                approval_status TEXT,
+                approval_decision_timestamp TEXT,
+                approval_reviewer TEXT,
+                approval_reason TEXT,
+                denial_reason TEXT,
+                backup_path TEXT,
+                rollback_available INTEGER NOT NULL,
+                operator TEXT,
+                warnings_json TEXT NOT NULL,
+                result TEXT
+            );
+            CREATE TABLE IF NOT EXISTS action_previews (
+                preview_id TEXT PRIMARY KEY,
+                action_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                preview TEXT NOT NULL,
+                diff TEXT NOT NULL,
+                previous_content_hash TEXT,
+                proposed_content_hash TEXT NOT NULL,
+                target_path TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS execution_receipts (
+                receipt_id TEXT PRIMARY KEY,
+                action_id TEXT NOT NULL,
+                approval_id TEXT,
+                manifest_id TEXT NOT NULL,
+                manifest_version INTEGER NOT NULL,
+                source_draft_id TEXT,
+                source_draft_revision INTEGER,
+                target_path TEXT NOT NULL,
+                previous_hash TEXT,
+                resulting_hash TEXT NOT NULL,
+                backup_path TEXT,
+                timestamp TEXT NOT NULL,
+                operator TEXT NOT NULL,
+                result TEXT NOT NULL,
+                warnings_json TEXT NOT NULL,
+                rollback_available INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS output_backups (
+                backup_id TEXT PRIMARY KEY,
+                action_id TEXT NOT NULL,
+                target_path TEXT NOT NULL,
+                backup_path TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                verified INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS rollback_records (
+                rollback_id TEXT PRIMARY KEY,
+                action_id TEXT NOT NULL,
+                receipt_id TEXT,
+                target_path TEXT NOT NULL,
+                backup_path TEXT NOT NULL,
+                previous_hash TEXT,
+                resulting_hash TEXT,
+                created_at TEXT NOT NULL,
+                executed_at TEXT,
+                status TEXT NOT NULL,
+                reason TEXT
+            );
             """
         )
         try:
@@ -191,9 +309,32 @@ class Database:
             self.fts5_available = True
         except sqlite3.OperationalError:
             self.fts5_available = False
+        self._ensure_columns(
+            "approvals",
+            {
+                "action_id": "TEXT",
+                "action_type": "TEXT",
+                "manifest_id": "TEXT",
+                "manifest_version": "INTEGER",
+                "canonical_target": "TEXT",
+                "previous_content_hash": "TEXT",
+                "proposed_content_hash": "TEXT",
+                "approval_binding_hash": "TEXT",
+                "approval_scope": "TEXT",
+            },
+        )
         self.connection.commit()
         self.connection.execute(f"PRAGMA user_version = {self.SCHEMA_VERSION}")
         self.connection.commit()
+
+    def _ensure_columns(self, table: str, columns: dict[str, str]) -> None:
+        existing = {
+            str(row["name"])
+            for row in self.connection.execute(f"PRAGMA table_info({table})").fetchall()
+        }
+        for name, type_name in columns.items():
+            if name not in existing:
+                self.connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {type_name}")
 
     def replace_documents(self, project_id: str, records: Iterable[DocumentRecord]) -> None:
         records = list(records)

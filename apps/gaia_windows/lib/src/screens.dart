@@ -29,6 +29,9 @@ class _GaiaShellState extends State<GaiaShell> {
     _Destination('Tasks', Icons.task_alt_outlined, Icons.task_alt),
     _Destination('Drafts', Icons.note_alt_outlined, Icons.note_alt),
     _Destination('Approvals', Icons.verified_outlined, Icons.verified),
+    _Destination('Permissions', Icons.shield_outlined, Icons.shield),
+    _Destination('Action Centre', Icons.play_circle_outline, Icons.play_circle),
+    _Destination('Receipts', Icons.receipt_long_outlined, Icons.receipt_long),
     _Destination('Daily Brief', Icons.event_note_outlined, Icons.event_note),
     _Destination('VS Code Ops', Icons.code_outlined, Icons.code),
     _Destination('Audit', Icons.rule_folder_outlined, Icons.rule_folder),
@@ -60,6 +63,9 @@ class _GaiaShellState extends State<GaiaShell> {
         TasksScreen(controller: controller),
         DraftsScreen(controller: controller),
         ApprovalsScreen(controller: controller),
+        PermissionsScreen(controller: controller),
+        ActionsScreen(controller: controller),
+        ReceiptsScreen(controller: controller),
         DailyBriefScreen(controller: controller),
         VscodeOpsScreen(controller: controller),
         AuditScreen(controller: controller),
@@ -153,6 +159,21 @@ class _GlobalStatus extends StatelessWidget {
           label: 'Read-only',
           color: Colors.blue,
           icon: Icons.lock,
+        ),
+        const StatusChip(
+          label: 'GAIA-owned output only',
+          color: Colors.deepOrange,
+          icon: Icons.folder_special,
+        ),
+        const StatusChip(
+          label: 'MicroGrow read-only',
+          color: Colors.teal,
+          icon: Icons.visibility,
+        ),
+        const StatusChip(
+          label: 'No auto Git',
+          color: Colors.indigo,
+          icon: Icons.do_not_disturb,
         ),
         if (selectedProject != null)
           StatusChip(
@@ -304,7 +325,7 @@ class HomeScreen extends StatelessWidget {
       ...controller.backendLogs.takeLast(3),
       if (controller.lastError != null) controller.lastError!,
       if (controller.backendCompatibilityState == BackendCompatibilityState.incompatible)
-        'Backend version ${controller.health?.version ?? 'unknown'} is incompatible with the v0.4 desktop client.',
+        'Backend version ${controller.health?.version ?? 'unknown'} is incompatible with the v0.5 desktop client.',
     ].where((item) => item.trim().isNotEmpty).toList();
     if (warnings.isEmpty) {
       return const Text('No recent warnings.');
@@ -1734,11 +1755,11 @@ class AboutScreen extends StatelessWidget {
       title: 'About',
       subtitle: 'Local-first, evidence-backed desktop control centre',
       child: SectionCard(
-        title: 'GAIA v0.4.0',
+        title: 'GAIA v0.5.0',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('GAIA Windows is a read-only client for the existing FastAPI backend.'),
+            const Text('GAIA Windows is the desktop control centre for the permissioned GAIA backend.'),
             const SizedBox(height: 12),
             _keyValueGrid([
               ('Backend', controller.settings.backendUrl),
@@ -1747,9 +1768,419 @@ class AboutScreen extends StatelessWidget {
               ('Current project', controller.selectedProject?.projectId ?? 'None'),
             ]),
             const SizedBox(height: 12),
-            const Text('Approval, task and draft workflows are now local GAIA records rather than executions.'),
+            const Text('Approval, task, draft and output-execution workflows are tracked locally and require explicit confirmation.'),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class PermissionsScreen extends StatefulWidget {
+  const PermissionsScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<PermissionsScreen> createState() => _PermissionsScreenState();
+}
+
+class _PermissionsScreenState extends State<PermissionsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final selected = controller.permissionManifests.isNotEmpty
+        ? controller.permissionManifests.firstWhere(
+            (entry) => entry['manifest_id'] == controller.selectedManifestId,
+            orElse: () => controller.permissionManifests.first,
+          )
+        : null;
+    if (selected != null) {
+      controller.selectManifest(selected['manifest_id'] as String?);
+    }
+    return _ScreenScaffold(
+      title: 'Permissions',
+      subtitle: 'Permission manifests and allowlisted GAIA-owned output roots',
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: SectionCard(
+              title: 'Manifests',
+              trailing: FilledButton(
+                onPressed: () => _createManifest(context),
+                child: const Text('Create manifest'),
+              ),
+              child: ListView(
+                children: [
+                  for (final manifest in controller.permissionManifests)
+                    Card(
+                      child: ListTile(
+                        selected: manifest['manifest_id'] == controller.selectedManifestId,
+                        onTap: () => controller.selectManifest(manifest['manifest_id'] as String?),
+                        title: Text(manifest['name']?.toString() ?? 'Unnamed manifest'),
+                        subtitle: Text(
+                          '${manifest['manifest_id']} • ${manifest['enabled'] == true ? 'enabled' : 'disabled'} • ${manifest['overwrite_policy'] ?? 'deny'}',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: SectionCard(
+              title: 'Manifest Detail',
+              subtitle: selected?['manifest_id']?.toString() ?? 'No manifest selected',
+              child: selected == null
+                  ? const Text('Create or select a manifest to inspect it.')
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _keyValueGrid([
+                          ('Manifest ID', selected['manifest_id']?.toString() ?? ''),
+                          ('Version', selected['manifest_version']?.toString() ?? ''),
+                          ('Enabled', selected['enabled'] == true ? 'Yes' : 'No'),
+                          ('Risk ceiling', selected['risk_ceiling']?.toString() ?? ''),
+                          ('Overwrite policy', selected['overwrite_policy']?.toString() ?? ''),
+                        ]),
+                        const SizedBox(height: 12),
+                        Text('Allowed roots: ${(selected['allowed_target_roots'] as List?)?.join(', ') ?? ''}'),
+                        Text('Allowed actions: ${(selected['allowed_action_types'] as List?)?.join(', ') ?? ''}'),
+                        Text('Allowed extensions: ${(selected['allowed_file_extensions'] as List?)?.join(', ') ?? ''}'),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            FilledButton(
+                              onPressed: () async {
+                                final result = await controller.validatePermissionManifest(selected['manifest_id'] as String);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(result['valid'] == true ? 'Manifest valid' : 'Manifest has issues')),
+                                  );
+                                }
+                              },
+                              child: const Text('Validate'),
+                            ),
+                            OutlinedButton(
+                              onPressed: () => controller.reviewPermissionManifest(
+                                selected['manifest_id'] as String,
+                                version: selected['manifest_version'] as int? ?? 1,
+                                enabled: !(selected['enabled'] as bool? ?? false),
+                                reviewNotes: 'Manual review from Control Centre',
+                              ),
+                              child: Text(selected['enabled'] == true ? 'Disable' : 'Enable'),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createManifest(BuildContext context) async {
+    final nameController = TextEditingController(text: 'Approved outputs');
+    final rootController = TextEditingController(text: 'workspace/approved_outputs');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create permission manifest'),
+          content: SizedBox(
+            width: 480,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
+                TextField(controller: rootController, decoration: const InputDecoration(labelText: 'Allowed root')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                await widget.controller.createPermissionManifest(
+                  name: nameController.text.trim(),
+                  allowedActionTypes: const <String>['create_output_file', 'update_output_file', 'rollback_output_file'],
+                  allowedTargetRoots: <String>[rootController.text.trim()],
+                  allowedFileExtensions: const <String>['.md', '.txt'],
+                  enabled: false,
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class ActionsScreen extends StatefulWidget {
+  const ActionsScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<ActionsScreen> createState() => _ActionsScreenState();
+}
+
+class _ActionsScreenState extends State<ActionsScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final selected = controller.outputActions.isNotEmpty
+        ? controller.outputActions.firstWhere(
+            (entry) => entry['action_id'] == controller.selectedActionId,
+            orElse: () => controller.outputActions.first,
+          )
+        : null;
+    if (selected != null) {
+      controller.selectAction(selected['action_id'] as String?);
+    }
+    final selectedDetail = controller.selectedActionDetail ?? selected;
+    return _ScreenScaffold(
+      title: 'Action Centre',
+      subtitle: 'Proposed actions, exact targets, hashes, approvals and receipts',
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: SectionCard(
+              title: 'Actions',
+              trailing: FilledButton(
+                onPressed: () => _createAction(context),
+                child: const Text('Create action'),
+              ),
+              child: ListView(
+                children: [
+                  for (final action in controller.outputActions)
+                    Card(
+                      child: ListTile(
+                        selected: action['action_id'] == controller.selectedActionId,
+                        onTap: () => controller.selectAction(action['action_id'] as String?),
+                        title: Text(action['title']?.toString() ?? 'Untitled action'),
+                        subtitle: Text(
+                          '${action['action_type'] ?? ''} • ${action['status'] ?? ''} • ${action['risk'] ?? ''}',
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: SectionCard(
+              title: 'Action Detail',
+              subtitle: selectedDetail?['action_id']?.toString() ?? 'No action selected',
+              child: selectedDetail == null
+                  ? const Text('Create or select an action to review it.')
+                  : ListView(
+                      children: [
+                        _keyValueGrid([
+                          ('Action ID', selectedDetail['action_id']?.toString() ?? ''),
+                          ('Type', selectedDetail['action_type']?.toString() ?? ''),
+                          ('Status', selectedDetail['status']?.toString() ?? ''),
+                          ('Risk', selectedDetail['risk']?.toString() ?? ''),
+                          ('Manifest', selectedDetail['manifest_id']?.toString() ?? ''),
+                          ('Target', selectedDetail['canonical_target']?.toString() ?? ''),
+                          ('Proposed hash', selectedDetail['proposed_content_hash']?.toString() ?? ''),
+                          ('Previous hash', selectedDetail['previous_content_hash']?.toString() ?? 'None'),
+                          ('Receipt', selectedDetail['execution_receipt_id']?.toString() ?? 'None'),
+                        ]),
+                        const SizedBox(height: 12),
+                        Text('Preview'),
+                        SelectableText(selectedDetail['preview']?.toString() ?? ''),
+                        const SizedBox(height: 12),
+                        Text('Diff'),
+                        SelectableText(selectedDetail['diff']?.toString() ?? ''),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            FilledButton(
+                              onPressed: () => controller.requestActionApproval(selectedDetail['action_id'] as String),
+                              child: const Text('Request approval'),
+                            ),
+                            OutlinedButton(
+                              onPressed: () => controller.approveAction(selectedDetail['action_id'] as String),
+                              child: const Text('Approve'),
+                            ),
+                            OutlinedButton(
+                              onPressed: () => controller.executeAction(selectedDetail['action_id'] as String, confirm: true, operator: 'manual'),
+                              child: const Text('Execute'),
+                            ),
+                            OutlinedButton(
+                              onPressed: () => controller.rollbackAction(selectedDetail['action_id'] as String, confirm: true, operator: 'manual'),
+                              child: const Text('Rollback'),
+                            ),
+                            OutlinedButton(
+                              onPressed: () => controller.cancelAction(selectedDetail['action_id'] as String),
+                              child: const Text('Cancel'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text('Approval binding: ${selectedDetail['approval_binding_hash'] ?? 'None'}'),
+                        Text('Approval status: ${selectedDetail['approval_status'] ?? 'None'}'),
+                        Text('Backup path: ${selectedDetail['backup_path'] ?? 'None'}'),
+                        Text('Selected previews: ${controller.selectedActionPreviews.length}'),
+                        for (final preview in controller.selectedActionPreviews)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Card(
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(preview['target_path']?.toString() ?? ''),
+                                    const SizedBox(height: 8),
+                                    SelectableText(preview['preview']?.toString() ?? ''),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _createAction(BuildContext context) async {
+    final titleController = TextEditingController(text: 'Export approved output');
+    final contentController = TextEditingController(text: 'Hello from GAIA v0.5');
+    final targetController = TextEditingController(text: 'workspace/approved_outputs/demo.md');
+    String manifestId = widget.controller.selectedManifestId ?? (widget.controller.permissionManifests.isNotEmpty ? widget.controller.permissionManifests.first['manifest_id'] as String : '');
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Create action'),
+          content: SizedBox(
+            width: 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  initialValue: manifestId.isEmpty ? null : manifestId,
+                  items: [
+                    for (final manifest in widget.controller.permissionManifests)
+                      DropdownMenuItem(value: manifest['manifest_id'] as String?, child: Text(manifest['name']?.toString() ?? 'Manifest')),
+                  ],
+                  onChanged: (value) => manifestId = value ?? manifestId,
+                  decoration: const InputDecoration(labelText: 'Manifest'),
+                ),
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
+                TextField(controller: targetController, decoration: const InputDecoration(labelText: 'Target path')),
+                TextField(controller: contentController, maxLines: 4, decoration: const InputDecoration(labelText: 'Content')),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () async {
+                await widget.controller.createOutputAction(
+                  title: titleController.text.trim(),
+                  projectId: widget.controller.selectedProjectId ?? 'sample',
+                  manifestId: manifestId,
+                  targetPath: targetController.text.trim(),
+                  actionType: 'create_output_file',
+                  content: contentController.text,
+                );
+                if (dialogContext.mounted) {
+                  Navigator.pop(dialogContext);
+                }
+              },
+              child: const Text('Create'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class ReceiptsScreen extends StatelessWidget {
+  const ReceiptsScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = controller.executionReceipts.isNotEmpty
+        ? controller.executionReceipts.firstWhere(
+            (entry) => entry['receipt_id'] == controller.selectedReceiptId,
+            orElse: () => controller.executionReceipts.first,
+          )
+        : null;
+    if (selected != null) {
+      controller.selectReceipt(selected['receipt_id'] as String?);
+    }
+    return _ScreenScaffold(
+      title: 'Receipts',
+      subtitle: 'Execution receipts and rollback records',
+      child: Row(
+        children: [
+          Expanded(
+            flex: 2,
+            child: SectionCard(
+              title: 'Receipts',
+              child: ListView(
+                children: [
+                  for (final receipt in controller.executionReceipts)
+                    Card(
+                      child: ListTile(
+                        selected: receipt['receipt_id'] == controller.selectedReceiptId,
+                        onTap: () => controller.selectReceipt(receipt['receipt_id'] as String?),
+                        title: Text(receipt['receipt_id']?.toString() ?? 'Receipt'),
+                        subtitle: Text('${receipt['action_id'] ?? ''} • ${receipt['result'] ?? ''}'),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            flex: 3,
+            child: SectionCard(
+              title: 'Receipt Detail',
+              subtitle: selected?['receipt_id']?.toString() ?? 'No receipt selected',
+              child: selected == null
+                  ? const Text('Select a receipt to inspect it.')
+                  : _keyValueGrid([
+                      ('Receipt ID', selected['receipt_id']?.toString() ?? ''),
+                      ('Action ID', selected['action_id']?.toString() ?? ''),
+                      ('Manifest', selected['manifest_id']?.toString() ?? ''),
+                      ('Target', selected['target_path']?.toString() ?? ''),
+                      ('Previous hash', selected['previous_hash']?.toString() ?? 'None'),
+                      ('Resulting hash', selected['resulting_hash']?.toString() ?? ''),
+                      ('Backup path', selected['backup_path']?.toString() ?? 'None'),
+                      ('Rollback available', selected['rollback_available'] == true ? 'Yes' : 'No'),
+                    ]),
+            ),
+          ),
+        ],
       ),
     );
   }

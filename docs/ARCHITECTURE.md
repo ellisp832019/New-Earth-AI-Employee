@@ -1,38 +1,30 @@
 # Architecture
 
-## Purpose
+GAIA is a local-first AI employee foundation built around strict evidence, safety, and approval boundaries.
 
-GAIA separates deterministic evidence collection from later probabilistic AI reasoning.
+## Layers
 
-```text
-CLI / FastAPI
-      |
-ProjectService
-  |       |        |
-Git     Scanner   Reports
-  |       |
-Read-only external project
-      |
-SQLite catalogue, FTS index, snapshots and audit events
-```
+- Python backend for project inspection, workflows, approvals, and output execution.
+- FastAPI service for structured local API access.
+- Typer CLI for operator workflows.
+- Flutter Windows desktop client for visual control.
+- Shared Dart integration client for dashboard-style consumption.
 
-## Components
+## v0.5 Output Workspace
 
-- `config.py`: loads project and runtime configuration.
-- `security.py`: canonical path and filename policy.
-- `git_inspector.py`: fixed read-only Git operations.
-- `scanner.py`: defensive text discovery, hashing and decoding.
-- `db.py`: SQLite schema, search, snapshots and audit storage.
-- `service.py`: orchestrates safe workflows and integrity checks.
-- `reports.py`: deterministic Markdown and JSON reports.
-- `api.py`: local HTTP interface.
-- `cli.py`: Windows-friendly command interface.
+- Permission manifests define what an action may do.
+- Actions hold the exact proposed write.
+- Approvals bind a reviewer decision to a specific action and manifest version.
+- Execution receipts capture the final result.
+- Backup and rollback records preserve recovery paths.
 
-## Design rules
+## Security Shape
 
-1. A model never receives arbitrary file or shell access.
-2. Evidence collection works without a model.
-3. Project roots and extensions are explicitly registered.
-4. Scans compare Git state before and after.
-5. Consequential actions remain absent in v0.1.
-6. Later AI providers must call these narrow services rather than bypass them.
+- Default deny for writes.
+- Canonical path checks against a GAIA-owned workspace.
+- No automatic Git commit or push behavior.
+- Explicit user confirmation before execution.
+
+## External Contract
+
+The stable integration surface is `gaia-v1`, exported via OpenAPI and mirrored in the reusable Dart client.
