@@ -46,9 +46,17 @@ class GaiaAppController extends ChangeNotifier {
   List<SearchResult> searchResults = <SearchResult>[];
   List<AgentRunRecord> agentRuns = <AgentRunRecord>[];
   List<AuditEvent> auditEvents = <AuditEvent>[];
+  List<TaskRecord> tasks = <TaskRecord>[];
+  List<DraftRecord> drafts = <DraftRecord>[];
+  List<ApprovalRecord> approvals = <ApprovalRecord>[];
+  List<DailyBriefRecord> briefs = <DailyBriefRecord>[];
   AskResponse? lastAskResponse;
   Map<String, String> reports = <String, String>{};
   String? selectedProjectId;
+  String? selectedTaskId;
+  String? selectedDraftId;
+  String? selectedApprovalId;
+  String? selectedBriefId;
   List<FirstRunCheck> firstRunChecks = <FirstRunCheck>[];
   final List<String> backendLogs = <String>[];
   http.Client? _activeAskClient;
@@ -97,6 +105,7 @@ class GaiaAppController extends ChangeNotifier {
         refreshModels(),
         refreshRuns(),
         refreshAuditEvents(),
+        refreshWorkflowRecords(),
       ]);
       if (selectedProjectId == null && projects.isNotEmpty) {
         selectedProjectId = projects.first.projectId;
@@ -122,7 +131,7 @@ class GaiaAppController extends ChangeNotifier {
       backendState = BackendConnectionState.connected;
       backendCompatibilityState = _compatibilityFromVersion(health!.version);
       if (backendCompatibilityState == BackendCompatibilityState.incompatible) {
-        lastError = 'Backend version ${health!.version} is incompatible with the v0.3 desktop client.';
+        lastError = 'Backend version ${health!.version} is incompatible with the v0.4 desktop client.';
       } else {
         lastError = null;
       }
@@ -226,6 +235,35 @@ class GaiaAppController extends ChangeNotifier {
     } catch (_) {
       searchResults = <SearchResult>[];
     }
+    await refreshWorkflowRecords(projectId: projectId);
+    notifyListeners();
+  }
+
+  Future<void> refreshWorkflowRecords({String? projectId}) async {
+    try {
+      tasks = await _client.listTasks(projectId: projectId ?? selectedProjectId, limit: 100);
+    } catch (_) {
+      tasks = <TaskRecord>[];
+    }
+    try {
+      drafts = await _client.listDrafts(projectId: projectId ?? selectedProjectId, limit: 100);
+    } catch (_) {
+      drafts = <DraftRecord>[];
+    }
+    try {
+      approvals = await _client.listApprovals(projectId: projectId ?? selectedProjectId, limit: 100);
+    } catch (_) {
+      approvals = <ApprovalRecord>[];
+    }
+    try {
+      briefs = await _client.listBriefs(projectId: projectId ?? selectedProjectId, limit: 50);
+    } catch (_) {
+      briefs = <DailyBriefRecord>[];
+    }
+    selectedTaskId ??= tasks.isEmpty ? null : tasks.first.taskId;
+    selectedDraftId ??= drafts.isEmpty ? null : drafts.first.draftId;
+    selectedApprovalId ??= approvals.isEmpty ? null : approvals.first.approvalId;
+    selectedBriefId ??= briefs.isEmpty ? null : briefs.first.briefId;
     notifyListeners();
   }
 
@@ -263,6 +301,190 @@ class GaiaAppController extends ChangeNotifier {
     await _client.scanProject(projectId);
     await refreshSelectedProject(projectId);
     await refreshRuns();
+  }
+
+  Future<void> createDailyBrief(String projectId) async {
+    await _client.createDailyBrief(projectId);
+    await refreshWorkflowRecords(projectId: projectId);
+  }
+
+  Future<void> createTaskFromRun(String runId) async {
+    await _client.createTaskFromRun(runId);
+    await refreshWorkflowRecords();
+  }
+
+  Future<void> acceptTask(String taskId) async {
+    await _client.acceptTask(taskId);
+    await refreshWorkflowRecords();
+  }
+
+  Future<void> transitionTask(String taskId, String status, {String? reason, List<String>? completionEvidence, String? manualOverrideReason, String actor = 'manual'}) async {
+    final task = tasks.firstWhere((entry) => entry.taskId == taskId);
+    await _client.transitionTask(
+      taskId,
+      <String, dynamic>{
+        'version': task.version,
+        'status': status,
+        'reason': reason,
+        'completion_evidence': completionEvidence,
+        'manual_override_reason': manualOverrideReason,
+        'actor': actor,
+      }..removeWhere((key, value) => value == null),
+    );
+    await refreshWorkflowRecords();
+  }
+
+  Future<void> createTask({
+    required String title,
+    required String projectId,
+    String description = '',
+    String priority = 'normal',
+    String category = 'general',
+    String sourceType = 'manual',
+    String? sourceIdentifier,
+    String? sourceAgentRunId,
+    List<String> evidenceReferences = const <String>[],
+    List<String> dependencyTaskIds = const <String>[],
+    String? blockerDescription,
+    String? assignedTo,
+    String completionCriteria = '',
+    bool approvalRequirement = false,
+    List<String> tags = const <String>[],
+  }) async {
+    await _client.createTask(<String, dynamic>{
+      'title': title,
+      'project_id': projectId,
+      'description': description,
+      'priority': priority,
+      'category': category,
+      'source_type': sourceType,
+      'source_identifier': sourceIdentifier,
+      'source_agent_run_id': sourceAgentRunId,
+      'evidence_references': evidenceReferences,
+      'dependency_task_ids': dependencyTaskIds,
+      'blocker_description': blockerDescription,
+      'assigned_to': assignedTo,
+      'completion_criteria': completionCriteria,
+      'approval_requirement': approvalRequirement,
+      'tags': tags,
+    }..removeWhere((key, value) => value == null));
+    await refreshWorkflowRecords(projectId: projectId);
+  }
+
+  Future<void> createDraft({
+    required String title,
+    required String projectId,
+    String draftType = 'generic_markdown',
+    String content = '',
+    String? sourceTaskId,
+    String? sourceAgentRunId,
+    bool approvalRequirement = false,
+  }) async {
+    await _client.createDraft(<String, dynamic>{
+      'title': title,
+      'draft_type': draftType,
+      'project_id': projectId,
+      'content': content,
+      'source_task_id': sourceTaskId,
+      'source_agent_run_id': sourceAgentRunId,
+      'approval_requirement': approvalRequirement,
+    }..removeWhere((key, value) => value == null));
+    await refreshWorkflowRecords(projectId: projectId);
+  }
+
+  Future<void> reviseDraft(String draftId, String content, {String? author, String? changeReason}) async {
+    final draft = drafts.firstWhere((entry) => entry.draftId == draftId);
+    await _client.reviseDraft(
+      draftId,
+      <String, dynamic>{
+        'version': draft.currentRevision,
+        'content': content,
+        'author': author ?? 'manual',
+        'change_reason': changeReason ?? 'revision',
+      },
+    );
+    await refreshWorkflowRecords(projectId: draft.projectId);
+  }
+
+  Future<void> createApproval({
+    required String title,
+    required String projectId,
+    String description = '',
+    String requestType = 'manual',
+    String? sourceTaskId,
+    String? sourceDraftId,
+    String requestingSource = 'manual',
+    String proposedAction = '',
+    String exactTargetDescription = '',
+    String writeBoundary = 'gaia-local',
+    String riskLevel = 'low',
+    String previewSummary = '',
+    String approvedContentHash = '',
+  }) async {
+    await _client.createApproval(<String, dynamic>{
+      'title': title,
+      'project_id': projectId,
+      'description': description,
+      'request_type': requestType,
+      'source_task_id': sourceTaskId,
+      'source_draft_id': sourceDraftId,
+      'requesting_source': requestingSource,
+      'proposed_action': proposedAction,
+      'exact_target_description': exactTargetDescription,
+      'write_boundary': writeBoundary,
+      'risk_level': riskLevel,
+      'preview_summary': previewSummary,
+      'approved_content_hash': approvedContentHash,
+    }..removeWhere((key, value) => value == null));
+    await refreshWorkflowRecords(projectId: projectId);
+  }
+
+  Future<void> submitDraft(String draftId) async {
+    await _client.submitDraft(draftId);
+    await refreshWorkflowRecords();
+  }
+
+  Future<void> approveRequest(String approvalId, {required int version, String reviewer = 'manual', String decisionReason = 'approved for manual use'}) async {
+    await _client.approveApproval(approvalId, <String, dynamic>{'version': version, 'reviewer': reviewer, 'decision_reason': decisionReason});
+    await refreshWorkflowRecords();
+  }
+
+  Future<void> rejectRequest(String approvalId, {required int version, String reviewer = 'manual', String decisionReason = 'rejected'}) async {
+    await _client.rejectApproval(approvalId, <String, dynamic>{'version': version, 'reviewer': reviewer, 'decision_reason': decisionReason});
+    await refreshWorkflowRecords();
+  }
+
+  Future<void> refreshApprovalValidation(String approvalId) async {
+    await _client.refreshApprovalValidation(approvalId);
+    await refreshWorkflowRecords();
+  }
+
+  Future<void> createApprovalFromDraft({
+    required String title,
+    required String projectId,
+    required String sourceDraftId,
+    String description = '',
+    String requestingSource = 'manual',
+    String proposedAction = 'Manual use review',
+    String exactTargetDescription = 'GAIA draft and task review',
+    String writeBoundary = 'gaia-local',
+    String riskLevel = 'medium',
+    String previewSummary = '',
+  }) async {
+    final draft = drafts.firstWhere((entry) => entry.draftId == sourceDraftId);
+    await createApproval(
+      title: title,
+      projectId: projectId,
+      description: description,
+      sourceDraftId: sourceDraftId,
+      requestingSource: requestingSource,
+      proposedAction: proposedAction,
+      exactTargetDescription: exactTargetDescription,
+      writeBoundary: writeBoundary,
+      riskLevel: riskLevel,
+      previewSummary: previewSummary,
+      approvedContentHash: draft.currentContentHash,
+    );
   }
 
   Future<void> askGaia({
@@ -419,11 +641,91 @@ class GaiaAppController extends ChangeNotifier {
     return null;
   }
 
+  TaskRecord? get selectedTask {
+    if (selectedTaskId == null) {
+      return null;
+    }
+    for (final task in tasks) {
+      if (task.taskId == selectedTaskId) {
+        return task;
+      }
+    }
+    return null;
+  }
+
+  DraftRecord? get selectedDraft {
+    if (selectedDraftId == null) {
+      return null;
+    }
+    for (final draft in drafts) {
+      if (draft.draftId == selectedDraftId) {
+        return draft;
+      }
+    }
+    return null;
+  }
+
+  ApprovalRecord? get selectedApproval {
+    if (selectedApprovalId == null) {
+      return null;
+    }
+    for (final approval in approvals) {
+      if (approval.approvalId == selectedApprovalId) {
+        return approval;
+      }
+    }
+    return null;
+  }
+
+  DailyBriefRecord? get selectedBrief {
+    if (selectedBriefId == null) {
+      return null;
+    }
+    for (final brief in briefs) {
+      if (brief.briefId == selectedBriefId) {
+        return brief;
+      }
+    }
+    return null;
+  }
+
   void selectProject(String? projectId) {
     if (selectedProjectId == projectId) {
       return;
     }
     selectedProjectId = projectId;
+    notifyListeners();
+  }
+
+  void selectTask(String? taskId) {
+    if (selectedTaskId == taskId) {
+      return;
+    }
+    selectedTaskId = taskId;
+    notifyListeners();
+  }
+
+  void selectDraft(String? draftId) {
+    if (selectedDraftId == draftId) {
+      return;
+    }
+    selectedDraftId = draftId;
+    notifyListeners();
+  }
+
+  void selectApproval(String? approvalId) {
+    if (selectedApprovalId == approvalId) {
+      return;
+    }
+    selectedApprovalId = approvalId;
+    notifyListeners();
+  }
+
+  void selectBrief(String? briefId) {
+    if (selectedBriefId == briefId) {
+      return;
+    }
+    selectedBriefId = briefId;
     notifyListeners();
   }
 
@@ -503,7 +805,7 @@ class GaiaAppController extends ChangeNotifier {
     if (major == null || minor == null) {
       return BackendCompatibilityState.unknown;
     }
-    if (major == 0 && minor == 3) {
+    if (major == 0 && minor == 4) {
       return BackendCompatibilityState.compatible;
     }
     return BackendCompatibilityState.incompatible;

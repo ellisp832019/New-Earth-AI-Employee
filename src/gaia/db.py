@@ -10,6 +10,8 @@ from gaia.models import AuditEvent, DocumentRecord, RepositorySnapshot, SearchRe
 
 
 class Database:
+    SCHEMA_VERSION = 4
+
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -76,6 +78,110 @@ class Database:
                 safe_error TEXT,
                 usage_json TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS tasks (
+                task_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                status TEXT NOT NULL,
+                priority TEXT NOT NULL,
+                category TEXT NOT NULL,
+                source_type TEXT NOT NULL,
+                source_identifier TEXT,
+                source_agent_run_id TEXT,
+                evidence_references_json TEXT NOT NULL,
+                dependency_task_ids_json TEXT NOT NULL,
+                blocker_description TEXT,
+                assigned_to TEXT,
+                due_date TEXT,
+                completion_criteria TEXT NOT NULL,
+                completion_evidence_json TEXT NOT NULL,
+                approval_requirement INTEGER NOT NULL,
+                tags_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                version INTEGER NOT NULL,
+                manual_override_reason TEXT
+            );
+            CREATE TABLE IF NOT EXISTS task_history (
+                history_id TEXT PRIMARY KEY,
+                task_id TEXT NOT NULL,
+                from_status TEXT,
+                to_status TEXT NOT NULL,
+                action TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                reason TEXT,
+                created_at TEXT NOT NULL,
+                metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS drafts (
+                draft_id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                draft_type TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                source_task_id TEXT,
+                source_agent_run_id TEXT,
+                current_revision INTEGER NOT NULL,
+                current_content_hash TEXT NOT NULL,
+                status TEXT NOT NULL,
+                evidence_references_json TEXT NOT NULL,
+                warnings_json TEXT NOT NULL,
+                approval_requirement INTEGER NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS draft_revisions (
+                revision_id TEXT PRIMARY KEY,
+                draft_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                author TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                UNIQUE(draft_id, revision_number)
+            );
+            CREATE TABLE IF NOT EXISTS approvals (
+                approval_id TEXT PRIMARY KEY,
+                request_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                source_task_id TEXT,
+                source_draft_id TEXT,
+                requesting_source TEXT NOT NULL,
+                proposed_action TEXT NOT NULL,
+                exact_target_description TEXT NOT NULL,
+                write_boundary TEXT NOT NULL,
+                risk_level TEXT NOT NULL,
+                preview_summary TEXT NOT NULL,
+                approved_content_hash TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                expiry_timestamp TEXT,
+                status TEXT NOT NULL,
+                reviewer TEXT,
+                decision_timestamp TEXT,
+                decision_reason TEXT,
+                audit_references_json TEXT NOT NULL,
+                invalidation_reason TEXT,
+                version INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS daily_briefs (
+                brief_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                title TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                repository_snapshot_json TEXT NOT NULL,
+                verified_facts_json TEXT NOT NULL,
+                inferences_json TEXT NOT NULL,
+                recommendations_json TEXT NOT NULL,
+                warnings_json TEXT NOT NULL,
+                unknowns_json TEXT NOT NULL,
+                markdown TEXT NOT NULL,
+                source_task_ids_json TEXT NOT NULL,
+                source_approval_ids_json TEXT NOT NULL,
+                source_run_ids_json TEXT NOT NULL
+            );
             """
         )
         try:
@@ -85,6 +191,8 @@ class Database:
             self.fts5_available = True
         except sqlite3.OperationalError:
             self.fts5_available = False
+        self.connection.commit()
+        self.connection.execute(f"PRAGMA user_version = {self.SCHEMA_VERSION}")
         self.connection.commit()
 
     def replace_documents(self, project_id: str, records: Iterable[DocumentRecord]) -> None:

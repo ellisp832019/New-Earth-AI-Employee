@@ -3,10 +3,13 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 import typer
 import uvicorn
+from pydantic import BaseModel
 from rich.console import Console
 from rich.table import Table
 
@@ -18,6 +21,20 @@ from gaia.db import Database
 from gaia.providers import ProviderRegistry
 from gaia.reports import write_report
 from gaia.service import ProjectService
+from gaia.workflows import (
+    ApprovalCreateRequest,
+    ApprovalDecisionRequest,
+    ApprovalRisk,
+    DraftCreateRequest,
+    DraftReviseRequest,
+    DraftType,
+    TaskCreateRequest,
+    TaskPriority,
+    TaskStatus,
+    TaskTransitionRequest,
+    TaskUpdateRequest,
+    TaskWorkflowService,
+)
 
 app = typer.Typer(help="GAIA local-first project-control employee")
 project_app = typer.Typer(help="Inspect registered projects")
@@ -25,11 +42,19 @@ projects_app = typer.Typer(help="List registered projects")
 models_app = typer.Typer(help="Model provider status")
 agent_app = typer.Typer(help="Conversational agent commands")
 agent_runs_app = typer.Typer(help="Agent run history")
+tasks_app = typer.Typer(help="GAIA task records")
+drafts_app = typer.Typer(help="GAIA draft records")
+approvals_app = typer.Typer(help="GAIA approval records")
+briefs_app = typer.Typer(help="GAIA daily brief records")
 app.add_typer(project_app, name="project")
 app.add_typer(projects_app, name="projects")
 app.add_typer(models_app, name="models")
 app.add_typer(agent_app, name="agent")
 agent_app.add_typer(agent_runs_app, name="runs")
+app.add_typer(tasks_app, name="tasks")
+app.add_typer(drafts_app, name="drafts")
+app.add_typer(approvals_app, name="approvals")
+app.add_typer(briefs_app, name="briefs")
 console = Console()
 
 
@@ -45,6 +70,22 @@ def _bundle(config: Path | None = None) -> tuple[ProjectService, Database, Provi
     registry = ProviderRegistry(settings.model_routing)
     agent = AgentService(service, database, registry)
     return service, database, registry, agent
+
+
+def _workflow_service(config: Path | None = None) -> TaskWorkflowService:
+    settings = load_settings(config)
+    return TaskWorkflowService(settings, Database(settings.database_path))
+
+
+def _print_models(records: Sequence[BaseModel]) -> None:
+    if not records:
+        console.print("No records found.")
+        return
+    console.print_json(json.dumps([record.model_dump(mode="json") for record in records]))
+
+
+def _print_model(record: BaseModel) -> None:
+    console.print_json(json.dumps(record.model_dump(mode="json")))
 
 
 def _safe_output_path(output: Path) -> Path:
@@ -215,10 +256,10 @@ def models_list(config: Path | None = typer.Option(None)) -> None:
 
 
 @agent_runs_app.command("list")
-def agent_runs_list(config: Path | None = typer.Option(None)) -> None:
+def agent_runs_list(limit: int = typer.Option(100, min=1, max=1000), config: Path | None = typer.Option(None)) -> None:
     _service, database, _registry, _agent = _bundle(config)
     try:
-        console.print_json(json.dumps(database.list_agent_runs()))
+        console.print_json(json.dumps(database.list_agent_runs(limit=limit)))
     finally:
         database.close()
 
@@ -289,3 +330,442 @@ def serve(
     """Start the local FastAPI service."""
     settings = load_settings(config)
     uvicorn.run(create_app(settings), host=host or settings.api_host, port=port or settings.api_port)
+
+
+@tasks_app.command("list")
+def tasks_list(
+    project_id: str | None = typer.Option(None),
+    status: str | None = typer.Option(None),
+    priority: str | None = typer.Option(None),
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_models(service.list_tasks(project_id=project_id, status=status, priority=priority, limit=limit, offset=offset))
+    finally:
+        service.close()
+
+
+@tasks_app.command("show")
+def tasks_show(task_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.get_task(task_id))
+    finally:
+        service.close()
+
+
+@tasks_app.command("create")
+def tasks_create(
+    title: str = typer.Argument(...),
+    project_id: str = typer.Option(...),
+    description: str = typer.Option(""),
+    priority: str = typer.Option("normal"),
+    category: str = typer.Option("general"),
+    source_type: str = typer.Option("manual"),
+    source_identifier: str | None = typer.Option(None),
+    source_agent_run_id: str | None = typer.Option(None),
+    evidence_reference: list[str] | None = typer.Option(None),
+    dependency_task_id: list[str] | None = typer.Option(None),
+    blocker_description: str | None = typer.Option(None),
+    assigned_to: str | None = typer.Option(None),
+    completion_criteria: str = typer.Option(""),
+    approval_requirement: bool = typer.Option(False),
+    tag: list[str] | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        task = service.create_task(
+            TaskCreateRequest(
+                title=title,
+                project_id=project_id,
+                description=description,
+                priority=cast(TaskPriority, priority),
+                category=category,
+                source_type=source_type,
+                source_identifier=source_identifier,
+                source_agent_run_id=source_agent_run_id,
+                evidence_references=evidence_reference or [],
+                dependency_task_ids=dependency_task_id or [],
+                blocker_description=blocker_description,
+                assigned_to=assigned_to,
+                completion_criteria=completion_criteria,
+                approval_requirement=approval_requirement,
+                tags=tag or [],
+            )
+        )
+        _print_model(task)
+    finally:
+        service.close()
+
+
+@tasks_app.command("from-run")
+def tasks_from_run(run_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.create_task_from_run(run_id))
+    finally:
+        service.close()
+
+
+@tasks_app.command("accept")
+def tasks_accept(task_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.accept_task(task_id))
+    finally:
+        service.close()
+
+
+@tasks_app.command("transition")
+def tasks_transition(
+    task_id: str,
+    status: str = typer.Argument(...),
+    reason: str | None = typer.Option(None),
+    completion_evidence: list[str] | None = typer.Option(None),
+    manual_override_reason: str | None = typer.Option(None),
+    actor: str = typer.Option("manual"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        task = service.get_task(task_id)
+        _print_model(
+            service.transition_task(
+                task_id,
+                TaskTransitionRequest(
+                    version=task.version,
+                    status=cast(TaskStatus, status),
+                    reason=reason,
+                    completion_evidence=completion_evidence or None,
+                    manual_override_reason=manual_override_reason,
+                    actor=actor,
+                ),
+            )
+        )
+    finally:
+        service.close()
+
+
+@tasks_app.command("update")
+def tasks_update(
+    task_id: str,
+    version: int = typer.Option(...),
+    title: str | None = typer.Option(None),
+    description: str | None = typer.Option(None),
+    priority: str | None = typer.Option(None),
+    category: str | None = typer.Option(None),
+    assigned_to: str | None = typer.Option(None),
+    blocker_description: str | None = typer.Option(None),
+    completion_criteria: str | None = typer.Option(None),
+    approval_requirement: bool | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(
+            service.update_task(
+                task_id,
+                TaskUpdateRequest(
+                    version=version,
+                    title=title,
+                    description=description,
+                    priority=cast(TaskPriority, priority),
+                    category=category,
+                    assigned_to=assigned_to,
+                    blocker_description=blocker_description,
+                    completion_criteria=completion_criteria,
+                    approval_requirement=approval_requirement,
+                ),
+            )
+        )
+    finally:
+        service.close()
+
+
+@tasks_app.command("cancel")
+def tasks_cancel(task_id: str, reason: str | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.cancel_task(task_id, reason=reason))
+    finally:
+        service.close()
+
+
+@tasks_app.command("history")
+def tasks_history(task_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_models(service.task_history(task_id))
+    finally:
+        service.close()
+
+
+@drafts_app.command("list")
+def drafts_list(
+    project_id: str | None = typer.Option(None),
+    status: str | None = typer.Option(None),
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_models(service.list_drafts(project_id=project_id, status=status, limit=limit, offset=offset))
+    finally:
+        service.close()
+
+
+@drafts_app.command("show")
+def drafts_show(draft_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.get_draft(draft_id))
+    finally:
+        service.close()
+
+
+@drafts_app.command("create")
+def drafts_create(
+    title: str = typer.Argument(...),
+    project_id: str = typer.Option(...),
+    draft_type: str = typer.Option("generic_markdown"),
+    content: str = typer.Option(""),
+    source_task_id: str | None = typer.Option(None),
+    source_agent_run_id: str | None = typer.Option(None),
+    approval_requirement: bool = typer.Option(False),
+    author: str = typer.Option("manual"),
+    change_reason: str = typer.Option("initial draft"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        draft, _revision = service.create_draft(
+            DraftCreateRequest(
+                title=title,
+                draft_type=cast(DraftType, draft_type),
+                project_id=project_id,
+                content=content,
+                source_task_id=source_task_id,
+                source_agent_run_id=source_agent_run_id,
+                approval_requirement=approval_requirement,
+                author=author,
+                change_reason=change_reason,
+            )
+        )
+        _print_model(draft)
+    finally:
+        service.close()
+
+
+@drafts_app.command("revise")
+def drafts_revise(
+    draft_id: str,
+    version: int = typer.Option(...),
+    content: str = typer.Option(...),
+    author: str = typer.Option("manual"),
+    change_reason: str = typer.Option("revision"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        draft, _revision = service.revise_draft(
+            draft_id,
+            DraftReviseRequest(version=version, content=content, author=author, change_reason=change_reason),
+        )
+        _print_model(draft)
+    finally:
+        service.close()
+
+
+@drafts_app.command("submit")
+def drafts_submit(draft_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.submit_draft_for_review(draft_id))
+    finally:
+        service.close()
+
+
+@drafts_app.command("reject")
+def drafts_reject(draft_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.reject_draft(draft_id))
+    finally:
+        service.close()
+
+
+@drafts_app.command("supersede")
+def drafts_supersede(draft_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.supersede_draft(draft_id))
+    finally:
+        service.close()
+
+
+@drafts_app.command("revisions")
+def drafts_revisions(draft_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_models(service.draft_revisions(draft_id))
+    finally:
+        service.close()
+
+
+@approvals_app.command("list")
+def approvals_list(
+    project_id: str | None = typer.Option(None),
+    status: str | None = typer.Option(None),
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_models(service.list_approvals(project_id=project_id, status=status, limit=limit, offset=offset))
+    finally:
+        service.close()
+
+
+@approvals_app.command("show")
+def approvals_show(approval_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.get_approval(approval_id))
+    finally:
+        service.close()
+
+
+@approvals_app.command("create")
+def approvals_create(
+    title: str = typer.Argument(...),
+    project_id: str = typer.Option(...),
+    description: str = typer.Option(""),
+    request_type: str = typer.Option("manual"),
+    source_task_id: str | None = typer.Option(None),
+    source_draft_id: str | None = typer.Option(None),
+    requesting_source: str = typer.Option("manual"),
+    proposed_action: str = typer.Option(""),
+    exact_target_description: str = typer.Option(""),
+    write_boundary: str = typer.Option("gaia-local"),
+    risk_level: str = typer.Option("low"),
+    preview_summary: str = typer.Option(""),
+    approved_content_hash: str = typer.Option(""),
+    reviewer: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(
+            service.create_approval(
+                ApprovalCreateRequest(
+                    title=title,
+                    project_id=project_id,
+                    description=description,
+                    request_type=request_type,
+                    source_task_id=source_task_id,
+                    source_draft_id=source_draft_id,
+                    requesting_source=requesting_source,
+                    proposed_action=proposed_action,
+                    exact_target_description=exact_target_description,
+                    write_boundary=write_boundary,
+                    risk_level=cast(ApprovalRisk, risk_level),
+                    preview_summary=preview_summary,
+                    approved_content_hash=approved_content_hash,
+                    reviewer=reviewer,
+                )
+            )
+        )
+    finally:
+        service.close()
+
+
+@approvals_app.command("approve")
+def approvals_approve(
+    approval_id: str,
+    version: int = typer.Option(...),
+    reviewer: str = typer.Option("manual"),
+    decision_reason: str = typer.Option("approved for manual use"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.approve(approval_id, ApprovalDecisionRequest(version=version, reviewer=reviewer, decision_reason=decision_reason)))
+    finally:
+        service.close()
+
+
+@approvals_app.command("reject")
+def approvals_reject(
+    approval_id: str,
+    version: int = typer.Option(...),
+    reviewer: str = typer.Option("manual"),
+    decision_reason: str = typer.Option("rejected"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.reject_approval(approval_id, ApprovalDecisionRequest(version=version, reviewer=reviewer, decision_reason=decision_reason)))
+    finally:
+        service.close()
+
+
+@approvals_app.command("cancel")
+def approvals_cancel(
+    approval_id: str,
+    version: int = typer.Option(...),
+    reviewer: str = typer.Option("manual"),
+    decision_reason: str = typer.Option("cancelled"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.cancel_approval(approval_id, ApprovalDecisionRequest(version=version, reviewer=reviewer, decision_reason=decision_reason)))
+    finally:
+        service.close()
+
+
+@approvals_app.command("refresh-validation")
+def approvals_refresh_validation(approval_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.refresh_approval_validation(approval_id))
+    finally:
+        service.close()
+
+
+@briefs_app.command("daily")
+def briefs_daily(project_id: str | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        project = project_id
+        if not project:
+            project = next(iter(service.settings.projects.keys()), None)
+        if not project:
+            raise typer.BadParameter("project_id is required when no projects are configured")
+        _print_model(service.daily_brief(project))
+    finally:
+        service.close()
+
+
+@briefs_app.command("list")
+def briefs_list(project_id: str | None = typer.Option(None), limit: int = typer.Option(100, min=1, max=500), offset: int = typer.Option(0, min=0), config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_models(service.list_briefs(project_id=project_id, limit=limit, offset=offset))
+    finally:
+        service.close()
+
+
+@briefs_app.command("show")
+def briefs_show(brief_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workflow_service(config)
+    try:
+        _print_model(service.get_brief(brief_id))
+    finally:
+        service.close()

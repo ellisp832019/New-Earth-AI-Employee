@@ -1,6 +1,6 @@
 # New Earth AI Employee
 
-**GAIA v0.3 - Windows Control Centre over the MicroGrow inspection foundation**
+**GAIA v0.4 - Controlled tasks, drafts, approvals and daily brief foundation**
 
 This repository is a local-first, read-only foundation for a controlled AI employee. Its first role is to inspect the external MicroGrow V1 repository, index approved text documents, capture Git state, produce deterministic evidence reports, and expose those capabilities through a CLI, FastAPI service, and a Windows desktop control centre.
 
@@ -10,8 +10,11 @@ GAIA v0.2 extends the foundation with a local conversational layer that answers 
 
 GAIA v0.3 adds a Flutter-based Windows desktop shell that connects to the existing read-only backend, keeps MicroGrow read-only, and surfaces evidence, reports, snapshots, agent runs, and audit history.
 
+GAIA v0.4 adds controlled task records, draft records, approval records, a deterministic daily operations brief, and the corresponding CLI, API, desktop and VS Code operator workflows. Approvals remain manual-use decisions only and do not execute actions.
+
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
 Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).
+Release notes for v0.4 live under [docs/releases](docs/releases/GAIA_V0_4_0_RELEASE_NOTES.md).
 
 ## Repository relationship
 
