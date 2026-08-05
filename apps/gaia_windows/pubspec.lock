@@ -112,6 +112,13 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  gaia_integration_client:
+    dependency: "direct main"
+    description:
+      path: "../../packages/gaia_integration_client"
+      relative: true
+    source: path
+    version: "0.5.0"
   http:
     dependency: "direct main"
     description:

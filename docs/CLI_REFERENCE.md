@@ -1,27 +1,34 @@
 # CLI Reference
 
-```powershell
-gaia doctor
-gaia projects list
-gaia project show microgrow-v1
-gaia project scan microgrow-v1
-gaia project snapshot microgrow-v1
-gaia project search microgrow-v1 "release readiness"
-gaia project report microgrow-v1
-gaia project report microgrow-v1 --format json --output data\reports\snapshot.json
-gaia models status
-gaia ask microgrow-v1 "Where exactly is MicroGrow currently?"
-gaia agent runs list
-gaia agent runs show <run-id>
-gaia serve
-```
+GAIA ships a Typer CLI for local control and validation.
 
-Use `--config PATH` on commands to load an alternate project registry.
+## Common Commands
 
-## Recommended order
+- `gaia doctor`
+- `gaia project scan <project-id>`
+- `gaia project snapshot <project-id>`
+- `gaia project report <project-id>`
+- `gaia ask <project-id> "<question>"`
 
-1. `gaia doctor`
-2. `gaia project scan microgrow-v1`
-3. `gaia project snapshot microgrow-v1`
-4. `gaia project report microgrow-v1`
-5. `gaia project search microgrow-v1 "your question terms"`
+## v0.5 Commands
+
+- `gaia permissions list`
+- `gaia permissions show <manifest-id>`
+- `gaia permissions validate <manifest-id>`
+- `gaia permissions create`
+- `gaia permissions review <manifest-id>`
+- `gaia actions list`
+- `gaia actions show <action-id>`
+- `gaia actions preview <action-id>`
+- `gaia actions request-approval <action-id>`
+- `gaia actions approve <action-id>`
+- `gaia actions execute <action-id>`
+- `gaia actions rollback <action-id>`
+- `gaia actions cancel <action-id>`
+- `gaia receipts list`
+- `gaia receipts show <receipt-id>`
+
+## Usage Notes
+
+- The CLI mirrors the same safety model as the API.
+- Path safety, manifest enforcement, and explicit confirmation are not optional.

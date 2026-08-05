@@ -1,30 +1,29 @@
 # Data Model
 
-## `documents`
+GAIA v0.5 extends the SQLite schema with permissioned output workspace records.
 
-One row per scanned approved document. Stores path, type, size, timestamp, hash, tracking state, indexing state, warnings and text content.
+## New Tables
 
-## `documents_fts`
+- `permission_manifests`
+- `output_actions`
+- `action_previews`
+- `execution_receipts`
+- `output_backups`
+- `rollback_records`
 
-SQLite FTS5 virtual table used for local full-text retrieval. A `LIKE` fallback is used when FTS5 is unavailable.
+## Updated Records
 
-## `snapshots`
+- `approvals` now stores action-binding columns so a review decision cannot drift away from the action it approved.
 
-Stores complete versioned `RepositorySnapshot` JSON payloads. A snapshot records Git state, document counts, warnings and important-path presence.
+## Model Relationships
 
-## `audit_events`
+- One permission manifest can authorize many actions.
+- One action can create many previews but only one execution receipt.
+- One receipt can point to one backup and one rollback record.
+- One approval is bound to one action and one manifest version.
 
-Records application operations with event ID, UTC timestamp, category, operation, project, outcome, safe metadata and error classification.
+## Storage Rules
 
-## Future tables
-
-Later releases may add:
-
-- `agent_runs`;
-- `tool_calls`;
-- `approvals`;
-- `tasks`;
-- `decisions`;
-- `model_usage`;
-- `memory_facts`;
-- `report_evidence`.
+- JSON fields are stored as serialized text in SQLite.
+- Content hashes are SHA-256 values.
+- Workspace-relative paths are stored in display-friendly form after canonical safety checks.

@@ -12,6 +12,15 @@ from gaia.config import Settings, load_settings
 from gaia.conversation import AskRequest
 from gaia.db import Database
 from gaia.models import HealthResponse
+from gaia.output_workspace import (
+    OutputActionCreateRequest,
+    OutputWorkspaceError,
+    OutputWorkspaceService,
+    PathSafetyError,
+    PermissionManifestCreateRequest,
+    PermissionManifestDecisionRequest,
+)
+from gaia.output_workspace import PermissionDeniedError as OutputPermissionDeniedError
 from gaia.providers import ProviderRegistry
 from gaia.service import ProjectService
 from gaia.workflows import (
@@ -36,6 +45,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     provider_registry = ProviderRegistry(resolved_settings.model_routing)
     agent_service = AgentService(service, database, provider_registry)
     workflow_service = TaskWorkflowService(resolved_settings, database)
+    output_service = OutputWorkspaceService(resolved_settings, database)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -169,6 +179,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return HTTPException(status_code=409, detail=str(error))
         if isinstance(error, ValidationError):
             return HTTPException(status_code=400, detail=str(error))
+        return HTTPException(status_code=500, detail=str(error))
+
+    def _output_http_error(error: Exception) -> HTTPException:
+        if isinstance(error, PathSafetyError):
+            return HTTPException(status_code=400, detail=str(error))
+        if isinstance(error, OutputPermissionDeniedError):
+            return HTTPException(status_code=403, detail=str(error))
+        if isinstance(error, OutputWorkspaceError):
+            return HTTPException(status_code=400, detail=str(error))
+        if isinstance(error, ConflictError):
+            return HTTPException(status_code=409, detail=str(error))
         return HTTPException(status_code=500, detail=str(error))
 
     @app.get("/agent/runs")
@@ -394,9 +415,129 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as exc:
             raise _workflow_http_error(exc) from exc
 
+    @app.get("/permissions")
+    def permissions() -> list[dict[str, object]]:
+        return [manifest.model_dump(mode="json") for manifest in output_service.list_permission_manifests()]
+
+    @app.post("/permissions")
+    def create_permission_manifest(request: PermissionManifestCreateRequest) -> dict[str, object]:
+        try:
+            return output_service.create_permission_manifest(request).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.get("/permissions/{manifest_id}")
+    def get_permission_manifest(manifest_id: str) -> dict[str, object]:
+        try:
+            return output_service.get_permission_manifest(manifest_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/permissions/{manifest_id}/validate")
+    def validate_permission_manifest(manifest_id: str) -> dict[str, object]:
+        try:
+            return output_service.validate_permission_manifest(manifest_id)
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/permissions/{manifest_id}/review")
+    def review_permission_manifest(manifest_id: str, request: PermissionManifestDecisionRequest) -> dict[str, object]:
+        try:
+            return output_service.update_permission_manifest(manifest_id, request).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.get("/actions")
+    def actions(project_id: str | None = None, status: str | None = None, limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0)) -> list[dict[str, object]]:
+        return [
+            action.model_dump(mode="json")
+            for action in output_service.list_actions(project_id=project_id, status=status, limit=limit, offset=offset)
+        ]
+
+    @app.post("/actions")
+    def create_action(request: OutputActionCreateRequest) -> dict[str, object]:
+        try:
+            return output_service.create_action(request).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.get("/actions/{action_id}")
+    def get_action(action_id: str) -> dict[str, object]:
+        try:
+            return output_service.get_action(action_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/actions/{action_id}/preview")
+    def preview_action(action_id: str) -> dict[str, object]:
+        try:
+            action = output_service.get_action(action_id)
+            previews = output_service.action_previews(action_id)
+            return {
+                "action": action.model_dump(mode="json"),
+                "previews": [preview.model_dump(mode="json") for preview in previews],
+            }
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/actions/{action_id}/request-approval")
+    def request_action_approval(action_id: str) -> dict[str, object]:
+        try:
+            approval = output_service.request_approval(action_id)
+            return approval.model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/actions/{action_id}/approve")
+    def approve_action(action_id: str) -> dict[str, object]:
+        try:
+            return output_service.approve_action(action_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/actions/{action_id}/execute")
+    def execute_action(action_id: str, confirm: bool = Query(default=False), operator: str = Query(default="manual")) -> dict[str, object]:
+        try:
+            if not confirm:
+                raise OutputWorkspaceError("Execution confirmation is required.")
+            action, receipt = output_service.execute_action(action_id, confirmation_token=action_id, operator=operator)
+            return {"action": action.model_dump(mode="json"), "receipt": receipt.model_dump(mode="json")}
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/actions/{action_id}/rollback")
+    def rollback_action(action_id: str, confirm: bool = Query(default=False), operator: str = Query(default="manual")) -> dict[str, object]:
+        try:
+            if not confirm:
+                raise OutputWorkspaceError("Rollback confirmation is required.")
+            action, rollback = output_service.rollback_action(action_id, confirmation_token=action_id, operator=operator)
+            return {"action": action.model_dump(mode="json"), "rollback": rollback.model_dump(mode="json")}
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/actions/{action_id}/cancel")
+    def cancel_action(action_id: str, reason: str = Query(default="cancelled")) -> dict[str, object]:
+        try:
+            return output_service.cancel_action(action_id, reason).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.get("/receipts")
+    def receipts(limit: int = Query(default=100, ge=1, le=500), offset: int = Query(default=0, ge=0)) -> list[dict[str, object]]:
+        return [receipt.model_dump(mode="json") for receipt in output_service.list_receipts(limit=limit, offset=offset)]
+
+    @app.get("/receipts/{receipt_id}")
+    def receipt(receipt_id: str) -> dict[str, object]:
+        try:
+            return output_service.get_receipt(receipt_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
     @app.get("/integration/v1/status")
     def integration_status() -> dict[str, object]:
-        return workflow_service.integration_status()
+        status = workflow_service.integration_status()
+        status["output_workspace"] = output_service.summary()
+        return status
 
     @app.get("/integration/v1/projects")
     def integration_projects() -> list[dict[str, object]]:
@@ -414,6 +555,49 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def integration_briefs_latest(project_id: str | None = None) -> dict[str, object] | None:
         brief = workflow_service.briefs_latest(project_id)
         return brief.model_dump(mode="json") if brief else None
+
+    @app.get("/integration/v1/actions/summary")
+    def integration_actions_summary(project_id: str | None = None) -> dict[str, object]:
+        actions = output_service.list_actions(project_id=project_id, limit=500)
+        return {
+            "project_id": project_id,
+            "total": len(actions),
+            "proposed": sum(action.status == "proposed" for action in actions),
+            "awaiting_approval": sum(action.status == "awaiting_approval" for action in actions),
+            "approved": sum(action.status == "approved" for action in actions),
+            "completed": sum(action.status == "completed" for action in actions),
+            "failed": sum(action.status == "failed" for action in actions),
+            "invalidated": sum(action.status == "invalidated" for action in actions),
+            "rolled_back": sum(action.status == "rolled_back" for action in actions),
+        }
+
+    @app.get("/integration/v1/receipts/latest")
+    def integration_latest_receipt() -> dict[str, object] | None:
+        receipts = output_service.list_receipts(limit=1)
+        return receipts[0].model_dump(mode="json") if receipts else None
+
+    @app.get("/integration/v1/compatibility")
+    def integration_compatibility() -> dict[str, object]:
+        return {
+            "backend_version": __version__,
+            "contract_version": "gaia-v1",
+            "status": "compatible",
+            "loopback_only": True,
+            "capabilities": [
+                "health",
+                "compatibility",
+                "provider_status",
+                "project_summaries",
+                "latest_snapshots",
+                "latest_agent_runs",
+                "task_summaries",
+                "drafts",
+                "pending_approvals",
+                "daily_brief",
+                "action_summaries",
+                "execution_receipts",
+            ],
+        }
 
     return app
 

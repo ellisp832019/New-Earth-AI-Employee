@@ -50,13 +50,22 @@ class GaiaAppController extends ChangeNotifier {
   List<DraftRecord> drafts = <DraftRecord>[];
   List<ApprovalRecord> approvals = <ApprovalRecord>[];
   List<DailyBriefRecord> briefs = <DailyBriefRecord>[];
+  List<Map<String, dynamic>> permissionManifests = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> outputActions = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> executionReceipts = <Map<String, dynamic>>[];
   AskResponse? lastAskResponse;
   Map<String, String> reports = <String, String>{};
+  Map<String, dynamic>? integrationCompatibility;
+  Map<String, dynamic>? selectedActionDetail;
+  List<Map<String, dynamic>> selectedActionPreviews = <Map<String, dynamic>>[];
   String? selectedProjectId;
   String? selectedTaskId;
   String? selectedDraftId;
   String? selectedApprovalId;
   String? selectedBriefId;
+  String? selectedActionId;
+  String? selectedManifestId;
+  String? selectedReceiptId;
   List<FirstRunCheck> firstRunChecks = <FirstRunCheck>[];
   final List<String> backendLogs = <String>[];
   http.Client? _activeAskClient;
@@ -101,11 +110,13 @@ class GaiaAppController extends ChangeNotifier {
     try {
       await Future.wait(<Future<void>>[
         refreshBackend(),
+        refreshCompatibility(),
         refreshProjects(),
         refreshModels(),
         refreshRuns(),
         refreshAuditEvents(),
         refreshWorkflowRecords(),
+        refreshOutputWorkspaceRecords(),
       ]);
       if (selectedProjectId == null && projects.isNotEmpty) {
         selectedProjectId = projects.first.projectId;
@@ -131,7 +142,7 @@ class GaiaAppController extends ChangeNotifier {
       backendState = BackendConnectionState.connected;
       backendCompatibilityState = _compatibilityFromVersion(health!.version);
       if (backendCompatibilityState == BackendCompatibilityState.incompatible) {
-        lastError = 'Backend version ${health!.version} is incompatible with the v0.4 desktop client.';
+        lastError = 'Backend version ${health!.version} is incompatible with the v0.5 desktop client.';
       } else {
         lastError = null;
       }
@@ -264,6 +275,58 @@ class GaiaAppController extends ChangeNotifier {
     selectedDraftId ??= drafts.isEmpty ? null : drafts.first.draftId;
     selectedApprovalId ??= approvals.isEmpty ? null : approvals.first.approvalId;
     selectedBriefId ??= briefs.isEmpty ? null : briefs.first.briefId;
+    notifyListeners();
+  }
+
+  Future<void> refreshCompatibility() async {
+    try {
+      integrationCompatibility = await _client.integrationCompatibility();
+    } catch (_) {
+      integrationCompatibility = null;
+    }
+    notifyListeners();
+  }
+
+  Future<void> refreshOutputWorkspaceRecords({String? projectId}) async {
+    try {
+      permissionManifests = await _client.listPermissionManifests();
+    } catch (_) {
+      permissionManifests = <Map<String, dynamic>>[];
+    }
+    try {
+      outputActions = await _client.listActions(projectId: projectId ?? selectedProjectId, limit: 100);
+    } catch (_) {
+      outputActions = <Map<String, dynamic>>[];
+    }
+    try {
+      executionReceipts = await _client.listReceipts(limit: 100);
+    } catch (_) {
+      executionReceipts = <Map<String, dynamic>>[];
+    }
+    selectedManifestId ??= permissionManifests.isEmpty ? null : permissionManifests.first['manifest_id'] as String?;
+    selectedActionId ??= outputActions.isEmpty ? null : outputActions.first['action_id'] as String?;
+    selectedReceiptId ??= executionReceipts.isEmpty ? null : executionReceipts.first['receipt_id'] as String?;
+    await refreshSelectedAction();
+    notifyListeners();
+  }
+
+  Future<void> refreshSelectedAction() async {
+    if (selectedActionId == null) {
+      selectedActionDetail = null;
+      selectedActionPreviews = <Map<String, dynamic>>[];
+      return;
+    }
+    try {
+      selectedActionDetail = await _client.getAction(selectedActionId!);
+      final preview = await _client.previewAction(selectedActionId!);
+      selectedActionPreviews = (preview['previews'] as List<dynamic>? ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((item) => item.cast<String, dynamic>())
+          .toList();
+    } catch (_) {
+      selectedActionDetail = null;
+      selectedActionPreviews = <Map<String, dynamic>>[];
+    }
     notifyListeners();
   }
 
@@ -485,6 +548,108 @@ class GaiaAppController extends ChangeNotifier {
       previewSummary: previewSummary,
       approvedContentHash: draft.currentContentHash,
     );
+  }
+
+  Future<void> createPermissionManifest({
+    required String name,
+    String description = '',
+    List<String> allowedActionTypes = const <String>[],
+    List<String> allowedTargetRoots = const <String>[],
+    List<String> allowedFileExtensions = const <String>[],
+    List<String> deniedPathPatterns = const <String>[],
+    int maximumFileSize = 0,
+    String overwritePolicy = 'deny',
+    bool backupRequirement = true,
+    bool rollbackRequirement = true,
+    bool approvalRequirement = true,
+    String riskCeiling = 'low',
+    bool enabled = false,
+  }) async {
+    await _client.createPermissionManifest(<String, dynamic>{
+      'name': name,
+      'description': description,
+      'allowed_action_types': allowedActionTypes,
+      'allowed_target_roots': allowedTargetRoots,
+      'allowed_file_extensions': allowedFileExtensions,
+      'denied_path_patterns': deniedPathPatterns,
+      'maximum_file_size': maximumFileSize,
+      'overwrite_policy': overwritePolicy,
+      'backup_requirement': backupRequirement,
+      'rollback_requirement': rollbackRequirement,
+      'approval_requirement': approvalRequirement,
+      'risk_ceiling': riskCeiling,
+      'enabled': enabled,
+    });
+    await refreshOutputWorkspaceRecords();
+  }
+
+  Future<void> reviewPermissionManifest(
+    String manifestId, {
+    required int version,
+    String reviewer = 'manual',
+    String reviewNotes = '',
+    bool enabled = true,
+  }) async {
+    await _client.reviewPermissionManifest(
+      manifestId,
+      <String, dynamic>{
+        'version': version,
+        'reviewer': reviewer,
+        'review_notes': reviewNotes,
+        'enabled': enabled,
+      },
+    );
+    await refreshOutputWorkspaceRecords();
+  }
+
+  Future<Map<String, dynamic>> validatePermissionManifest(String manifestId) async {
+    return await _client.validatePermissionManifest(manifestId);
+  }
+
+  Future<void> createOutputAction({
+    required String title,
+    required String projectId,
+    required String manifestId,
+    required String targetPath,
+    required String actionType,
+    String content = '',
+    String contentSource = 'manual',
+  }) async {
+    await _client.createAction(<String, dynamic>{
+      'title': title,
+      'project_id': projectId,
+      'manifest_id': manifestId,
+      'target_path': targetPath,
+      'action_type': actionType,
+      'content': content,
+      'content_source': contentSource,
+    });
+    await refreshOutputWorkspaceRecords(projectId: projectId);
+  }
+
+  Future<void> requestActionApproval(String actionId) async {
+    await _client.requestActionApproval(actionId);
+    await refreshOutputWorkspaceRecords();
+  }
+
+  Future<void> approveAction(String actionId) async {
+    await _client.approveAction(actionId);
+    await refreshOutputWorkspaceRecords();
+  }
+
+  Future<void> executeAction(String actionId, {bool confirm = false, String operator = 'manual'}) async {
+    await _client.executeAction(actionId, confirm: confirm, operator: operator);
+    await refreshOutputWorkspaceRecords();
+  }
+
+  Future<void> rollbackAction(String actionId, {bool confirm = false, String operator = 'manual'}) async {
+    await _client.rollbackAction(actionId, confirm: confirm, operator: operator);
+    await refreshOutputWorkspaceRecords();
+  }
+
+  Future<void> cancelAction(String actionId, {String reason = 'cancelled'}) async {
+    await _client.cancelAction(actionId, reason: reason);
+    await refreshOutputWorkspaceRecords();
   }
 
   Future<void> askGaia({
@@ -729,6 +894,31 @@ class GaiaAppController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void selectAction(String? actionId) {
+    if (selectedActionId == actionId) {
+      return;
+    }
+    selectedActionId = actionId;
+    unawaited(refreshSelectedAction());
+    notifyListeners();
+  }
+
+  void selectManifest(String? manifestId) {
+    if (selectedManifestId == manifestId) {
+      return;
+    }
+    selectedManifestId = manifestId;
+    notifyListeners();
+  }
+
+  void selectReceipt(String? receiptId) {
+    if (selectedReceiptId == receiptId) {
+      return;
+    }
+    selectedReceiptId = receiptId;
+    notifyListeners();
+  }
+
   String get backendStatusLabel {
     return switch (backendState) {
       BackendConnectionState.connected => 'Connected',
@@ -805,7 +995,7 @@ class GaiaAppController extends ChangeNotifier {
     if (major == null || minor == null) {
       return BackendCompatibilityState.unknown;
     }
-    if (major == 0 && minor == 4) {
+    if (major == 0 && minor == 5) {
       return BackendCompatibilityState.compatible;
     }
     return BackendCompatibilityState.incompatible;

@@ -1,41 +1,29 @@
 # Security Model
 
-## Threats considered
-
-- path traversal and absolute-path escape;
-- symlink or junction escape;
-- access to credentials and environment files;
-- binary or oversized file ingestion;
-- prompt injection contained in project documents;
-- prompt injection in conversational evidence retrieval;
-- arbitrary command execution;
-- credential leakage in Git remote URLs;
-- accidental mutation of the inspected repository;
-- audit logs containing sensitive contents.
+GAIA v0.5 is designed to make accidental writes, hidden writes, and ambiguous execution hard to do.
 
 ## Controls
 
-- canonical `resolve(strict=True)` path resolution;
-- common-root validation with Windows case normalisation;
-- approved extension list;
-- excluded directory and filename lists;
-- broad secret-bearing filename detection;
-- symlink avoidance during scans;
-- no `shell=True` usage;
-- fixed Git argument templates only;
-- command timeout and output limits;
-- remote credential redaction;
-- pre/post repository-state comparison;
-- audit metadata excludes file contents and secrets;
-- conversational runs stay local;
-- fail-closed behaviour when a path cannot be proven safe.
+- Allowlisted output roots only.
+- Permission manifests for output actions.
+- Explicit approval requests and approval bindings.
+- Explicit confirmation tokens for execution and rollback.
+- Execution receipts and backups for post-action review.
 
-## Prompt injection boundary
+## Path Safety
 
-Repository text is **data**, never authority. Later language-model integration must wrap retrieved excerpts as untrusted evidence and must not permit document text to alter employee policies, tool permissions or approval requirements.
+- Traversal is rejected.
+- Hidden `.git` paths are rejected.
+- Reserved Windows names are rejected.
+- UNC, device, and ADS-style paths are rejected.
+- Targets must remain inside the configured GAIA-owned workspace.
 
-## Remaining limitations
+## Operational Boundaries
 
-- Windows junction detection depends on operating-system behaviour and Python path resolution.
-- Read-only access is enforced by application policy; production deployment should also use Windows filesystem permissions or a dedicated restricted account.
-- SQLite audit records are append-oriented but not cryptographically immutable. Hash chaining is planned for a later release.
+- MicroGrow remains read-only.
+- The backend never commits or pushes Git changes automatically.
+- The desktop client surfaces the safety posture instead of bypassing it.
+
+## Evidence
+
+Every write produces a receipt. Overwrite-style writes can also produce a backup and a later rollback record.

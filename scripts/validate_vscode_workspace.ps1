@@ -83,7 +83,7 @@ foreach ($config in $launch.configurations) {
     }
 }
 
-foreach ($group in @("projects", "project", "models", "agent", "tasks", "drafts", "approvals", "briefs")) {
+foreach ($group in @("projects", "project", "models", "agent", "tasks", "drafts", "approvals", "briefs", "permissions", "actions", "receipts")) {
     & $python -m gaia $group --help | Out-Null
     if ($LASTEXITCODE -ne 0) {
         throw "CLI group '$group' is unavailable"

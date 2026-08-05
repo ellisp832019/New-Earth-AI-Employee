@@ -51,6 +51,23 @@ abstract class GaiaBackendApi {
   Future<Map<String, dynamic>> taskSummary({String? projectId});
   Future<Map<String, dynamic>> approvalSummary({String? projectId});
   Future<DailyBriefRecord?> latestBrief({String? projectId});
+  Future<List<Map<String, dynamic>>> listPermissionManifests();
+  Future<Map<String, dynamic>> getPermissionManifest(String manifestId);
+  Future<Map<String, dynamic>> validatePermissionManifest(String manifestId);
+  Future<Map<String, dynamic>> createPermissionManifest(Map<String, dynamic> body);
+  Future<Map<String, dynamic>> reviewPermissionManifest(String manifestId, Map<String, dynamic> body);
+  Future<List<Map<String, dynamic>>> listActions({String? projectId, String? status, int limit = 100, int offset = 0});
+  Future<Map<String, dynamic>> createAction(Map<String, dynamic> body);
+  Future<Map<String, dynamic>> getAction(String actionId);
+  Future<Map<String, dynamic>> previewAction(String actionId);
+  Future<Map<String, dynamic>> requestActionApproval(String actionId);
+  Future<Map<String, dynamic>> approveAction(String actionId);
+  Future<Map<String, dynamic>> executeAction(String actionId, {bool confirm = false, String operator = 'manual'});
+  Future<Map<String, dynamic>> rollbackAction(String actionId, {bool confirm = false, String operator = 'manual'});
+  Future<Map<String, dynamic>> cancelAction(String actionId, {String reason = 'cancelled'});
+  Future<List<Map<String, dynamic>>> listReceipts({int limit = 100, int offset = 0});
+  Future<Map<String, dynamic>> getReceipt(String receiptId);
+  Future<Map<String, dynamic>> integrationCompatibility();
 }
 
 class GaiaApiError implements Exception {
@@ -82,10 +99,10 @@ class GaiaApiClient implements GaiaBackendApi {
     return _decodeJsonResponse(response);
   }
 
-  Future<dynamic> _postJson(String path, {Object? body}) async {
+  Future<dynamic> _postJson(String path, {Object? body, Map<String, String>? queryParameters}) async {
     final response = await _client
         .post(
-          _resolve(path),
+          _resolve(path).replace(queryParameters: queryParameters),
           headers: const {'content-type': 'application/json'},
           body: body == null ? null : jsonEncode(body),
         )
@@ -442,6 +459,97 @@ class GaiaApiClient implements GaiaBackendApi {
       return null;
     }
     return DailyBriefRecord.fromJson((json as Map).cast<String, dynamic>());
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> listPermissionManifests() async {
+    final json = await _getJson('/permissions') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getPermissionManifest(String manifestId) async {
+    return (await _getJson('/permissions/$manifestId')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> validatePermissionManifest(String manifestId) async {
+    return (await _postJson('/permissions/$manifestId/validate')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> createPermissionManifest(Map<String, dynamic> body) async {
+    return (await _postJson('/permissions', body: body)) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> reviewPermissionManifest(String manifestId, Map<String, dynamic> body) async {
+    return (await _postJson('/permissions/$manifestId/review', body: body)) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> listActions({String? projectId, String? status, int limit = 100, int offset = 0}) async {
+    final query = <String, String>{'limit': limit.toString(), 'offset': offset.toString()};
+    if (projectId != null) query['project_id'] = projectId;
+    if (status != null) query['status'] = status;
+    final json = await _getJson('/actions', queryParameters: query) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> createAction(Map<String, dynamic> body) async {
+    return (await _postJson('/actions', body: body)) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> getAction(String actionId) async {
+    return (await _getJson('/actions/$actionId')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> previewAction(String actionId) async {
+    return (await _postJson('/actions/$actionId/preview')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> requestActionApproval(String actionId) async {
+    return (await _postJson('/actions/$actionId/request-approval')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> approveAction(String actionId) async {
+    return (await _postJson('/actions/$actionId/approve')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> executeAction(String actionId, {bool confirm = false, String operator = 'manual'}) async {
+    return (await _postJson('/actions/$actionId/execute', queryParameters: {'confirm': confirm.toString(), 'operator': operator})) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> rollbackAction(String actionId, {bool confirm = false, String operator = 'manual'}) async {
+    return (await _postJson('/actions/$actionId/rollback', queryParameters: {'confirm': confirm.toString(), 'operator': operator})) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> cancelAction(String actionId, {String reason = 'cancelled'}) async {
+    return (await _postJson('/actions/$actionId/cancel', queryParameters: {'reason': reason})) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> listReceipts({int limit = 100, int offset = 0}) async {
+    final json = await _getJson('/receipts', queryParameters: {'limit': limit.toString(), 'offset': offset.toString()}) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getReceipt(String receiptId) async {
+    return (await _getJson('/receipts/$receiptId')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> integrationCompatibility() async {
+    return (await _getJson('/integration/v1/compatibility')) as Map<String, dynamic>;
   }
 
   void close() {

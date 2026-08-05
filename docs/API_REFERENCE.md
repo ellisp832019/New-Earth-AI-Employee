@@ -1,29 +1,49 @@
 # API Reference
 
-Start the service:
+This repository exposes a local GAIA API through FastAPI.
 
-```powershell
-.\scripts\start_api.ps1
-```
-
-Open `http://127.0.0.1:8765/docs` for interactive OpenAPI documentation.
-
-## Endpoints
+## Core Endpoints
 
 - `GET /health`
 - `GET /projects`
 - `GET /projects/{project_id}`
 - `POST /projects/{project_id}/scan`
-- `GET /projects/{project_id}/snapshots`
-- `GET /projects/{project_id}/snapshots/latest`
-- `GET /projects/{project_id}/documents`
-- `GET /projects/{project_id}/search?q=...`
-- `POST /projects/{project_id}/reports/foundation?format=markdown`
-- `GET /audit/events`
-- `GET /models/status`
-- `GET /models`
-- `POST /agent/ask`
-- `GET /agent/runs`
-- `GET /agent/runs/{run_id}`
+- `GET /tasks`
+- `POST /tasks`
+- `GET /drafts`
+- `POST /drafts`
+- `GET /approvals`
+- `POST /approvals`
+- `GET /briefs`
 
-The API binds to loopback by default. Do not expose it to a network until authentication, transport security and deployment hardening are implemented.
+## v0.5 Output Workspace Endpoints
+
+- `GET /permissions`
+- `POST /permissions`
+- `GET /permissions/{manifest_id}`
+- `POST /permissions/{manifest_id}/validate`
+- `POST /permissions/{manifest_id}/review`
+- `GET /actions`
+- `POST /actions`
+- `GET /actions/{action_id}`
+- `POST /actions/{action_id}/preview`
+- `POST /actions/{action_id}/request-approval`
+- `POST /actions/{action_id}/approve`
+- `POST /actions/{action_id}/execute`
+- `POST /actions/{action_id}/rollback`
+- `POST /actions/{action_id}/cancel`
+- `GET /receipts`
+- `GET /receipts/{receipt_id}`
+
+## Integration Endpoints
+
+- `GET /integration/v1/status`
+- `GET /integration/v1/compatibility`
+- `GET /integration/v1/actions/summary`
+- `GET /integration/v1/receipts/latest`
+
+## Design Notes
+
+- Output writes are only allowed through explicit permission manifests.
+- Execution requires an approval binding and an explicit confirmation token.
+- Receipts and backups are first-class API objects.

@@ -233,6 +233,15 @@ class ApprovalRecord(BaseModel):
     risk_level: ApprovalRisk = "low"
     preview_summary: str = ""
     approved_content_hash: str = ""
+    action_id: str | None = None
+    action_type: str | None = None
+    manifest_id: str | None = None
+    manifest_version: int | None = None
+    canonical_target: str | None = None
+    previous_content_hash: str | None = None
+    proposed_content_hash: str | None = None
+    approval_binding_hash: str | None = None
+    approval_scope: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
     expiry_timestamp: datetime | None = None
     status: ApprovalStatus = "pending"
@@ -531,10 +540,12 @@ class TaskWorkflowService:
                 INSERT OR REPLACE INTO approvals(
                     approval_id, request_type, title, description, project_id, source_task_id,
                     source_draft_id, requesting_source, proposed_action, exact_target_description,
-                    write_boundary, risk_level, preview_summary, approved_content_hash, created_at,
+                    write_boundary, risk_level, preview_summary, approved_content_hash, action_id,
+                    action_type, manifest_id, manifest_version, canonical_target, previous_content_hash,
+                    proposed_content_hash, approval_binding_hash, approval_scope, created_at,
                     expiry_timestamp, status, reviewer, decision_timestamp, decision_reason,
                     audit_references_json, invalidation_reason, version
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     approval.approval_id,
@@ -551,6 +562,15 @@ class TaskWorkflowService:
                     approval.risk_level,
                     approval.preview_summary,
                     approval.approved_content_hash,
+                    approval.action_id,
+                    approval.action_type,
+                    approval.manifest_id,
+                    approval.manifest_version,
+                    approval.canonical_target,
+                    approval.previous_content_hash,
+                    approval.proposed_content_hash,
+                    approval.approval_binding_hash,
+                    approval.approval_scope,
                     approval.created_at.isoformat(),
                     approval.expiry_timestamp.isoformat() if approval.expiry_timestamp else None,
                     approval.status,

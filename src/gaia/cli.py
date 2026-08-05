@@ -5,7 +5,7 @@ import json
 import shutil
 from collections.abc import Sequence
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import typer
 import uvicorn
@@ -18,6 +18,12 @@ from gaia.agent import AgentService
 from gaia.api import create_app
 from gaia.config import load_settings
 from gaia.db import Database
+from gaia.output_workspace import (
+    OutputActionCreateRequest,
+    OutputWorkspaceService,
+    PermissionManifestCreateRequest,
+    PermissionManifestDecisionRequest,
+)
 from gaia.providers import ProviderRegistry
 from gaia.reports import write_report
 from gaia.service import ProjectService
@@ -46,6 +52,9 @@ tasks_app = typer.Typer(help="GAIA task records")
 drafts_app = typer.Typer(help="GAIA draft records")
 approvals_app = typer.Typer(help="GAIA approval records")
 briefs_app = typer.Typer(help="GAIA daily brief records")
+permissions_app = typer.Typer(help="Permission manifests and output workspace controls")
+actions_app = typer.Typer(help="Permissioned GAIA output actions")
+receipts_app = typer.Typer(help="Execution receipts")
 app.add_typer(project_app, name="project")
 app.add_typer(projects_app, name="projects")
 app.add_typer(models_app, name="models")
@@ -55,6 +64,9 @@ app.add_typer(tasks_app, name="tasks")
 app.add_typer(drafts_app, name="drafts")
 app.add_typer(approvals_app, name="approvals")
 app.add_typer(briefs_app, name="briefs")
+app.add_typer(permissions_app, name="permissions")
+app.add_typer(actions_app, name="actions")
+app.add_typer(receipts_app, name="receipts")
 console = Console()
 
 
@@ -75,6 +87,11 @@ def _bundle(config: Path | None = None) -> tuple[ProjectService, Database, Provi
 def _workflow_service(config: Path | None = None) -> TaskWorkflowService:
     settings = load_settings(config)
     return TaskWorkflowService(settings, Database(settings.database_path))
+
+
+def _workspace_service(config: Path | None = None) -> OutputWorkspaceService:
+    settings = load_settings(config)
+    return OutputWorkspaceService(settings, Database(settings.database_path))
 
 
 def _print_models(records: Sequence[BaseModel]) -> None:
@@ -769,3 +786,233 @@ def briefs_show(brief_id: str, config: Path | None = typer.Option(None)) -> None
         _print_model(service.get_brief(brief_id))
     finally:
         service.close()
+
+
+@permissions_app.command("list")
+def permissions_list(config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_models(service.list_permission_manifests())
+    finally:
+        service.database.close()
+
+
+@permissions_app.command("show")
+def permissions_show(manifest_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_model(service.get_permission_manifest(manifest_id))
+    finally:
+        service.database.close()
+
+
+@permissions_app.command("validate")
+def permissions_validate(manifest_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        console.print_json(json.dumps(service.validate_permission_manifest(manifest_id)))
+    finally:
+        service.database.close()
+
+
+@permissions_app.command("create")
+def permissions_create(
+    name: str,
+    allowed_target_root: list[str] = typer.Option([], "--allowed-target-root"),
+    allowed_action_type: list[str] = typer.Option([], "--allowed-action-type"),
+    allowed_file_extension: list[str] = typer.Option([], "--allowed-file-extension"),
+    manifest_version: int = typer.Option(1, hidden=True),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workspace_service(config)
+    try:
+        request = PermissionManifestCreateRequest(
+            name=name,
+            allowed_target_roots=allowed_target_root,
+            allowed_action_types=cast(Any, allowed_action_type),
+            allowed_file_extensions=allowed_file_extension,
+        )
+        _print_model(service.create_permission_manifest(request))
+    finally:
+        service.database.close()
+
+
+@permissions_app.command("review")
+def permissions_review(
+    manifest_id: str,
+    version: int = typer.Option(...),
+    reviewer: str = typer.Option("manual"),
+    notes: str = typer.Option("manual review"),
+    enabled: bool = typer.Option(True),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_model(
+            service.update_permission_manifest(
+                manifest_id,
+                PermissionManifestDecisionRequest(version=version, reviewer=reviewer, review_notes=notes, enabled=enabled),
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@actions_app.command("list")
+def actions_list(
+    project_id: str | None = typer.Option(None),
+    status: str | None = typer.Option(None),
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_models(service.list_actions(project_id=project_id, status=status, limit=limit, offset=offset))
+    finally:
+        service.database.close()
+
+
+@actions_app.command("show")
+def actions_show(action_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_model(service.get_action(action_id))
+    finally:
+        service.database.close()
+
+
+@actions_app.command("preview")
+def actions_preview(action_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        console.print_json(
+            json.dumps(
+                {
+                    "action": service.get_action(action_id).model_dump(mode="json"),
+                    "previews": [preview.model_dump(mode="json") for preview in service.action_previews(action_id)],
+                }
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@actions_app.command("request-approval")
+def actions_request_approval(
+    action_id: str,
+    reviewer: str = typer.Option("manual"),
+    decision_reason: str = typer.Option("requested"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_model(service.request_approval(action_id, reviewer=reviewer, decision_reason=decision_reason))
+    finally:
+        service.database.close()
+
+
+@actions_app.command("approve")
+def actions_approve(
+    action_id: str,
+    reviewer: str = typer.Option("manual"),
+    decision_reason: str = typer.Option("Approved for manual use"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_model(service.approve_action(action_id, reviewer=reviewer, decision_reason=decision_reason))
+    finally:
+        service.database.close()
+
+
+@actions_app.command("execute")
+def actions_execute(
+    action_id: str,
+    confirm: bool = typer.Option(False),
+    operator: str = typer.Option("manual"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    if not confirm:
+        raise typer.BadParameter("--confirm is required to execute an action")
+    service = _workspace_service(config)
+    try:
+        action, receipt = service.execute_action(action_id, confirmation_token=action_id, operator=operator)
+        console.print_json(json.dumps({"action": action.model_dump(mode="json"), "receipt": receipt.model_dump(mode="json")}))
+    finally:
+        service.database.close()
+
+
+@actions_app.command("rollback")
+def actions_rollback(
+    action_id: str,
+    confirm: bool = typer.Option(False),
+    operator: str = typer.Option("manual"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    if not confirm:
+        raise typer.BadParameter("--confirm is required to rollback an action")
+    service = _workspace_service(config)
+    try:
+        action, rollback = service.rollback_action(action_id, confirmation_token=action_id, operator=operator)
+        console.print_json(json.dumps({"action": action.model_dump(mode="json"), "rollback": rollback.model_dump(mode="json")}))
+    finally:
+        service.database.close()
+
+
+@actions_app.command("cancel")
+def actions_cancel(
+    action_id: str,
+    reason: str = typer.Option("cancelled"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_model(service.cancel_action(action_id, reason))
+    finally:
+        service.database.close()
+
+
+@actions_app.command("create")
+def actions_create(
+    title: str,
+    project_id: str,
+    manifest_id: str,
+    target_path: str,
+    action_type: str = typer.Option("create_generated_document"),
+    content: str = typer.Option(""),
+    content_source: str = typer.Option("manual"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _workspace_service(config)
+    try:
+        request = OutputActionCreateRequest(
+            action_type=cast(Any, action_type),
+            title=title,
+            project_id=project_id,
+            manifest_id=manifest_id,
+            target_path=target_path,
+            content=content or None,
+            content_source=cast(Any, content_source),
+        )
+        _print_model(service.create_action(request))
+    finally:
+        service.database.close()
+
+
+@receipts_app.command("list")
+def receipts_list(limit: int = typer.Option(100, min=1, max=500), offset: int = typer.Option(0, min=0), config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_models(service.list_receipts(limit=limit, offset=offset))
+    finally:
+        service.database.close()
+
+
+@receipts_app.command("show")
+def receipts_show(receipt_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        _print_model(service.get_receipt(receipt_id))
+    finally:
+        service.database.close()
