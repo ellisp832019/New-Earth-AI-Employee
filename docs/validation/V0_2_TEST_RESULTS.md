@@ -23,7 +23,7 @@
 - `python -m compileall src tests`: passed
 - `python -m ruff check src tests`: passed
 - `python -m mypy src\gaia`: passed
-- `python -m pytest`: 37 passed, 1 warning
+- `python -m pytest`: 38 passed, 1 warning
 - `gaia doctor`: passed
 - `gaia models status`: passed
 - `gaia ask microgrow-v1 "What was completed most recently?" --deterministic-only`: passed
@@ -33,4 +33,5 @@
 
 - The pytest warning was the existing Starlette deprecation notice from the test client stack.
 - The deterministic ask command created a stored agent run in the local GAIA database for `microgrow-v1`.
+- The release hardening pass added regression coverage for prompt-injection warning separation and project-relative Git evidence paths.
 - The local SQLite database and generated reports remain excluded by `.gitignore`.

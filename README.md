@@ -8,6 +8,8 @@ GAIA v0.1 does **not** modify MicroGrow, execute unrestricted shell commands, se
 
 GAIA v0.2 extends the foundation with a local conversational layer that answers questions from the same evidence sources while remaining read-only.
 
+Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
+
 ## Repository relationship
 
 ```text

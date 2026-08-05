@@ -55,7 +55,8 @@ class AgentService:
             snapshot = self.project_service.snapshot(project_id)
         queries = generate_search_queries(question, analysis)
         evidence = self._collect_evidence(project_id, snapshot, queries, evidence_limit)
-        warnings = detect_prompt_injection(question)
+        prompt_injection_warnings = detect_prompt_injection(question)
+        warnings = list(prompt_injection_warnings)
         warnings.extend(item.warning for item in evidence if item.warning)
         selection = self.provider_registry.select(provider)
         selected_model = model or selection.model_name
@@ -102,7 +103,7 @@ class AgentService:
             structured_answer=structured_answer,
             confidence=confidence,
             warnings=warnings,
-            prompt_injection_warnings=warnings,
+            prompt_injection_warnings=prompt_injection_warnings,
             usage=model_response.usage if model_response else {},
         )
         self.database.insert_agent_run(run)
@@ -118,7 +119,7 @@ class AgentService:
             evidence=evidence,
             confidence=confidence,
             warnings=warnings,
-            prompt_injection_warnings=warnings,
+            prompt_injection_warnings=prompt_injection_warnings,
             deterministic_only=deterministic_only or not provider_status.available,
             structured=True,
             started_at=start,
@@ -144,7 +145,7 @@ class AgentService:
             EvidenceItem(
                 source_kind="git",
                 project_id=project_id,
-                source_path=snapshot.project_root,
+                source_path=".",
                 title="Current Git state",
                 snippet=f"Branch {snapshot.git.branch or 'unknown'}; clean={snapshot.git.is_clean}; recent={len(snapshot.git.recent_commits)} commits",
                 score=3.5,
