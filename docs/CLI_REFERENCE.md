@@ -9,6 +9,10 @@ gaia project snapshot microgrow-v1
 gaia project search microgrow-v1 "release readiness"
 gaia project report microgrow-v1
 gaia project report microgrow-v1 --format json --output data\reports\snapshot.json
+gaia models status
+gaia ask microgrow-v1 "Where exactly is MicroGrow currently?"
+gaia agent runs list
+gaia agent runs show <run-id>
 gaia serve
 ```
 

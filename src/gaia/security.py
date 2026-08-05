@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 
 from gaia.models import ProjectConfig
@@ -16,9 +17,20 @@ def _normcase(path: Path) -> str:
 
 def resolve_project_path(project: ProjectConfig, requested: str | Path) -> Path:
     root = project.root.expanduser().resolve(strict=True)
-    raw = Path(requested)
+    requested_text = str(requested).strip()
+    if not requested_text:
+        raise PathSecurityError("Requested path is empty")
+    if _contains_traversal(requested_text):
+        raise PathSecurityError("Requested path contains traversal segments")
+
+    raw = _normalise_requested_path(requested_text)
     candidate = raw if raw.is_absolute() else root / raw
-    candidate = candidate.expanduser().resolve(strict=True)
+    try:
+        candidate = candidate.expanduser().resolve(strict=True)
+    except FileNotFoundError as exc:
+        raise PathSecurityError("Requested path does not exist or is not reachable") from exc
+    except OSError as exc:
+        raise PathSecurityError("Requested path is malformed or inaccessible") from exc
 
     root_case = _normcase(root)
     candidate_case = _normcase(candidate)
@@ -57,3 +69,12 @@ def is_secret_bearing_filename(name: str) -> bool:
         "api_key",
     )
     return any(token in lower for token in secret_tokens)
+
+
+def _normalise_requested_path(requested: str) -> Path:
+    return Path(requested.replace("\\", "/"))
+
+
+def _contains_traversal(requested: str) -> bool:
+    parts = re.split(r"[\\/]+", requested)
+    return any(part == ".." for part in parts)

@@ -4,6 +4,8 @@
 
 GAIA v0.1 is the secure evidence layer for an AI employee. It reads only approved project files, captures repository state, builds a local search index and generates foundation reports.
 
+GAIA v0.2 adds a local conversational layer that answers questions from those same evidence sources.
+
 ## Daily operation
 
 ### Check the system
@@ -36,6 +38,14 @@ gaia project search microgrow-v1 "automation engine"
 ### View audit history
 
 Start the API and open `/docs`, then execute `GET /audit/events`.
+
+### Ask a question
+
+```powershell
+gaia ask microgrow-v1 "What was completed most recently?"
+```
+
+If Ollama is unavailable, GAIA returns a deterministic evidence-backed answer instead of pretending a model was used.
 
 ## Understanding results
 

@@ -1,0 +1,12 @@
+enabled: false
+default_provider: mock
+providers:
+  ollama:
+    enabled: false
+    base_url: "http://127.0.0.1:11434"
+    model: ""
+    request_timeout_seconds: 30
+    connection_timeout_seconds: 5
+    max_response_bytes: 200000
+    max_context_chars: 12000
+    max_retries: 0

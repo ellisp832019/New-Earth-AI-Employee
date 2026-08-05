@@ -5,6 +5,7 @@ import sqlite3
 from collections.abc import Iterable
 from pathlib import Path
 
+from gaia.conversation import AgentRunRecord
 from gaia.models import AuditEvent, DocumentRecord, RepositorySnapshot, SearchResult
 
 
@@ -54,6 +55,26 @@ class Database:
                 outcome TEXT NOT NULL,
                 metadata_json TEXT NOT NULL,
                 error_classification TEXT
+            );
+            CREATE TABLE IF NOT EXISTS agent_runs (
+                run_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL,
+                question TEXT NOT NULL,
+                question_category TEXT NOT NULL,
+                snapshot_id TEXT,
+                retrieval_queries_json TEXT NOT NULL,
+                selected_evidence_json TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model_name TEXT,
+                start_timestamp TEXT NOT NULL,
+                finish_timestamp TEXT NOT NULL,
+                status TEXT NOT NULL,
+                structured_answer_json TEXT NOT NULL,
+                confidence TEXT NOT NULL,
+                warnings_json TEXT NOT NULL,
+                prompt_injection_warnings_json TEXT NOT NULL,
+                safe_error TEXT,
+                usage_json TEXT NOT NULL
             );
             """
         )
@@ -227,6 +248,59 @@ class Database:
             item["metadata"] = json.loads(str(item.pop("metadata_json")))
             events.append(item)
         return events
+
+    def insert_agent_run(self, run: AgentRunRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO agent_runs(
+                    run_id, project_id, question, question_category, snapshot_id,
+                    retrieval_queries_json, selected_evidence_json, provider, model_name,
+                    start_timestamp, finish_timestamp, status, structured_answer_json,
+                    confidence, warnings_json, prompt_injection_warnings_json, safe_error, usage_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    run.run_id,
+                    run.project_id,
+                    run.question,
+                    run.question_category,
+                    run.snapshot_id,
+                    json.dumps(run.retrieval_queries, default=str, sort_keys=True),
+                    json.dumps([item.model_dump(mode="json") for item in run.selected_evidence], default=str, sort_keys=True),
+                    run.provider,
+                    run.model_name,
+                    run.start_timestamp.isoformat(),
+                    run.finish_timestamp.isoformat(),
+                    run.status,
+                    json.dumps(run.structured_answer, default=str, sort_keys=True),
+                    run.confidence,
+                    json.dumps(run.warnings, default=str, sort_keys=True),
+                    json.dumps(run.prompt_injection_warnings, default=str, sort_keys=True),
+                    run.safe_error,
+                    json.dumps(run.usage, default=str, sort_keys=True),
+                ),
+            )
+
+    def list_agent_runs(self, limit: int = 100) -> list[dict[str, object]]:
+        rows = self.connection.execute(
+            "SELECT * FROM agent_runs ORDER BY start_timestamp DESC LIMIT ?", (max(1, min(limit, 1000)),)
+        ).fetchall()
+        return [self._row_to_agent_run_dict(row) for row in rows]
+
+    def get_agent_run(self, run_id: str) -> dict[str, object] | None:
+        row = self.connection.execute("SELECT * FROM agent_runs WHERE run_id = ?", (run_id,)).fetchone()
+        return self._row_to_agent_run_dict(row) if row else None
+
+    def _row_to_agent_run_dict(self, row: sqlite3.Row) -> dict[str, object]:
+        item = dict(row)
+        item["retrieval_queries"] = json.loads(str(item.pop("retrieval_queries_json")))
+        item["selected_evidence"] = json.loads(str(item.pop("selected_evidence_json")))
+        item["structured_answer"] = json.loads(str(item.pop("structured_answer_json")))
+        item["warnings"] = json.loads(str(item.pop("warnings_json")))
+        item["prompt_injection_warnings"] = json.loads(str(item.pop("prompt_injection_warnings_json")))
+        item["usage"] = json.loads(str(item.pop("usage_json")))
+        return item
 
 
 def _make_snippet(content: str, query: str, radius: int = 120) -> str:

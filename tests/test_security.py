@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from gaia.security import PathSecurityError, is_secret_bearing_filename, resolve_project_path
@@ -9,9 +11,16 @@ def test_allows_approved_file(settings):
     assert path.name == "README.md"
 
 
-def test_allows_mixed_separators_and_case(settings):
+@pytest.mark.skipif(not sys.platform.startswith("win"), reason="Windows path semantics are case-insensitive")
+def test_allows_mixed_separators_and_case_windows(settings):
     project = settings.projects["sample"]
     path = resolve_project_path(project, "DOCS\\STATUS.MD")
+    assert path.name == "status.md"
+
+
+def test_allows_mixed_separators_portable(settings):
+    project = settings.projects["sample"]
+    path = resolve_project_path(project, "docs\\status.md")
     assert path.name == "status.md"
 
 
@@ -25,9 +34,14 @@ def test_rejects_traversal(settings, tmp_path):
 
 def test_rejects_nested_traversal(settings, tmp_path):
     project = settings.projects["sample"]
-    outside = tmp_path.parent / "outside.md"
-    outside.write_text("outside")
     requested = tmp_path / "docs" / ".." / ".." / "outside.md"
+    with pytest.raises(PathSecurityError):
+        resolve_project_path(project, requested)
+
+
+def test_rejects_nested_traversal_missing_component(settings, tmp_path):
+    project = settings.projects["sample"]
+    requested = tmp_path / "missing" / ".." / ".." / "outside.md"
     with pytest.raises(PathSecurityError):
         resolve_project_path(project, requested)
 

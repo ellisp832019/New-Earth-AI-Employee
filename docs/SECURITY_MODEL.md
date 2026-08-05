@@ -7,6 +7,7 @@
 - access to credentials and environment files;
 - binary or oversized file ingestion;
 - prompt injection contained in project documents;
+- prompt injection in conversational evidence retrieval;
 - arbitrary command execution;
 - credential leakage in Git remote URLs;
 - accidental mutation of the inspected repository;
@@ -26,6 +27,7 @@
 - remote credential redaction;
 - pre/post repository-state comparison;
 - audit metadata excludes file contents and secrets;
+- conversational runs stay local;
 - fail-closed behaviour when a path cannot be proven safe.
 
 ## Prompt injection boundary
