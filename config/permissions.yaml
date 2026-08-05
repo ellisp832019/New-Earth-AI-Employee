@@ -1,0 +1,23 @@
+version: 1
+mode: read_only
+
+allowed:
+  - inspect_registered_project_git
+  - scan_approved_text_documents
+  - index_local_documents
+  - search_local_index
+  - create_repository_snapshots
+  - generate_deterministic_reports
+  - record_audit_events
+
+prohibited:
+  - arbitrary_shell_execution
+  - write_external_project_files
+  - delete_files
+  - git_mutation
+  - send_email
+  - change_calendar
+  - financial_transactions
+  - firmware_changes
+  - physical_device_control
+  - self_modify_policy

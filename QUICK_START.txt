@@ -1,0 +1,24 @@
+NEW EARTH AI EMPLOYEE — GAIA v0.1
+
+1. Extract this folder to:
+   D:\Dev\Projects\New-Earth-AI-Employee
+
+2. Open PowerShell in that folder.
+
+3. Run:
+   Set-ExecutionPolicy -Scope Process Bypass
+   .\scripts\setup_windows.ps1
+   .\.venv\Scripts\Activate.ps1
+   gaia doctor
+   .\scripts\run_tests.ps1
+   .\scripts\first_run.ps1
+
+4. Read:
+   docs\START_HERE.md
+   docs\USER_GUIDE.md
+
+5. For Codex:
+   Open CODEX_MASTER_PROMPT.md and paste the full prompt into Codex.
+
+MicroGrow remains external and read-only at:
+D:\Dev\Projects\MicroGrow V1

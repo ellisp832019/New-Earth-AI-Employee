@@ -1,0 +1,50 @@
+projects:
+  microgrow-v1:
+    name: MicroGrow V1
+    root: 'D:\Dev\Projects\MicroGrow V1'
+    access: read_only
+    approved_extensions:
+      - .md
+      - .txt
+      - .json
+      - .yaml
+      - .yml
+      - .csv
+      - .toml
+      - .ini
+      - .dart
+      - .py
+      - .cpp
+      - .c
+      - .h
+      - .hpp
+    excluded_directories:
+      - .git
+      - .pio
+      - build
+      - dist
+      - node_modules
+      - .dart_tool
+      - .venv
+      - venv
+      - __pycache__
+      - .pytest_cache
+      - .mypy_cache
+      - .ruff_cache
+      - coverage
+    excluded_filenames:
+      - .env
+      - .env.local
+      - credentials.json
+      - secrets.json
+      - id_rsa
+      - id_ed25519
+    important_paths:
+      - README.md
+      - REPO_CONTEXT.md
+      - docs/audit
+      - docs/project_control
+      - docs/user_guides
+      - docs/releases
+      - platformio.ini
+      - pubspec.yaml

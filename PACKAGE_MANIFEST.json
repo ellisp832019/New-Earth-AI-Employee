@@ -1,0 +1,332 @@
+{
+  "package": "New-Earth-AI-Employee",
+  "version": "0.1.0",
+  "employee": "GAIA \u2014 New Earth Operations Coordinator",
+  "role": "MicroGrow Project-Control Officer",
+  "scope": "Read-only evidence foundation",
+  "file_count": 63,
+  "validation": {
+    "tests": "20 passed",
+    "coverage_percent": 70,
+    "source_compilation": "passed",
+    "cli_help": "passed",
+    "real_windows_microgrow_validation": "pending in included Codex workflow"
+  },
+  "files": [
+    {
+      "path": ".env.example",
+      "size_bytes": 223,
+      "sha256": "feed7f3175c46abc55f6cdbc04569c6a765a22e257545c1638f98bba47c9b935"
+    },
+    {
+      "path": ".gitignore",
+      "size_bytes": 262,
+      "sha256": "25209fb429c94c83b9519b9af2aeed048756975c7cf6a2cb1f34023e111d0286"
+    },
+    {
+      "path": "CODEX_MASTER_PROMPT.md",
+      "size_bytes": 8302,
+      "sha256": "fba555a7905c2c4fc466586e86e59e96d4d7bc570bdfa29d0718e49fa59059ae"
+    },
+    {
+      "path": "FILE_TREE.txt",
+      "size_bytes": 1345,
+      "sha256": "0309c45f97b20af1b866aaa6a5e10da2a9a0aaf097e80e52cb47eccd8e63c1b0"
+    },
+    {
+      "path": "LICENSE.txt",
+      "size_bytes": 283,
+      "sha256": "c4f7d701b49011fdc34598847ef78f3092e401b894e695d4033e3741b328f02b"
+    },
+    {
+      "path": "QUICK_START.txt",
+      "size_bytes": 540,
+      "sha256": "63b1b2cf76557d8b3da00d10a48f561637867ce88a0a66d50c4d42dfa7082438"
+    },
+    {
+      "path": "README.md",
+      "size_bytes": 2006,
+      "sha256": "1d7bbce2d2c4edef06acab2a8b2f9b6df9d520512a6edbdb2d9b92d635f6ad46"
+    },
+    {
+      "path": "VERSION",
+      "size_bytes": 6,
+      "sha256": "e9dd8507f4bf0c6f42458e41aea833ad0bd3f6127272335eee9bf4d58541ed67"
+    },
+    {
+      "path": "config/employee.yaml",
+      "size_bytes": 603,
+      "sha256": "b91e258cde4b694696a499f9528ad786efa0a3aa4b1e52177a862666f160489a"
+    },
+    {
+      "path": "config/model-routing.example.yaml",
+      "size_bytes": 133,
+      "sha256": "00ff79b833cdb8ee7fc066c3fcf9e4f4c379cab10eaa6c3d31a0c6dbff806645"
+    },
+    {
+      "path": "config/permissions.yaml",
+      "size_bytes": 489,
+      "sha256": "5a0845cdb4b6e31ae34013b86fdd4dec10ae01e077ae2734cc8f8a442be295a7"
+    },
+    {
+      "path": "config/projects.yaml",
+      "size_bytes": 900,
+      "sha256": "d92529f0918e0ceb1d1051f7a624b420e6dc605c49dbf05ded6ee2ab03d6c8bf"
+    },
+    {
+      "path": "data/logs/.gitkeep",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "data/reports/.gitkeep",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/API_REFERENCE.md",
+      "size_bytes": 685,
+      "sha256": "39120c3c17150864cae8385b76a0cf49936528ba021be20be72f7533439936cd"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "size_bytes": 1180,
+      "sha256": "8f8da0f84136e703c2cd5fbccccacfded248e79d6f2ca3dca2065d88a7250c77"
+    },
+    {
+      "path": "docs/CLI_REFERENCE.md",
+      "size_bytes": 629,
+      "sha256": "823b002098891fd26f0370c58531a2381de143834c7c3228de91f65172c8b4e2"
+    },
+    {
+      "path": "docs/CODEX_USAGE_GUIDE.md",
+      "size_bytes": 641,
+      "sha256": "777b1e1343f01f03b0d924689f2dacbc75886a336520f7e5d9c58a8f218b1655"
+    },
+    {
+      "path": "docs/DATA_MODEL.md",
+      "size_bytes": 802,
+      "sha256": "b09e230f2ed3f04e1e85e269ac50b0ed5d7e005a4207e9c2a9c3ba70c417f6d9"
+    },
+    {
+      "path": "docs/EMPLOYEE_HANDBOOK.md",
+      "size_bytes": 1015,
+      "sha256": "fb4059a562c62a8a2baeaec85da64e6f99e33ea94d98581ba2b42bd21dc864d6"
+    },
+    {
+      "path": "docs/GAIA_V0_1_ROADMAP.md",
+      "size_bytes": 1287,
+      "sha256": "87d0d8544006a0c9b38356b51e05ec58897604549f000d10c41d1e147aee18b9"
+    },
+    {
+      "path": "docs/MICROGROW_INSPECTION_GUIDE.md",
+      "size_bytes": 1096,
+      "sha256": "797268ca32d08c2bc1fc76807c443d51d359de09454a1214288218cb178e274e"
+    },
+    {
+      "path": "docs/OPERATIONS_RUNBOOK.md",
+      "size_bytes": 736,
+      "sha256": "59410ed426266313b14d08b8265f95d75f932abf54462cb92a4d47649bfff1b7"
+    },
+    {
+      "path": "docs/PACKAGE_VALIDATION.md",
+      "size_bytes": 1091,
+      "sha256": "5c7526bcfdf6894bab00bcd5a80f77df252833d4e0b10f80fe562f604dbda6f8"
+    },
+    {
+      "path": "docs/PROJECT_REGISTRY.md",
+      "size_bytes": 562,
+      "sha256": "59880404afc1ded15241af4d60906eb0434ff8306601329917f65cf36b3d30f3"
+    },
+    {
+      "path": "docs/SECURITY_MODEL.md",
+      "size_bytes": 1640,
+      "sha256": "92eb45488d58ec74f8e9e79e7a95186d1b69ffbf90bc357e5e55c92dab717051"
+    },
+    {
+      "path": "docs/START_HERE.md",
+      "size_bytes": 792,
+      "sha256": "85ba552da064f18f3b81e077b2ec3cd603166affb072cb2b524d6b832bf0837e"
+    },
+    {
+      "path": "docs/TESTING.md",
+      "size_bytes": 504,
+      "sha256": "fadf2bd47bc20bb7f4f8bcc0bab2cbc3c0c7b653961f803abe35c52d4d1c96c1"
+    },
+    {
+      "path": "docs/USER_GUIDE.md",
+      "size_bytes": 1959,
+      "sha256": "b25ed07dbf4fe6a5dcc088c8385741d00b7f36fb8cab01be160b641a390b72d1"
+    },
+    {
+      "path": "docs/WINDOWS_SETUP.md",
+      "size_bytes": 824,
+      "sha256": "e9c57dbbb9d6fea78b1238005a50b36815a2b7c1506641cc6c6d467e27c3f851"
+    },
+    {
+      "path": "docs/validation/.gitkeep",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "pyproject.toml",
+      "size_bytes": 1108,
+      "sha256": "79a8ba3449fb3aa789d39d5ef1fbd6cc84944d790e1c55aae2a3e83e7b9c97e7"
+    },
+    {
+      "path": "schemas/audit-event.schema.json",
+      "size_bytes": 762,
+      "sha256": "2ec674a8559c2d2552eb7945cab9fc979d21ce2aafd956a0a53b62a92275c802"
+    },
+    {
+      "path": "schemas/project-registry.schema.json",
+      "size_bytes": 976,
+      "sha256": "8fbf87e8427bd5b172772dcacf82c626e84d06164f0e6a062bc24e4f68471a11"
+    },
+    {
+      "path": "scripts/first_run.ps1",
+      "size_bytes": 280,
+      "sha256": "84396c6a171c43474ab7da725d25c388d0413f64935f8796a19d21d88230777f"
+    },
+    {
+      "path": "scripts/generate_report.ps1",
+      "size_bytes": 414,
+      "sha256": "d63664c5d1248cc0d9383c05cbce2ad15412e9b633cc659bc458b63f6978f9a4"
+    },
+    {
+      "path": "scripts/initialize_repo.ps1",
+      "size_bytes": 543,
+      "sha256": "cd6efd1e193845107c55189b57c074485513e44bad00bdba3fc7dedeb3210f75"
+    },
+    {
+      "path": "scripts/open_vscode.ps1",
+      "size_bytes": 256,
+      "sha256": "ff2edf5129862e5b63ae30642f25d54ee36c3b830f07a8ce55de2d76e3d785a5"
+    },
+    {
+      "path": "scripts/run_tests.ps1",
+      "size_bytes": 332,
+      "sha256": "b3ad54ec697682097e2aad60e83f4dd17f7be08ac57fb0be741bf65859f99e23"
+    },
+    {
+      "path": "scripts/scan_microgrow.ps1",
+      "size_bytes": 367,
+      "sha256": "9d15770f694d7b6648b251ac373103555f7b87331551a2269611a4e8291e8cf8"
+    },
+    {
+      "path": "scripts/setup_windows.ps1",
+      "size_bytes": 1072,
+      "sha256": "7ad57643f5a7bc12d25e629ca582343c51129cc442deb563fc0e3b1132691e7f"
+    },
+    {
+      "path": "scripts/start_api.ps1",
+      "size_bytes": 251,
+      "sha256": "3bd68362c53ee53e417bc1450bbf99e1608dc1892a05aa6f5f1485f92a0d5b33"
+    },
+    {
+      "path": "src/gaia/__init__.py",
+      "size_bytes": 74,
+      "sha256": "e0807e4c85734f1de2238f90375cdc8914f9b7826662a0588812c8397dff2e9b"
+    },
+    {
+      "path": "src/gaia/__main__.py",
+      "size_bytes": 63,
+      "sha256": "1ebd667b967d9501cd6f0dc108cb49d9a60ed0fdbdcccc5c93946cc51a130d3f"
+    },
+    {
+      "path": "src/gaia/api.py",
+      "size_bytes": 4869,
+      "sha256": "b81d6de8c67d85c05b9182a8479c0f64aa6f604f6b960deca3f73fccdcf583a5"
+    },
+    {
+      "path": "src/gaia/audit.py",
+      "size_bytes": 1023,
+      "sha256": "5e6e2c951a5835b905a978b034a05f1048d9ff2d321e110c358e0407b6377e83"
+    },
+    {
+      "path": "src/gaia/cli.py",
+      "size_bytes": 5331,
+      "sha256": "06778d60b001db723dd463c6f0f2d79407665e107a30f266d82e605d85c54166"
+    },
+    {
+      "path": "src/gaia/config.py",
+      "size_bytes": 2027,
+      "sha256": "80193d30d80c0e1799bbcb55c617f4ab97c5b6f2f98b86571f2c00b8f6729730"
+    },
+    {
+      "path": "src/gaia/db.py",
+      "size_bytes": 9528,
+      "sha256": "d0fc9b50f190243f2e8e7a0eedca9767dcd519ddebe011205bd0ef245dc1ab26"
+    },
+    {
+      "path": "src/gaia/git_inspector.py",
+      "size_bytes": 5355,
+      "sha256": "1264632c26f95510d6a247cad6c859beca3cb5d838a7bca691013596708645d4"
+    },
+    {
+      "path": "src/gaia/models.py",
+      "size_bytes": 2944,
+      "sha256": "48da7d83d2fc9de52bb4ec2d3e75e24185cc90a8adbb2b97fba24966c36f859c"
+    },
+    {
+      "path": "src/gaia/reports.py",
+      "size_bytes": 2615,
+      "sha256": "3fbf019d87da0d5f5aaf6e6323c6e4faa3f1528a3e64ff9eea68fe0ed10a99f4"
+    },
+    {
+      "path": "src/gaia/scanner.py",
+      "size_bytes": 5302,
+      "sha256": "a358f1609a0ea114ba464735065f5c1b324170b5248acb246e2a28bfe28b5756"
+    },
+    {
+      "path": "src/gaia/security.py",
+      "size_bytes": 1958,
+      "sha256": "e3ea9d49ef898f85b3951f30bd083994d5cbfcbb2740fbcc8ec65e5d7bfcc891"
+    },
+    {
+      "path": "src/gaia/service.py",
+      "size_bytes": 5305,
+      "sha256": "b6a1ffb30981ee5771ea227de5f6d076f3eefae23ed0612c47d0521f9744a44f"
+    },
+    {
+      "path": "tests/conftest.py",
+      "size_bytes": 1992,
+      "sha256": "7eb482e2e635802a01168e1c7099fc2d05c816019d96b4c147252007c8a4de8d"
+    },
+    {
+      "path": "tests/test_api.py",
+      "size_bytes": 1099,
+      "sha256": "ac6e0fcbae18514d7aa0ba6b7722576a6123c2be3d01acb780bbe4b3ab7c7b58"
+    },
+    {
+      "path": "tests/test_config.py",
+      "size_bytes": 292,
+      "sha256": "fe1843f85d7924d23ee884663289e940dcb4bdae9f49ac988ef9be59672889dd"
+    },
+    {
+      "path": "tests/test_db_search.py",
+      "size_bytes": 861,
+      "sha256": "a9e448f785c2f3856a43a4f4c1ea7450a7268a0b50f0c665ed119359802300e1"
+    },
+    {
+      "path": "tests/test_git_inspector.py",
+      "size_bytes": 939,
+      "sha256": "229195542d85f02c260cd77d79ac47cf26da48d8bef185bd1542949771626311"
+    },
+    {
+      "path": "tests/test_scanner.py",
+      "size_bytes": 864,
+      "sha256": "c291c414597703c919274dcc07e0d406d81d340f63c9b4c61c215b3f8c2b686f"
+    },
+    {
+      "path": "tests/test_security.py",
+      "size_bytes": 1481,
+      "sha256": "26ee5c0531e1e274c3c888696f5f31398f14dd65f6b1659fb38647dcd4b9336a"
+    },
+    {
+      "path": "tests/test_service.py",
+      "size_bytes": 1105,
+      "sha256": "b76df5014d429d65ec4146e83a8f53968643aebc419b1fddccbb016c54f98ead"
+    }
+  ]
+}

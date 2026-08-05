@@ -1,0 +1,6 @@
+$ErrorActionPreference = "Stop"
+Set-Location (Split-Path -Parent $PSScriptRoot)
+$python = ".\.venv\Scripts\python.exe"
+if (-not (Test-Path $python)) { throw "Virtual environment missing. Run scripts\setup_windows.ps1 first." }
+New-Item -ItemType Directory -Force -Path "data\reports" | Out-Null
+& $python -m gaia project report microgrow-v1 --format markdown --output "data\reports\MICROGROW_FOUNDATION_REPORT.md"

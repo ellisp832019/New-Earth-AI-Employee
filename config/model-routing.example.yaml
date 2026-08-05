@@ -1,0 +1,5 @@
+# Model integration is intentionally disabled in GAIA v0.1.
+model_routing:
+  enabled: false
+  default_provider: none
+  providers: {}

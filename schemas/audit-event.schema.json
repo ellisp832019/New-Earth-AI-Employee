@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://new-earth.uk/schemas/gaia/audit-event.schema.json",
+  "title": "GAIA Audit Event",
+  "type": "object",
+  "required": ["event_id", "timestamp", "category", "operation", "outcome", "metadata"],
+  "properties": {
+    "event_id": {"type": "string", "format": "uuid"},
+    "timestamp": {"type": "string", "format": "date-time"},
+    "category": {"type": "string", "minLength": 1},
+    "operation": {"type": "string", "minLength": 1},
+    "project_id": {"type": ["string", "null"]},
+    "outcome": {"enum": ["allowed", "rejected", "success", "failure"]},
+    "metadata": {"type": "object"},
+    "error_classification": {"type": ["string", "null"]}
+  },
+  "additionalProperties": false
+}
