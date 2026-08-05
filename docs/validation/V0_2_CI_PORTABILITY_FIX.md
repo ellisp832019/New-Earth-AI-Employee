@@ -43,4 +43,4 @@ GitHub Actions initially reported `3 failed, 35 passed, 1 warning` on the Python
 
 ## GitHub Actions Result
 
-Pending after the branch push and PR re-run.
+Passed on the PR after the portability repair. Both Python 3.11 and Python 3.14 jobs completed successfully.
