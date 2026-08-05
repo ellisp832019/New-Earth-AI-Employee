@@ -6,6 +6,8 @@ This repository is a local-first, read-only foundation for a controlled AI emplo
 
 GAIA v0.1 does **not** modify MicroGrow, execute unrestricted shell commands, send email, control equipment, or make autonomous changes.
 
+GAIA v0.2 extends the foundation with a local conversational layer that answers questions from the same evidence sources while remaining read-only.
+
 ## Repository relationship
 
 ```text
@@ -39,6 +41,7 @@ gaia doctor
 gaia project scan microgrow-v1
 gaia project snapshot microgrow-v1
 gaia project report microgrow-v1 --format markdown --output ".\data\reports\microgrow-foundation.md"
+gaia ask microgrow-v1 "Where exactly is MicroGrow currently?"
 ```
 
 Start the API:

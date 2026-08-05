@@ -28,6 +28,22 @@ def test_scan_search_report(settings):
         assert "GAIA Foundation Report" in response.text
         assert client.get("/projects/sample/snapshots/latest").status_code == 200
         assert client.get("/audit/events").status_code == 200
+        assert client.get("/models/status").status_code == 200
+        assert client.get("/models").status_code == 200
+
+
+def test_agent_ask_api(settings):
+    with TestClient(create_app(settings)) as client:
+        response = client.post(
+            "/agent/ask",
+            json={"project_id": "sample", "question": "What was completed most recently?", "deterministic_only": True},
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["project_id"] == "sample"
+        assert payload["run_id"]
+        assert client.get("/agent/runs").status_code == 200
+        assert client.get(f"/agent/runs/{payload['run_id']}").status_code == 200
 
 
 def test_unknown_project(settings):

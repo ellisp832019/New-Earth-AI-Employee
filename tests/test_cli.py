@@ -12,3 +12,17 @@ def test_doctor_and_projects_list(settings_file):
     result = runner.invoke(app, ["projects", "list", "--config", str(settings_file)])
     assert result.exit_code == 0
     assert "Registered projects" in result.output
+
+
+def test_ask_and_runs(settings_file):
+    runner = CliRunner()
+    result = runner.invoke(
+        app,
+        ["ask", "sample", "What was completed most recently?", "--deterministic-only", "--config", str(settings_file)],
+    )
+    assert result.exit_code == 0
+    assert "Ask Result" in result.output
+
+    result = runner.invoke(app, ["agent", "runs", "list", "--config", str(settings_file)])
+    assert result.exit_code == 0
+    assert "run_id" in result.output

@@ -20,5 +20,10 @@ Open `http://127.0.0.1:8765/docs` for interactive OpenAPI documentation.
 - `GET /projects/{project_id}/search?q=...`
 - `POST /projects/{project_id}/reports/foundation?format=markdown`
 - `GET /audit/events`
+- `GET /models/status`
+- `GET /models`
+- `POST /agent/ask`
+- `GET /agent/runs`
+- `GET /agent/runs/{run_id}`
 
 The API binds to loopback by default. Do not expose it to a network until authentication, transport security and deployment hardening are implemented.

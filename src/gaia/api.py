@@ -7,9 +7,12 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from gaia import __version__
+from gaia.agent import AgentService
 from gaia.config import Settings, load_settings
+from gaia.conversation import AskRequest
 from gaia.db import Database
 from gaia.models import HealthResponse
+from gaia.providers import ProviderRegistry
 from gaia.service import ProjectService
 
 
@@ -17,6 +20,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     resolved_settings = settings or load_settings()
     database = Database(resolved_settings.database_path)
     service = ProjectService(resolved_settings, database)
+    provider_registry = ProviderRegistry(resolved_settings.model_routing)
+    agent_service = AgentService(service, database, provider_registry)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -116,6 +121,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/audit/events")
     def audit_events(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, object]]:
         return database.list_audit_events(limit)
+
+    @app.get("/models/status")
+    async def models_status() -> list[dict[str, object]]:
+        return [status.model_dump(mode="json") for status in await provider_registry.list_status()]
+
+    @app.get("/models")
+    async def models() -> list[dict[str, object]]:
+        return [status.model_dump(mode="json") for status in await provider_registry.list_status()]
+
+    @app.post("/agent/ask")
+    async def ask(request: AskRequest) -> dict[str, object]:
+        try:
+            response = await agent_service.ask(
+                request.project_id,
+                request.question,
+                provider=request.provider,
+                model=request.model,
+                evidence_limit=request.evidence_limit,
+                refresh_snapshot=request.refresh_snapshot,
+                deterministic_only=request.deterministic_only,
+            )
+            return response.model_dump(mode="json")
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Project not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/agent/runs")
+    def agent_runs(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, object]]:
+        return database.list_agent_runs(limit)
+
+    @app.get("/agent/runs/{run_id}")
+    def agent_run(run_id: str) -> dict[str, object]:
+        run = database.get_agent_run(run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return run
 
     return app
 
