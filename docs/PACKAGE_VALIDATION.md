@@ -1,6 +1,6 @@
 # Package Validation
 
-Package version: `0.2.0`
+Package version: `0.3.0`
 
 ## Validation completed before packaging
 

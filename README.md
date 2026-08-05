@@ -1,14 +1,17 @@
 # New Earth AI Employee
 
-**GAIA v0.1 — MicroGrow Project-Control Officer**
+**GAIA v0.3 - Windows Control Centre over the MicroGrow inspection foundation**
 
-This repository is a local-first, read-only foundation for a controlled AI employee. Its first role is to inspect the external MicroGrow V1 repository, index approved text documents, capture Git state, produce deterministic evidence reports, and expose those capabilities through a CLI and FastAPI service.
+This repository is a local-first, read-only foundation for a controlled AI employee. Its first role is to inspect the external MicroGrow V1 repository, index approved text documents, capture Git state, produce deterministic evidence reports, and expose those capabilities through a CLI, FastAPI service, and a Windows desktop control centre.
 
 GAIA v0.1 does **not** modify MicroGrow, execute unrestricted shell commands, send email, control equipment, or make autonomous changes.
 
 GAIA v0.2 extends the foundation with a local conversational layer that answers questions from the same evidence sources while remaining read-only.
 
+GAIA v0.3 adds a Flutter-based Windows desktop shell that connects to the existing read-only backend, keeps MicroGrow read-only, and surfaces evidence, reports, snapshots, agent runs, and audit history.
+
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
+Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).
 
 ## Repository relationship
 
@@ -27,6 +30,7 @@ D:\Dev\Projects\MicroGrow V1           <- external read-only source
 - append-only audit events;
 - FastAPI endpoints;
 - Typer CLI;
+- Flutter Windows desktop control centre;
 - Windows PowerShell setup and run scripts;
 - automated tests;
 - complete user, architecture, security and roadmap documentation;
@@ -38,6 +42,7 @@ D:\Dev\Projects\MicroGrow V1           <- external read-only source
 cd "D:\Dev\Projects\New-Earth-AI-Employee"
 Set-ExecutionPolicy -Scope Process Bypass
 .\scripts\setup_windows.ps1
+.\scripts\setup_flutter_windows.ps1
 .\.venv\Scripts\Activate.ps1
 gaia doctor
 gaia project scan microgrow-v1
@@ -53,6 +58,14 @@ Start the API:
 ```
 
 Then open `http://127.0.0.1:8765/docs`.
+
+Start the Windows control centre:
+
+```powershell
+.\scripts\run_gaia_windows.ps1
+```
+
+The desktop client connects to the local GAIA backend on `http://127.0.0.1:8000`.
 
 ## Safety boundary
 
