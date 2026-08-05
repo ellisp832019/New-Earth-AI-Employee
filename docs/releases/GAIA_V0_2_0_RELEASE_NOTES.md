@@ -14,6 +14,9 @@ GAIA v0.2.0 adds a local, evidence-backed conversational layer to the existing r
 - Added prompt-injection detection and warning propagation.
 - Separated prompt-injection warnings from general answer warnings.
 - Redacted the absolute Git host path from conversational evidence.
+- Corrected the package version to `0.2.0`.
+- Made the CI conversational read-only test self-contained with a temporary Git repository.
+- Made path-security tests explicitly platform-aware.
 - Added Codex prompt drafting for planning-only handoff work.
 - Added release-hardening and publication-safety documentation.
 
@@ -37,6 +40,7 @@ The conversational layer remains evidence-first. Deterministic Git facts come fr
 - Runtime databases, logs, caches, and generated reports remain excluded from Git.
 - Prompt-injection attempts are detected and surfaced as warnings rather than executed.
 - Evidence paths are project-relative where possible.
+- Windows-only filesystem semantics are tested separately from portable Linux CI behavior.
 
 ## CLI Additions
 
@@ -95,12 +99,14 @@ Release hardening was validated with:
 - compileall: passed;
 - Ruff: passed;
 - mypy: passed;
-- pytest: passed with 38 tests and 1 warning;
+- pytest: passed with 40 tests and 1 warning;
 - `gaia doctor`: passed.
 
 ## MicroGrow Read-Only Proof
 
 MicroGrow validation was performed against `D:\Dev\Projects\MicroGrow V1` using read-only inspection, snapshot, search, report, and conversational paths. The branch, commit SHA, and porcelain status matched before and after validation.
+
+The Linux CI repair replaced the MicroGrow-dependent conversational test with a temporary Git repository fixture so GitHub Actions no longer depends on Peter's Windows-only path.
 
 ## Known Limitations
 
