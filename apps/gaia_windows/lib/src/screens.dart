@@ -32,6 +32,8 @@ class _GaiaShellState extends State<GaiaShell> {
     _Destination('Permissions', Icons.shield_outlined, Icons.shield),
     _Destination('Action Centre', Icons.play_circle_outline, Icons.play_circle),
     _Destination('Receipts', Icons.receipt_long_outlined, Icons.receipt_long),
+    _Destination('Trust Centre', Icons.verified_user_outlined, Icons.verified_user),
+    _Destination('Integration', Icons.cable_outlined, Icons.cable),
     _Destination('Daily Brief', Icons.event_note_outlined, Icons.event_note),
     _Destination('VS Code Ops', Icons.code_outlined, Icons.code),
     _Destination('Audit', Icons.rule_folder_outlined, Icons.rule_folder),
@@ -66,6 +68,8 @@ class _GaiaShellState extends State<GaiaShell> {
         PermissionsScreen(controller: controller),
         ActionsScreen(controller: controller),
         ReceiptsScreen(controller: controller),
+        TrustCentreScreen(controller: controller),
+        IntegrationScreen(controller: controller),
         DailyBriefScreen(controller: controller),
         VscodeOpsScreen(controller: controller),
         AuditScreen(controller: controller),
@@ -1755,7 +1759,7 @@ class AboutScreen extends StatelessWidget {
       title: 'About',
       subtitle: 'Local-first, evidence-backed desktop control centre',
       child: SectionCard(
-        title: 'GAIA v0.5.1',
+        title: 'GAIA v0.6.0',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2067,7 +2071,7 @@ class _ActionsScreenState extends State<ActionsScreen> {
 
   Future<void> _createAction(BuildContext context) async {
     final titleController = TextEditingController(text: 'Export approved output');
-    final contentController = TextEditingController(text: 'Hello from GAIA v0.5.1');
+    final contentController = TextEditingController(text: 'Hello from GAIA v0.6.0');
     final targetController = TextEditingController(text: 'workspace/approved_outputs/demo.md');
     String manifestId = widget.controller.selectedManifestId ?? (widget.controller.permissionManifests.isNotEmpty ? widget.controller.permissionManifests.first['manifest_id'] as String : '');
     await showDialog<void>(
@@ -2177,8 +2181,107 @@ class ReceiptsScreen extends StatelessWidget {
                       ('Resulting hash', selected['resulting_hash']?.toString() ?? ''),
                       ('Backup path', selected['backup_path']?.toString() ?? 'None'),
                       ('Rollback available', selected['rollback_available'] == true ? 'Yes' : 'No'),
+                      ('Chain ID', selected['chain_id']?.toString() ?? 'None'),
+                      ('Chain sequence', selected['chain_sequence']?.toString() ?? 'None'),
+                      ('Receipt hash', selected['receipt_content_hash']?.toString() ?? 'None'),
+                      ('Verification', selected['verification_status']?.toString() ?? 'unknown'),
                     ]),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TrustCentreScreen extends StatelessWidget {
+  const TrustCentreScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final latestReceipt = controller.executionReceipts.isNotEmpty ? controller.executionReceipts.first : null;
+    final compatibility = controller.integrationCompatibility ?? <String, dynamic>{};
+    return _ScreenScaffold(
+      title: 'Trust Centre',
+      subtitle: 'Compatibility, chains, templates and retention posture',
+      child: ListView(
+        children: [
+          SectionCard(
+            title: 'Compatibility',
+            subtitle: compatibility['status']?.toString() ?? 'Unavailable',
+            child: _keyValueGrid([
+              ('Backend', compatibility['backend_version']?.toString() ?? 'unknown'),
+              ('Contract', compatibility['integration_contract_version']?.toString() ?? compatibility['contract_version']?.toString() ?? 'unknown'),
+              ('Client', compatibility['client_package_version']?.toString() ?? 'unknown'),
+              ('Capabilities', (compatibility['capabilities'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
+              ('Degraded', (compatibility['degraded_features'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Receipt Chain',
+            subtitle: latestReceipt?['chain_id']?.toString() ?? 'No receipts yet',
+            child: latestReceipt == null
+                ? const Text('Create and execute an action to populate the receipt chain.')
+                : _keyValueGrid([
+                    ('Chain ID', latestReceipt['chain_id']?.toString() ?? 'None'),
+                    ('Sequence', latestReceipt['chain_sequence']?.toString() ?? 'None'),
+                    ('Receipt hash', latestReceipt['receipt_content_hash']?.toString() ?? 'None'),
+                    ('Previous hash', latestReceipt['previous_receipt_hash']?.toString() ?? 'None'),
+                    ('Verification', latestReceipt['verification_status']?.toString() ?? 'unknown'),
+                  ]),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Trust Summary',
+            child: _keyValueGrid([
+              ('Manifests', controller.permissionManifests.length.toString()),
+              ('Actions', controller.outputActions.length.toString()),
+              ('Receipts', controller.executionReceipts.length.toString()),
+              ('No auto deletion', 'Default preserve'),
+            ]),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class IntegrationScreen extends StatelessWidget {
+  const IntegrationScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final compatibility = controller.integrationCompatibility ?? <String, dynamic>{};
+    return _ScreenScaffold(
+      title: 'Integration',
+      subtitle: 'Dashboard-safe contract diagnostics',
+      child: ListView(
+        children: [
+          SectionCard(
+            title: 'Contract State',
+            subtitle: compatibility['status']?.toString() ?? 'Unavailable',
+            child: _keyValueGrid([
+              ('Backend', compatibility['backend_version']?.toString() ?? 'unknown'),
+              ('Minimum API', compatibility['minimum_supported_api_version']?.toString() ?? 'unknown'),
+              ('Maximum API', compatibility['maximum_tested_api_version']?.toString() ?? 'unknown'),
+              ('Contract', compatibility['integration_contract_version']?.toString() ?? compatibility['contract_version']?.toString() ?? 'unknown'),
+              ('Loopback only', compatibility['loopback_only'] == true ? 'Yes' : 'No'),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Feature Gating',
+            child: _keyValueGrid([
+              ('Capabilities', (compatibility['capabilities'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
+              ('Degraded features', (compatibility['degraded_features'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
+              ('Warnings', (compatibility['deprecation_warnings'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
+              ('Example host', 'This repo ships a loopback reference host'),
+            ]),
           ),
         ],
       ),

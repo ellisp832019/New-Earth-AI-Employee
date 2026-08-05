@@ -1,5 +1,18 @@
 # Changelog
 
+## [gaia-v0.6.0] - 2026-08-05
+
+### Added
+
+- Reusable GAIA dashboard module package for embedding in future hosts.
+- Example dashboard host demonstrating connected, degraded, incompatible and unavailable states.
+- Stronger compatibility contract, tamper-evident receipt chains, review-package verification, action templates, and retention scaffolding.
+- Trust Centre and integration screens in the Windows control centre.
+
+### Changed
+
+- Backend, integration client, Flutter surfaces, and documentation now align on `0.6.0`.
+
 ## [gaia-v0.5.1] - 2026-08-05
 
 ### Fixed

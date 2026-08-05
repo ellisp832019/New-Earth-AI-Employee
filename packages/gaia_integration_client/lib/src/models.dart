@@ -33,28 +33,46 @@ class GaiaHealth {
 
 class GaiaCompatibility {
   GaiaCompatibility({
+    required this.backendProductVersion,
+    required this.minimumSupportedApiVersion,
+    required this.maximumTestedApiVersion,
+    required this.integrationContractVersion,
+    required this.clientPackageVersion,
     required this.backendVersion,
-    required this.contractVersion,
     required this.status,
     required this.loopbackOnly,
     required this.capabilities,
+    required this.degradedFeatures,
+    required this.deprecationWarnings,
   });
 
   factory GaiaCompatibility.fromJson(Map<String, dynamic> json) => GaiaCompatibility(
-        backendVersion: json['backend_version'] as String? ?? 'unknown',
-        contractVersion: json['contract_version'] as String? ?? 'unknown',
+        backendProductVersion: json['backend_product_version'] as String? ?? json['backend_version'] as String? ?? 'unknown',
+        minimumSupportedApiVersion: json['minimum_supported_api_version'] as String? ?? 'unknown',
+        maximumTestedApiVersion: json['maximum_tested_api_version'] as String? ?? 'unknown',
+        integrationContractVersion: json['integration_contract_version'] as String? ?? json['contract_version'] as String? ?? 'unknown',
+        clientPackageVersion: json['client_package_version'] as String? ?? 'unknown',
+        backendVersion: json['backend_version'] as String? ?? json['backend_product_version'] as String? ?? 'unknown',
         status: json['status'] as String? ?? 'unknown',
         loopbackOnly: json['loopback_only'] as bool? ?? true,
         capabilities: (json['capabilities'] as List<dynamic>? ?? const <dynamic>[])
             .whereType<String>()
             .toList(),
+        degradedFeatures: (json['degraded_features'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
+        deprecationWarnings: (json['deprecation_warnings'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
       );
 
+  final String backendProductVersion;
+  final String minimumSupportedApiVersion;
+  final String maximumTestedApiVersion;
+  final String integrationContractVersion;
+  final String clientPackageVersion;
   final String backendVersion;
-  final String contractVersion;
   final String status;
   final bool loopbackOnly;
   final List<String> capabilities;
+  final List<String> degradedFeatures;
+  final List<String> deprecationWarnings;
 }
 
 class GaiaProjectSummary {
@@ -144,6 +162,11 @@ class GaiaExecutionReceipt {
     required this.targetPath,
     required this.resultingHash,
     required this.timestamp,
+    required this.chainId,
+    required this.chainSequence,
+    required this.previousReceiptHash,
+    required this.receiptContentHash,
+    required this.verificationStatus,
   });
 
   factory GaiaExecutionReceipt.fromJson(Map<String, dynamic> json) => GaiaExecutionReceipt(
@@ -154,6 +177,11 @@ class GaiaExecutionReceipt {
         targetPath: json['target_path'] as String? ?? '',
         resultingHash: json['resulting_hash'] as String? ?? '',
         timestamp: DateTime.parse(json['timestamp'] as String? ?? DateTime.now().toIso8601String()),
+        chainId: json['chain_id'] as String?,
+        chainSequence: json['chain_sequence'] as int?,
+        previousReceiptHash: json['previous_receipt_hash'] as String?,
+        receiptContentHash: json['receipt_content_hash'] as String?,
+        verificationStatus: json['verification_status'] as String? ?? 'unknown',
       );
 
   final String receiptId;
@@ -163,6 +191,182 @@ class GaiaExecutionReceipt {
   final String targetPath;
   final String resultingHash;
   final DateTime timestamp;
+  final String? chainId;
+  final int? chainSequence;
+  final String? previousReceiptHash;
+  final String? receiptContentHash;
+  final String verificationStatus;
+}
+
+class GaiaReceiptVerification {
+  GaiaReceiptVerification({
+    required this.receiptId,
+    required this.chainId,
+    required this.chainSequence,
+    required this.status,
+    required this.previousReceiptHash,
+    required this.receiptContentHash,
+    required this.warnings,
+  });
+
+  factory GaiaReceiptVerification.fromJson(Map<String, dynamic> json) => GaiaReceiptVerification(
+        receiptId: json['receipt_id'] as String? ?? '',
+        chainId: json['chain_id'] as String?,
+        chainSequence: json['chain_sequence'] as int?,
+        status: json['status'] as String? ?? 'unknown',
+        previousReceiptHash: json['previous_receipt_hash'] as String?,
+        receiptContentHash: json['receipt_content_hash'] as String?,
+        warnings: (json['warnings'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
+      );
+
+  final String receiptId;
+  final String? chainId;
+  final int? chainSequence;
+  final String status;
+  final String? previousReceiptHash;
+  final String? receiptContentHash;
+  final List<String> warnings;
+}
+
+class GaiaActionTemplate {
+  GaiaActionTemplate({
+    required this.templateId,
+    required this.templateVersion,
+    required this.title,
+    required this.description,
+    required this.permittedActionType,
+    required this.requiredInputs,
+    required this.optionalInputs,
+    required this.targetPathPattern,
+    required this.allowedExtension,
+    required this.riskLevel,
+    required this.approvalRequired,
+    required this.previewRenderer,
+    required this.retentionClass,
+    required this.enabled,
+  });
+
+  factory GaiaActionTemplate.fromJson(Map<String, dynamic> json) => GaiaActionTemplate(
+        templateId: json['template_id'] as String? ?? '',
+        templateVersion: json['template_version'] as int? ?? 1,
+        title: json['title'] as String? ?? '',
+        description: json['description'] as String? ?? '',
+        permittedActionType: json['permitted_action_type'] as String? ?? '',
+        requiredInputs: (json['required_inputs'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
+        optionalInputs: (json['optional_inputs'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
+        targetPathPattern: json['target_path_pattern'] as String? ?? '',
+        allowedExtension: json['allowed_extension'] as String? ?? '',
+        riskLevel: json['risk_level'] as String? ?? 'low',
+        approvalRequired: json['approval_required'] as bool? ?? true,
+        previewRenderer: json['preview_renderer'] as String? ?? 'markdown',
+        retentionClass: json['retention_class'] as String? ?? 'standard',
+        enabled: json['enabled'] as bool? ?? true,
+      );
+
+  final String templateId;
+  final int templateVersion;
+  final String title;
+  final String description;
+  final String permittedActionType;
+  final List<String> requiredInputs;
+  final List<String> optionalInputs;
+  final String targetPathPattern;
+  final String allowedExtension;
+  final String riskLevel;
+  final bool approvalRequired;
+  final String previewRenderer;
+  final String retentionClass;
+  final bool enabled;
+}
+
+class GaiaRetentionPolicy {
+  GaiaRetentionPolicy({
+    required this.policyId,
+    required this.policyVersion,
+    required this.retentionClass,
+    required this.minimumCopies,
+    required this.minimumAgeDays,
+    required this.maximumAgeDays,
+    required this.maximumCount,
+    required this.preserveFailedActions,
+    required this.preserveRollbacks,
+    required this.preserveAuditLinkedRecords,
+    required this.dryRunRequired,
+    required this.approvalRequired,
+    required this.enabled,
+  });
+
+  factory GaiaRetentionPolicy.fromJson(Map<String, dynamic> json) => GaiaRetentionPolicy(
+        policyId: json['policy_id'] as String? ?? '',
+        policyVersion: json['policy_version'] as int? ?? 1,
+        retentionClass: json['retention_class'] as String? ?? 'default',
+        minimumCopies: json['minimum_copies'] as int? ?? 1,
+        minimumAgeDays: json['minimum_age_days'] as int? ?? 0,
+        maximumAgeDays: json['maximum_age_days'] as int?,
+        maximumCount: json['maximum_count'] as int?,
+        preserveFailedActions: json['preserve_failed_actions'] as bool? ?? true,
+        preserveRollbacks: json['preserve_rollbacks'] as bool? ?? true,
+        preserveAuditLinkedRecords: json['preserve_audit_linked_records'] as bool? ?? true,
+        dryRunRequired: json['dry_run_required'] as bool? ?? true,
+        approvalRequired: json['approval_required'] as bool? ?? true,
+        enabled: json['enabled'] as bool? ?? true,
+      );
+
+  final String policyId;
+  final int policyVersion;
+  final String retentionClass;
+  final int minimumCopies;
+  final int minimumAgeDays;
+  final int? maximumAgeDays;
+  final int? maximumCount;
+  final bool preserveFailedActions;
+  final bool preserveRollbacks;
+  final bool preserveAuditLinkedRecords;
+  final bool dryRunRequired;
+  final bool approvalRequired;
+  final bool enabled;
+}
+
+class GaiaRetentionPlan {
+  GaiaRetentionPlan({
+    required this.planId,
+    required this.policyId,
+    required this.planHash,
+    required this.approvedHash,
+    required this.createdAt,
+    required this.status,
+    required this.payload,
+  });
+
+  factory GaiaRetentionPlan.fromJson(Map<String, dynamic> json) => GaiaRetentionPlan(
+        planId: json['plan_id'] as String? ?? '',
+        policyId: json['policy_id'] as String? ?? '',
+        planHash: json['plan_hash'] as String? ?? '',
+        approvedHash: json['approved_hash'] as String?,
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        status: json['status'] as String? ?? 'dry_run',
+        payload: (json['payload'] as Map<String, dynamic>? ?? <String, dynamic>{}),
+      );
+
+  final String planId;
+  final String policyId;
+  final String planHash;
+  final String? approvedHash;
+  final DateTime createdAt;
+  final String status;
+  final Map<String, dynamic> payload;
+}
+
+class GaiaReviewPackageResult {
+  GaiaReviewPackageResult({required this.status, required this.reason});
+
+  factory GaiaReviewPackageResult.fromJson(Map<String, dynamic> json) => GaiaReviewPackageResult(
+        status: json['status'] as String? ?? 'unknown',
+        reason: json['reason'] as String? ?? '',
+      );
+
+  final String status;
+  final String reason;
 }
 
 class GaiaDailyBrief {

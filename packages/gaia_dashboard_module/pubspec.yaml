@@ -1,0 +1,18 @@
+name: gaia_dashboard_module
+description: Reusable GAIA dashboard widgets and controller for embedding in external hosts
+version: 0.6.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  gaia_integration_client:
+    path: ../gaia_integration_client
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  http: ^1.5.0
