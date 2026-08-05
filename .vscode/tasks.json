@@ -88,6 +88,25 @@
       }
     },
     {
+      "label": "GAIA: Validate Managed Backend Lifecycle",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\validate_managed_backend_scripts.ps1"
+      ],
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
       "label": "GAIA: Ollama Status",
       "type": "process",
       "command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
@@ -783,7 +802,7 @@
       }
     },
     {
-      "label": "GAIA: v0.5 Release Readiness",
+      "label": "GAIA: v0.5.1 Release Readiness",
       "type": "process",
       "command": "powershell.exe",
       "args": [

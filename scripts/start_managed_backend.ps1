@@ -6,57 +6,93 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-$python = Join-Path $PWD ".venv\Scripts\python.exe"
+. "$PSScriptRoot\managed_backend_common.ps1"
+
+$repoRoot = $PWD.Path
+$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot
+$python = $paths.PythonExe
 if (-not (Test-Path $python)) {
     throw "Virtual environment missing. Run scripts\setup_windows.ps1 first."
 }
 
-$runtimeDir = Join-Path $PWD "data\runtime"
-$logDir = Join-Path $PWD "data\logs"
-New-Item -ItemType Directory -Force -Path $runtimeDir, $logDir | Out-Null
+$expectedVersion = (& $python -c "import gaia; print(gaia.__version__)").Trim()
+New-Item -ItemType Directory -Force -Path $paths.RuntimeDir, $paths.LogDir | Out-Null
 
-$pidFile = Join-Path $runtimeDir "gaia-backend.pid"
-$metaFile = Join-Path $runtimeDir "gaia-backend.json"
-$stdoutLog = Join-Path $logDir "gaia-backend.out.log"
-$stderrLog = Join-Path $logDir "gaia-backend.err.log"
+$stdoutLog = Join-Path $paths.LogDir "gaia-backend.out.log"
+$stderrLog = Join-Path $paths.LogDir "gaia-backend.err.log"
+
+$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port $Port -ExpectedBackendVersion $expectedVersion
+if ($snapshot.State -eq "healthy") {
+    Write-Host "GAIA managed backend already running"
+    Write-Host ("Managed backend PID: {0}" -f $snapshot.ManagedPid)
+    exit 0
+}
+
+if ($snapshot.State -eq "incompatible") {
+    throw $snapshot.Reason
+}
+
+if ($snapshot.State -eq "external" -or $snapshot.State -eq "unmanaged") {
+    throw $snapshot.Reason
+}
+
+if ($snapshot.State -eq "stale") {
+    if ($snapshot.ListenerOwningProcess) {
+        throw $snapshot.Reason
+    }
+    Remove-GaiaManagedBackendArtifacts -Paths $paths
+}
 
 Write-Host "GAIA managed backend starting"
 
-$process = Start-Process `
+$managedProcess = Start-Process `
     -FilePath $python `
     -ArgumentList @("-m", "gaia", "serve", "--host", "127.0.0.1", "--port", "$Port") `
-    -WorkingDirectory $PWD `
+    -WorkingDirectory $repoRoot `
     -WindowStyle Hidden `
     -PassThru `
     -RedirectStandardOutput $stdoutLog `
     -RedirectStandardError $stderrLog
 
-$meta = [pscustomobject]@{
-    pid = $process.Id
-    port = $Port
-    host = "127.0.0.1"
-    command = "$python -m gaia serve --host 127.0.0.1 --port $Port"
-    startedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
-}
-$meta | ConvertTo-Json -Compress | Set-Content -Path $metaFile -Encoding UTF8
-$process.Id | Set-Content -Path $pidFile -Encoding ASCII
-
 try {
+    $health = $null
     for ($attempt = 1; $attempt -le 60; $attempt++) {
         try {
-            Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2 | Out-Null
-            Write-Host "GAIA managed backend ready"
-            break
+            $health = Invoke-GaiaBackendHealth -Port $Port -TimeoutSec 2
+            if ($health.status) {
+                break
+            }
         } catch {
             Start-Sleep -Seconds 1
         }
     }
-    if (-not (Test-Path $pidFile)) {
-        throw "Managed backend pid file missing."
+
+    if (-not $health) {
+        throw "Backend did not become healthy on 127.0.0.1:$Port."
     }
-    Wait-Process -Id $process.Id
-} finally {
-    if (-not $process.HasExited) {
-        try { Stop-Process -Id $process.Id -Force } catch {}
+
+    if ($health.version -ne $expectedVersion) {
+        throw "Backend reported version $($health.version) but expected $expectedVersion."
     }
+
+    $meta = [pscustomobject]@{
+        pid = $managedProcess.Id
+        port = $Port
+        host = "127.0.0.1"
+        command = "$python -m gaia serve --host 127.0.0.1 --port $Port"
+        repositoryRoot = $repoRoot
+        pythonPath = $python
+        version = $health.version
+        startedAtUtc = (Get-Date).ToUniversalTime().ToString("o")
+    }
+    $meta | ConvertTo-Json -Compress | Set-Content -Path $paths.MetaFile -Encoding UTF8
+    $managedProcess.Id.ToString() | Set-Content -Path $paths.PidFile -Encoding ASCII
+
+    Write-Host "GAIA managed backend ready"
+} catch {
+    if ($managedProcess -and -not $managedProcess.HasExited) {
+        try { Stop-Process -Id $managedProcess.Id -Force } catch {}
+    }
+    Remove-GaiaManagedBackendArtifacts -Paths $paths
+    throw
 }

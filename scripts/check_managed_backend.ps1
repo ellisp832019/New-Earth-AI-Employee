@@ -6,21 +6,46 @@ param(
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-$runtimeDir = Join-Path $PWD "data\runtime"
-$pidFile = Join-Path $runtimeDir "gaia-backend.pid"
-if (-not (Test-Path $pidFile)) {
-    throw "Managed backend pid file not found."
+. "$PSScriptRoot\managed_backend_common.ps1"
+
+$repoRoot = $PWD.Path
+$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot
+$python = $paths.PythonExe
+if (-not (Test-Path $python)) {
+    throw "Virtual environment missing. Run scripts\setup_windows.ps1 first."
 }
 
-$pid = [int](Get-Content $pidFile -Raw)
-$process = Get-Process -Id $pid -ErrorAction SilentlyContinue
-if (-not $process) {
-    throw "Managed backend process $pid is not running."
+$expectedVersion = (& $python -c "import gaia; print(gaia.__version__)").Trim()
+$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port $Port -ExpectedBackendVersion $expectedVersion
+
+$summary = [pscustomobject]@{
+    state = $snapshot.State
+    reason = $snapshot.Reason
+    managedPid = $snapshot.ManagedPid
+    port = $snapshot.Port
+    repositoryRoot = $snapshot.RepoRoot
+    backendVersion = $snapshot.BackendVersion
+    backendCompatibility = $snapshot.BackendCompatibility
+    listenerOwningProcess = $snapshot.ListenerOwningProcess
 }
 
-$cim = Get-CimInstance Win32_Process -Filter "ProcessId = $pid"
-if (-not $cim.CommandLine -or $cim.CommandLine -notmatch '--host 127\.0\.0\.1' -or $cim.CommandLine -notmatch "--port $Port") {
-    throw "Process $pid is not the managed GAIA backend."
+if ($snapshot.State -eq "healthy") {
+    $summary | ConvertTo-Json -Compress
+    exit 0
 }
 
-Invoke-RestMethod -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 5 | ConvertTo-Json -Compress
+$exitCode = switch ($snapshot.State) {
+    "missing" { 10 }
+    "stale" { 11 }
+    "unmanaged" { 12 }
+    "external" { 13 }
+    "incompatible" { 14 }
+    default { 1 }
+}
+
+Write-Host ("Managed backend state: {0}" -f $snapshot.State)
+if ($snapshot.Reason) {
+    Write-Host $snapshot.Reason
+}
+$summary | ConvertTo-Json -Compress
+exit $exitCode

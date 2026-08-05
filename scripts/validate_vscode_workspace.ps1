@@ -83,6 +83,63 @@ foreach ($config in $launch.configurations) {
     }
 }
 
+function Get-TaskByLabel {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    foreach ($task in $tasks.tasks) {
+        if ($task.label -eq $Label) {
+            return $task
+        }
+    }
+
+    return $null
+}
+
+function Assert-TaskScriptPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$TaskLabel,
+        [Parameter(Mandatory = $true)]
+        [string]$ExpectedScriptName
+    )
+
+    $task = Get-TaskByLabel -Label $TaskLabel
+    if (-not $task) {
+        throw "Missing required VS Code task: $TaskLabel"
+    }
+
+    $fileArgIndex = [Array]::IndexOf($task.args, '-File')
+    if ($fileArgIndex -lt 0 -or $fileArgIndex + 1 -ge $task.args.Count) {
+        throw "Task '$TaskLabel' does not call a PowerShell script."
+    }
+
+    $scriptPath = $task.args[$fileArgIndex + 1].Replace('${workspaceFolder}', $PWD.Path)
+    if (-not (Test-Path $scriptPath)) {
+        throw "Task '$TaskLabel' references missing script $scriptPath"
+    }
+
+    if ((Split-Path $scriptPath -Leaf) -ne $ExpectedScriptName) {
+        throw "Task '$TaskLabel' must call $ExpectedScriptName."
+    }
+}
+
+Assert-TaskScriptPath -TaskLabel "GAIA: Start Backend" -ExpectedScriptName "start_managed_backend.ps1"
+Assert-TaskScriptPath -TaskLabel "GAIA: Backend Health" -ExpectedScriptName "check_managed_backend.ps1"
+Assert-TaskScriptPath -TaskLabel "GAIA: Stop Managed Backend" -ExpectedScriptName "stop_managed_backend.ps1"
+Assert-TaskScriptPath -TaskLabel "GAIA: Version Status" -ExpectedScriptName "version_status.ps1"
+Assert-TaskScriptPath -TaskLabel "GAIA: Validate Managed Backend Lifecycle" -ExpectedScriptName "validate_managed_backend_scripts.ps1"
+Assert-TaskScriptPath -TaskLabel "GAIA: v0.5.1 Release Readiness" -ExpectedScriptName "release_readiness.ps1"
+
+foreach ($scriptFile in Get-ChildItem -Path $PWD\scripts -Filter *.ps1) {
+    $scriptText = Get-Content $scriptFile.FullName -Raw
+    if ($scriptText -match '(?i)\$(pid|args|input|error|home|host|matches|profile|pwd|this)\s*=') {
+        throw "Unsafe automatic-variable assignment found in $($scriptFile.Name)"
+    }
+}
+
 foreach ($group in @("projects", "project", "models", "agent", "tasks", "drafts", "approvals", "briefs", "permissions", "actions", "receipts")) {
     & $python -m gaia $group --help | Out-Null
     if ($LASTEXITCODE -ne 0) {

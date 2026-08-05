@@ -4,26 +4,8 @@ param()
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-& .\.venv\Scripts\python.exe -m compileall src tests
-& .\.venv\Scripts\python.exe -m ruff check src tests
-& .\.venv\Scripts\python.exe -m mypy src\gaia
-& .\.venv\Scripts\python.exe -m pytest
+& $PSScriptRoot\validate_managed_backend_scripts.ps1
+& $PSScriptRoot\validate_vscode_workspace.ps1
+& $PSScriptRoot\version_status.ps1 | Out-Null
 
-Push-Location apps\gaia_windows
-try {
-    flutter pub get
-    flutter analyze
-    flutter test
-    flutter build windows --debug
-    flutter build windows --release
-} finally {
-    Pop-Location
-}
-
-powershell -NoProfile -ExecutionPolicy Bypass -File "${PWD}\scripts\validate_vscode_workspace.ps1"
-
-git diff --check
-git status --short --branch
-git ls-files
-
-Write-Host "GAIA v0.4 release readiness checks completed." -ForegroundColor Green
+Write-Host "GAIA v0.5.1 release readiness checks completed." -ForegroundColor Green
