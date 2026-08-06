@@ -27,6 +27,7 @@ from gaia.output_workspace import (
 from gaia.providers import ProviderRegistry
 from gaia.reports import write_report
 from gaia.service import ProjectService
+from gaia.trust import GAIATrustService
 from gaia.workflows import (
     ApprovalCreateRequest,
     ApprovalDecisionRequest,
@@ -55,6 +56,9 @@ briefs_app = typer.Typer(help="GAIA daily brief records")
 permissions_app = typer.Typer(help="Permission manifests and output workspace controls")
 actions_app = typer.Typer(help="Permissioned GAIA output actions")
 receipts_app = typer.Typer(help="Execution receipts")
+templates_app = typer.Typer(help="Versioned action templates")
+retention_app = typer.Typer(help="Retention policies and plans")
+review_packages_app = typer.Typer(help="Offline review packages")
 app.add_typer(project_app, name="project")
 app.add_typer(projects_app, name="projects")
 app.add_typer(models_app, name="models")
@@ -67,6 +71,9 @@ app.add_typer(briefs_app, name="briefs")
 app.add_typer(permissions_app, name="permissions")
 app.add_typer(actions_app, name="actions")
 app.add_typer(receipts_app, name="receipts")
+app.add_typer(templates_app, name="templates")
+app.add_typer(retention_app, name="retention")
+app.add_typer(review_packages_app, name="review-packages")
 console = Console()
 
 
@@ -92,6 +99,11 @@ def _workflow_service(config: Path | None = None) -> TaskWorkflowService:
 def _workspace_service(config: Path | None = None) -> OutputWorkspaceService:
     settings = load_settings(config)
     return OutputWorkspaceService(settings, Database(settings.database_path))
+
+
+def _trust_service(config: Path | None = None) -> GAIATrustService:
+    settings = load_settings(config)
+    return GAIATrustService(settings, Database(settings.database_path))
 
 
 def _print_models(records: Sequence[BaseModel]) -> None:
@@ -1014,5 +1026,203 @@ def receipts_show(receipt_id: str, config: Path | None = typer.Option(None)) -> 
     service = _workspace_service(config)
     try:
         _print_model(service.get_receipt(receipt_id))
+    finally:
+        service.database.close()
+
+
+@receipts_app.command("verify")
+def receipts_verify(receipt_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.verify_receipt(receipt_id).model_dump(mode="json")))
+    finally:
+        service.database.close()
+
+
+@receipts_app.command("verify-chain")
+def receipts_verify_chain(chain_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.verify_chain(chain_id)))
+    finally:
+        service.database.close()
+
+
+@receipts_app.command("export")
+def receipts_export(receipt_id: str, output: Path | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _workspace_service(config)
+    try:
+        receipt = service.get_receipt(receipt_id)
+        payload = receipt.model_dump(mode="json")
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+            console.print(f"Receipt exported to {output}")
+        else:
+            console.print_json(json.dumps(payload))
+    finally:
+        service.database.close()
+
+
+@receipts_app.command("chains")
+def receipts_chains(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.list_receipt_chains()))
+    finally:
+        service.database.close()
+
+
+@receipts_app.command("export-chain")
+def receipts_export_chain(chain_id: str, output: Path | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        payload = service.get_receipt_chain(chain_id)
+        if output:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
+            console.print(f"Receipt chain exported to {output}")
+        else:
+            console.print_json(json.dumps(payload))
+    finally:
+        service.database.close()
+
+
+@templates_app.command("list")
+def templates_list(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps([template.model_dump(mode="json") for template in service.list_action_templates()]))
+    finally:
+        service.database.close()
+
+
+@templates_app.command("show")
+def templates_show(template_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(service.get_action_template(template_id).model_dump_json())
+    finally:
+        service.database.close()
+
+
+@templates_app.command("propose")
+def templates_propose(
+    template_id: str,
+    action_type: str = typer.Option("create_generated_document"),
+    title: str = typer.Option("Template proposal"),
+    project_id: str = typer.Option("microgrow-v1"),
+    manifest_id: str = typer.Option(""),
+    target_path: str = typer.Option("workspace/approved_outputs/template.txt"),
+    content: str = typer.Option("template content"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _trust_service(config)
+    try:
+        request = OutputActionCreateRequest(
+            action_type=cast(Any, action_type),
+            title=title,
+            project_id=project_id,
+            manifest_id=manifest_id or template_id,
+            target_path=target_path,
+            content=content,
+            content_source="manual",
+        )
+        console.print_json(json.dumps(service.template_propose(template_id, request)))
+    finally:
+        service.database.close()
+
+
+@templates_app.command("preview")
+def templates_preview(
+    template_id: str,
+    action_type: str = typer.Option("create_generated_document"),
+    title: str = typer.Option("Template preview"),
+    project_id: str = typer.Option("microgrow-v1"),
+    manifest_id: str = typer.Option(""),
+    target_path: str = typer.Option("workspace/approved_outputs/template.txt"),
+    content: str = typer.Option("template content"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _trust_service(config)
+    try:
+        request = OutputActionCreateRequest(
+            action_type=cast(Any, action_type),
+            title=title,
+            project_id=project_id,
+            manifest_id=manifest_id or template_id,
+            target_path=target_path,
+            content=content,
+            content_source="manual",
+        )
+        console.print_json(json.dumps(service.template_preview(template_id, request)))
+    finally:
+        service.database.close()
+
+
+@retention_app.command("policies")
+def retention_policies(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps([policy.model_dump(mode="json") for policy in service.list_retention_policies()]))
+    finally:
+        service.database.close()
+
+
+@retention_app.command("status")
+def retention_status(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.retention_status()))
+    finally:
+        service.database.close()
+
+
+@retention_app.command("plan")
+def retention_plan(policy_id: str = typer.Option("preserve-all"), config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(service.plan_retention(policy_id).model_dump_json())
+    finally:
+        service.database.close()
+
+
+@retention_app.command("apply")
+def retention_apply(
+    plan_id: str,
+    approved_hash: str,
+    confirm: bool = typer.Option(False, help="Confirm the approved retention plan"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(service.apply_retention(plan_id, approved_hash, confirm=confirm).model_dump_json())
+    finally:
+        service.database.close()
+
+
+@review_packages_app.command("create")
+def review_packages_create(action_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(service.create_review_package(action_id).model_dump_json())
+    finally:
+        service.database.close()
+
+
+@review_packages_app.command("verify")
+def review_packages_verify(package_path: Path, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.verify_review_package(package_path)))
+    finally:
+        service.database.close()
+
+
+@review_packages_app.command("inspect")
+def review_packages_inspect(package_path: Path, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.verify_review_package(package_path)))
     finally:
         service.database.close()

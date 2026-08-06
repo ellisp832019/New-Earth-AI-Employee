@@ -871,6 +871,153 @@
         "GAIA MicroGrow: Ask Current Status"
       ],
       "group": "test"
+    },
+    {
+      "label": "GAIA: Validate Receipt Chains",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\validate_receipt_chains.ps1"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: Create Offline Review Package",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\create_review_package.ps1",
+        "action-id-here"
+      ],
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: Verify Offline Review Package",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\verify_gaia_review_package.ps1",
+        "package.zip"
+      ],
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: List Action Templates",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\validate_action_templates.ps1"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: Validate Action Templates",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "GAIA: List Action Templates"
+      ],
+      "group": "test"
+    },
+    {
+      "label": "GAIA: Retention Dry Run",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\retention_dry_run.ps1"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: Validate Dashboard Module",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\validate_dashboard_module.ps1"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: Run Dashboard Example Host",
+      "type": "process",
+      "command": "flutter",
+      "args": [
+        "run"
+      ],
+      "options": {
+        "cwd": "${workspaceFolder}\\examples\\gaia_dashboard_host"
+      },
+      "group": "none",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: Validate Integration Compatibility",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\validate_integration_contract.ps1"
+      ],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "GAIA: Complete v0.6 Validation",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "GAIA: Validate Receipt Chains",
+        "GAIA: Validate Action Templates",
+        "GAIA: Retention Dry Run",
+        "GAIA: Validate Dashboard Module",
+        "GAIA: Validate Integration Compatibility"
+      ],
+      "group": "test"
+    },
+    {
+      "label": "GAIA: v0.6 Release Readiness",
+      "type": "process",
+      "command": "powershell.exe",
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\release_readiness.ps1"
+      ],
+      "group": "test",
+      "problemMatcher": []
     }
   ],
   "inputs": [

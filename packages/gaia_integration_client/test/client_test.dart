@@ -23,11 +23,17 @@ void main() {
       if (path == '/integration/v1/compatibility') {
         return http.Response(
           jsonEncode({
-            'backend_version': '0.5.0',
-            'contract_version': 'gaia-v1',
-            'status': 'compatible',
+            'backend_product_version': '0.6.0',
+            'minimum_supported_api_version': '0.6.0',
+            'maximum_tested_api_version': '0.6.0',
+            'integration_contract_version': 'gaia-v2',
+            'client_package_version': '0.6.0',
+            'backend_version': '0.6.0',
+            'status': 'compatible_with_warnings',
             'loopback_only': true,
-            'capabilities': ['actions', 'receipts'],
+            'capabilities': ['actions', 'receipts', 'retention_policies'],
+            'degraded_features': ['offline_packages'],
+            'deprecation_warnings': ['v1 contract is deprecated'],
           }),
           200,
         );
@@ -58,6 +64,25 @@ void main() {
             'target_path': 'workspace/approved_outputs/demo.md',
             'resulting_hash': 'abc',
             'timestamp': '2026-08-05T00:00:00Z',
+            'chain_id': 'manifest-1',
+            'chain_sequence': 1,
+            'previous_receipt_hash': null,
+            'receipt_content_hash': 'hash-1',
+            'verification_status': 'valid',
+          }),
+          200,
+        );
+      }
+      if (path == '/receipts/receipt-1/verify') {
+        return http.Response(
+          jsonEncode({
+            'receipt_id': 'receipt-1',
+            'chain_id': 'manifest-1',
+            'chain_sequence': 1,
+            'status': 'valid',
+            'previous_receipt_hash': null,
+            'receipt_content_hash': 'hash-1',
+            'warnings': const [],
           }),
           200,
         );
@@ -71,7 +96,8 @@ void main() {
     expect(health.version, '0.5.0');
 
     final compatibility = await gaia.compatibility();
-    expect(compatibility.contractVersion, 'gaia-v1');
+    expect(compatibility.integrationContractVersion, 'gaia-v2');
+    expect(compatibility.status, 'compatible_with_warnings');
     expect(compatibility.capabilities, contains('actions'));
 
     final actionSummary = await gaia.actionSummary(projectId: 'sample');
@@ -79,5 +105,8 @@ void main() {
 
     final receipt = await gaia.latestReceipt();
     expect(receipt?.receiptId, 'receipt-1');
+
+    final verification = await gaia.verifyReceipt('receipt-1');
+    expect(verification.status, 'valid');
   });
 }

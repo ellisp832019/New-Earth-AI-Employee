@@ -10,7 +10,7 @@ from gaia.models import AuditEvent, DocumentRecord, RepositorySnapshot, SearchRe
 
 
 class Database:
-    SCHEMA_VERSION = 5
+    SCHEMA_VERSION = 6
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -276,7 +276,12 @@ class Database:
                 operator TEXT NOT NULL,
                 result TEXT NOT NULL,
                 warnings_json TEXT NOT NULL,
-                rollback_available INTEGER NOT NULL
+                rollback_available INTEGER NOT NULL,
+                chain_id TEXT,
+                chain_sequence INTEGER,
+                previous_receipt_hash TEXT,
+                receipt_content_hash TEXT,
+                verification_status TEXT
             );
             CREATE TABLE IF NOT EXISTS output_backups (
                 backup_id TEXT PRIMARY KEY,
@@ -300,6 +305,59 @@ class Database:
                 status TEXT NOT NULL,
                 reason TEXT
             );
+            CREATE TABLE IF NOT EXISTS action_templates (
+                template_id TEXT PRIMARY KEY,
+                template_version INTEGER NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS receipt_chains (
+                chain_id TEXT NOT NULL,
+                receipt_id TEXT NOT NULL,
+                chain_sequence INTEGER NOT NULL,
+                receipt_content_hash TEXT NOT NULL,
+                previous_receipt_hash TEXT,
+                created_at TEXT NOT NULL,
+                verification_status TEXT NOT NULL,
+                PRIMARY KEY(chain_id, chain_sequence)
+            );
+            CREATE TABLE IF NOT EXISTS review_packages (
+                package_id TEXT PRIMARY KEY,
+                action_id TEXT NOT NULL,
+                receipt_id TEXT,
+                chain_id TEXT,
+                package_path TEXT NOT NULL,
+                manifest_json TEXT NOT NULL,
+                hashes_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                verification_status TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS retention_policies (
+                policy_id TEXT PRIMARY KEY,
+                policy_version INTEGER NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS retention_plans (
+                plan_id TEXT PRIMARY KEY,
+                policy_id TEXT NOT NULL,
+                plan_hash TEXT NOT NULL,
+                approved_hash TEXT,
+                created_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL,
+                status TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS retention_receipts (
+                receipt_id TEXT PRIMARY KEY,
+                plan_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS package_verifications (
+                verification_id TEXT PRIMARY KEY,
+                package_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL,
+                payload_json TEXT NOT NULL
+            );
             """
         )
         try:
@@ -321,6 +379,16 @@ class Database:
                 "proposed_content_hash": "TEXT",
                 "approval_binding_hash": "TEXT",
                 "approval_scope": "TEXT",
+            },
+        )
+        self._ensure_columns(
+            "execution_receipts",
+            {
+                "chain_id": "TEXT",
+                "chain_sequence": "INTEGER",
+                "previous_receipt_hash": "TEXT",
+                "receipt_content_hash": "TEXT",
+                "verification_status": "TEXT",
             },
         )
         self.connection.commit()

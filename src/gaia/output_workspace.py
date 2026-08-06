@@ -54,7 +54,7 @@ WINDOWS_RESERVED_NAMES = {
 
 
 def _json_dumps(value: Any) -> str:
-    return json.dumps(value, default=str, sort_keys=True)
+    return json.dumps(value, default=str, sort_keys=True, separators=(",", ":"))
 
 
 def _json_loads(value: Any, default: Any) -> Any:
@@ -215,6 +215,11 @@ class ExecutionReceiptRecord(BaseModel):
     result: str = "completed"
     warnings: list[str] = Field(default_factory=list)
     rollback_available: bool = False
+    chain_id: str | None = None
+    chain_sequence: int | None = None
+    previous_receipt_hash: str | None = None
+    receipt_content_hash: str | None = None
+    verification_status: str = "unknown"
 
 
 class BackupRecord(BaseModel):
@@ -1070,6 +1075,39 @@ class OutputWorkspaceService:
         return resolved
 
     def _write_receipt(self, receipt: ExecutionReceiptRecord) -> None:
+        chain_row = self.database.connection.execute(
+            "SELECT chain_sequence, receipt_content_hash FROM execution_receipts WHERE chain_id = ? ORDER BY chain_sequence DESC LIMIT 1",
+            (receipt.manifest_id,),
+        ).fetchone()
+        receipt.chain_id = receipt.manifest_id
+        receipt.chain_sequence = int(chain_row["chain_sequence"]) + 1 if chain_row else 1
+        receipt.previous_receipt_hash = chain_row["receipt_content_hash"] if chain_row else None
+        receipt.receipt_content_hash = hashlib.sha256(
+            _json_dumps(
+                {
+                    "receipt_id": receipt.receipt_id,
+                    "action_id": receipt.action_id,
+                    "approval_id": receipt.approval_id,
+                    "manifest_id": receipt.manifest_id,
+                    "manifest_version": receipt.manifest_version,
+                    "source_draft_id": receipt.source_draft_id,
+                    "source_draft_revision": receipt.source_draft_revision,
+                    "target_path": receipt.target_path,
+                    "previous_hash": receipt.previous_hash,
+                    "resulting_hash": receipt.resulting_hash,
+                    "backup_path": receipt.backup_path,
+                    "timestamp": receipt.timestamp.isoformat(),
+                    "operator": receipt.operator,
+                    "result": receipt.result,
+                    "warnings": receipt.warnings,
+                    "rollback_available": int(receipt.rollback_available),
+                    "chain_id": receipt.chain_id,
+                    "chain_sequence": receipt.chain_sequence,
+                    "previous_receipt_hash": receipt.previous_receipt_hash,
+                }
+            ).encode("utf-8")
+        ).hexdigest()
+        receipt.verification_status = "valid"
         with self.database.connection:
             self.database.connection.execute(
                 """
@@ -1077,8 +1115,9 @@ class OutputWorkspaceService:
                     receipt_id, action_id, approval_id, manifest_id, manifest_version,
                     source_draft_id, source_draft_revision, target_path, previous_hash,
                     resulting_hash, backup_path, timestamp, operator, result, warnings_json,
-                    rollback_available
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    rollback_available, chain_id, chain_sequence, previous_receipt_hash,
+                    receipt_content_hash, verification_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     receipt.receipt_id,
@@ -1097,6 +1136,28 @@ class OutputWorkspaceService:
                     receipt.result,
                     _json_dumps(receipt.warnings),
                     int(receipt.rollback_available),
+                    receipt.chain_id,
+                    receipt.chain_sequence,
+                    receipt.previous_receipt_hash,
+                    receipt.receipt_content_hash,
+                    receipt.verification_status,
+                ),
+            )
+            self.database.connection.execute(
+                """
+                INSERT OR REPLACE INTO receipt_chains(
+                    chain_id, receipt_id, chain_sequence, receipt_content_hash,
+                    previous_receipt_hash, created_at, verification_status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    receipt.chain_id,
+                    receipt.receipt_id,
+                    receipt.chain_sequence,
+                    receipt.receipt_content_hash,
+                    receipt.previous_receipt_hash,
+                    receipt.timestamp.isoformat(),
+                    receipt.verification_status,
                 ),
             )
 
@@ -1153,6 +1214,8 @@ class OutputWorkspaceService:
             data = dict(row)
             data["timestamp"] = datetime.fromisoformat(str(data["timestamp"]))
             data["warnings"] = _json_loads(data.pop("warnings_json"), [])
+            data.setdefault("chain_id", data.get("manifest_id"))
+            data["chain_sequence"] = data.get("chain_sequence")
             receipts.append(ExecutionReceiptRecord.model_validate(data))
         return receipts
 
@@ -1166,6 +1229,7 @@ class OutputWorkspaceService:
         data = dict(row)
         data["timestamp"] = datetime.fromisoformat(str(data["timestamp"]))
         data["warnings"] = _json_loads(data.pop("warnings_json"), [])
+        data.setdefault("chain_id", data.get("manifest_id"))
         return ExecutionReceiptRecord.model_validate(data)
 
     def rollback_action(self, action_id: str, *, confirmation_token: str, operator: str = "manual") -> tuple[OutputAction, RollbackRecord]:

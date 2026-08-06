@@ -1,15 +1,15 @@
 [CmdletBinding()]
 param(
-    [string]$OutputPath = "contracts\openapi\gaia-v1.json"
+    [string]$OutputPath = "contracts\openapi\gaia-v1.json",
+    [string]$PythonPath = $null
 )
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-$python = Join-Path $PWD ".venv\Scripts\python.exe"
-if (-not (Test-Path $python)) {
-    throw "Python interpreter not found: $python"
-}
+. "$PSScriptRoot\python_runtime_common.ps1"
+
+$pythonRuntime = Resolve-GaiaPythonRuntime -RepoRoot $PWD.Path -PythonPath $PythonPath
 
 $output = Join-Path $PWD $OutputPath
 $outputDir = Split-Path -Parent $output
@@ -27,9 +27,6 @@ target.write_text(json.dumps(schema, indent=2, sort_keys=True), encoding="utf-8"
 
 $scriptPath = Join-Path $env:TEMP "gaia_export_openapi.py"
 Set-Content -Path $scriptPath -Value $script -Encoding UTF8
-& $python $scriptPath
-if ($LASTEXITCODE -ne 0) {
-    throw "OpenAPI export failed."
-}
+Invoke-GaiaPython -PythonPath $pythonRuntime.Path -Arguments @($scriptPath) | Out-Null
 
 Write-Host "OpenAPI contract exported to $output" -ForegroundColor Green

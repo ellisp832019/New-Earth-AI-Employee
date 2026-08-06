@@ -1,0 +1,24 @@
+name: gaia_dashboard_host
+description: Example host for the reusable GAIA dashboard module
+version: 0.6.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.11.5
+
+dependencies:
+  flutter:
+    sdk: flutter
+  gaia_dashboard_module:
+    path: ../../packages/gaia_dashboard_module
+  gaia_integration_client:
+    path: ../../packages/gaia_integration_client
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  http: ^1.5.0
+
+flutter:
+  uses-material-design: true

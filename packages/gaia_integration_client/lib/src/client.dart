@@ -139,4 +139,59 @@ class GaiaIntegrationClient {
   Future<Map<String, dynamic>> rollbackAction(String actionId, {required bool confirm}) async {
     return (await _postJson('/actions/$actionId/rollback', queryParameters: {'confirm': confirm.toString()})) as Map<String, dynamic>;
   }
+
+  Future<List<GaiaActionTemplate>> listActionTemplates() async {
+    final json = await _getJson('/action-templates') as List<dynamic>;
+    return json.whereType<Map>().map((item) => GaiaActionTemplate.fromJson(item.cast<String, dynamic>())).toList();
+  }
+
+  Future<GaiaActionTemplate> getActionTemplate(String templateId) async {
+    final json = await _getJson('/action-templates/$templateId') as Map<String, dynamic>;
+    return GaiaActionTemplate.fromJson(json);
+  }
+
+  Future<Map<String, dynamic>> proposeActionTemplate(String templateId, Map<String, dynamic> body) async {
+    return (await _postJson('/action-templates/$templateId/propose', body: body)) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> previewActionTemplate(String templateId, Map<String, dynamic> body) async {
+    return (await _postJson('/action-templates/$templateId/preview', body: body)) as Map<String, dynamic>;
+  }
+
+  Future<GaiaReceiptVerification> verifyReceipt(String receiptId) async {
+    final json = await _getJson('/receipts/$receiptId/verify') as Map<String, dynamic>;
+    return GaiaReceiptVerification.fromJson(json);
+  }
+
+  Future<Map<String, dynamic>> verifyReceiptChain(String chainId) async {
+    return (await _postJson('/receipts/verify-chain', body: {'chain_id': chainId})) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> listReceiptChains() async {
+    final json = await _getJson('/receipts/chains') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> getReceiptChain(String chainId) async {
+    return (await _getJson('/receipts/chains/$chainId')) as Map<String, dynamic>;
+  }
+
+  Future<List<GaiaRetentionPolicy>> listRetentionPolicies() async {
+    final json = await _getJson('/retention/policies') as List<dynamic>;
+    return json.whereType<Map>().map((item) => GaiaRetentionPolicy.fromJson(item.cast<String, dynamic>())).toList();
+  }
+
+  Future<Map<String, dynamic>> retentionStatus() async {
+    return (await _getJson('/retention/status')) as Map<String, dynamic>;
+  }
+
+  Future<GaiaRetentionPlan> retentionPlan(String policyId) async {
+    final json = await _postJson('/retention/plan', body: {'policy_id': policyId}) as Map<String, dynamic>;
+    return GaiaRetentionPlan.fromJson(json);
+  }
+
+  Future<GaiaReviewPackageResult> verifyReviewPackage(String packagePath) async {
+    final json = await _postJson('/review-packages/verify', body: {'package_path': packagePath}) as Map<String, dynamic>;
+    return GaiaReviewPackageResult.fromJson(json);
+  }
 }

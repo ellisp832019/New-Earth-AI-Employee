@@ -1,22 +1,22 @@
 [CmdletBinding()]
 param(
-    [int]$Port = 8000
+    [int]$Port = 8000,
+    [string]$PythonPath = $null
 )
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
+. "$PSScriptRoot\python_runtime_common.ps1"
 . "$PSScriptRoot\managed_backend_common.ps1"
 
 $repoRoot = $PWD.Path
-$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot
-$python = $paths.PythonExe
-if (-not (Test-Path $python)) {
-    throw "Virtual environment missing. Run scripts\setup_windows.ps1 first."
-}
+$pythonRuntime = Resolve-GaiaPythonRuntime -RepoRoot $repoRoot -PythonPath $PythonPath
+$python = $pythonRuntime.Path
+$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot -PythonPath $python
 
-$expectedVersion = (& $python -c "import gaia; print(gaia.__version__)").Trim()
-$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port $Port -ExpectedBackendVersion $expectedVersion
+$expectedVersion = (Invoke-GaiaPython -PythonPath $python -Arguments @('-c', 'import gaia; print(gaia.__version__)') | Out-String).Trim()
+$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port $Port -ExpectedBackendVersion $expectedVersion -PythonPath $python
 
 if ($snapshot.State -eq "missing" -or $snapshot.State -eq "stale") {
     Remove-GaiaManagedBackendArtifacts -Paths $paths
@@ -37,7 +37,7 @@ if ($snapshot.State -eq "healthy" -or $snapshot.State -eq "incompatible") {
         exit 0
     }
 
-    $identity = Test-GaiaManagedBackendIdentity -RepoRoot $repoRoot -Port $Port -ExpectedPythonPath $paths.PythonExe -ProcessRecord $processInfo -MetaRecord (Read-GaiaManagedBackendMeta -MetaFile $paths.MetaFile)
+    $identity = Test-GaiaManagedBackendIdentity -RepoRoot $repoRoot -Port $Port -ExpectedPythonPath $python -ProcessRecord $processInfo -MetaRecord (Read-GaiaManagedBackendMeta -MetaFile $paths.MetaFile)
     $treeIds = Get-GaiaManagedBackendProcessTreeIds -RootProcessId $managedPid
     if (-not $identity.IsManagedProcess -or -not $snapshot.ListenerOwningProcess -or -not $treeIds.Contains([int]$snapshot.ListenerOwningProcess)) {
         throw "Refusing to stop process $managedPid because it is not the managed GAIA backend."

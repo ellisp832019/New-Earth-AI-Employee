@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
 
 from gaia import __version__
@@ -23,6 +23,7 @@ from gaia.output_workspace import (
 from gaia.output_workspace import PermissionDeniedError as OutputPermissionDeniedError
 from gaia.providers import ProviderRegistry
 from gaia.service import ProjectService
+from gaia.trust import GAIATrustService
 from gaia.workflows import (
     ApprovalCreateRequest,
     ApprovalDecisionRequest,
@@ -46,10 +47,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     agent_service = AgentService(service, database, provider_registry)
     workflow_service = TaskWorkflowService(resolved_settings, database)
     output_service = OutputWorkspaceService(resolved_settings, database)
+    trust_service = GAIATrustService(resolved_settings, database)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         service.audit.record(category="application", operation="startup", outcome="success")
+        trust_service.seed_templates()
+        trust_service.seed_retention_policies()
         yield
         database.close()
 
@@ -533,10 +537,93 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as exc:
             raise _output_http_error(exc) from exc
 
+    @app.get("/receipts/{receipt_id}/verify")
+    def receipt_verify(receipt_id: str) -> dict[str, object]:
+        try:
+            return trust_service.verify_receipt(receipt_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/receipts/verify-chain")
+    def receipt_verify_chain(chain_id: str = Body(embed=True)) -> dict[str, object]:
+        return trust_service.verify_chain(chain_id)
+
+    @app.get("/receipts/chains")
+    def receipt_chains() -> list[dict[str, object]]:
+        return trust_service.list_receipt_chains()
+
+    @app.get("/receipts/chains/{chain_id}")
+    def receipt_chain(chain_id: str) -> dict[str, object]:
+        try:
+            return trust_service.get_receipt_chain(chain_id)
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.get("/action-templates")
+    def action_templates() -> list[dict[str, object]]:
+        return [template.model_dump(mode="json") for template in trust_service.list_action_templates()]
+
+    @app.get("/action-templates/{template_id}")
+    def action_template(template_id: str) -> dict[str, object]:
+        try:
+            return trust_service.get_action_template(template_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/action-templates/{template_id}/propose")
+    def action_template_propose(template_id: str, request: OutputActionCreateRequest) -> dict[str, object]:
+        try:
+            return trust_service.template_propose(template_id, request)
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/action-templates/{template_id}/preview")
+    def action_template_preview(template_id: str, request: OutputActionCreateRequest) -> dict[str, object]:
+        try:
+            return trust_service.template_preview(template_id, request)
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.get("/retention/policies")
+    def retention_policies() -> list[dict[str, object]]:
+        return [policy.model_dump(mode="json") for policy in trust_service.list_retention_policies()]
+
+    @app.get("/retention/status")
+    def retention_status() -> dict[str, object]:
+        return trust_service.retention_status()
+
+    @app.post("/retention/plan")
+    def retention_plan(policy_id: str = Body(embed=True)) -> dict[str, object]:
+        try:
+            return trust_service.plan_retention(policy_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/retention/apply")
+    def retention_apply(
+        plan_id: str = Body(embed=True),
+        approved_hash: str = Body(embed=True),
+        confirm: bool = Body(default=False, embed=True),
+    ) -> dict[str, object]:
+        try:
+            return trust_service.apply_retention(plan_id, approved_hash, confirm=confirm).model_dump(mode="json")
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
+    @app.post("/review-packages/verify")
+    def review_package_verify(package_path: str = Body(embed=True)) -> dict[str, object]:
+        return trust_service.verify_review_package(package_path)
+
     @app.get("/integration/v1/status")
     def integration_status() -> dict[str, object]:
         status = workflow_service.integration_status()
         status["output_workspace"] = output_service.summary()
+        status["compatibility"] = trust_service.compatibility()
+        status["trust"] = {
+            "action_templates": len(trust_service.list_action_templates()),
+            "receipt_chains": len(trust_service.list_receipt_chains()),
+            "retention_policies": len(trust_service.list_retention_policies()),
+        }
         return status
 
     @app.get("/integration/v1/projects")
@@ -578,26 +665,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/integration/v1/compatibility")
     def integration_compatibility() -> dict[str, object]:
-        return {
-            "backend_version": __version__,
-            "contract_version": "gaia-v1",
-            "status": "compatible",
-            "loopback_only": True,
-            "capabilities": [
-                "health",
-                "compatibility",
-                "provider_status",
-                "project_summaries",
-                "latest_snapshots",
-                "latest_agent_runs",
-                "task_summaries",
-                "drafts",
-                "pending_approvals",
-                "daily_brief",
-                "action_summaries",
-                "execution_receipts",
-            ],
-        }
+        return trust_service.compatibility()
 
     return app
 
