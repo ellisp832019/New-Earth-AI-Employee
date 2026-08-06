@@ -10,7 +10,7 @@ from gaia.models import AuditEvent, DocumentRecord, RepositorySnapshot, SearchRe
 
 
 class Database:
-    SCHEMA_VERSION = 6
+    SCHEMA_VERSION = 7
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -358,6 +358,49 @@ class Database:
                 status TEXT NOT NULL,
                 payload_json TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS signing_keys (
+                key_id TEXT PRIMARY KEY,
+                key_name TEXT NOT NULL,
+                public_key TEXT NOT NULL,
+                private_key_path TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                revoked_at TEXT,
+                rotated_from_key_id TEXT,
+                last_used_at TEXT,
+                signing_enabled INTEGER NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS provenance_manifests (
+                manifest_id TEXT PRIMARY KEY,
+                manifest_version INTEGER NOT NULL,
+                subject_kind TEXT NOT NULL,
+                subject_id TEXT NOT NULL,
+                subject_version INTEGER NOT NULL,
+                content_hash TEXT NOT NULL,
+                canonical_json TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                signing_key_id TEXT,
+                signature TEXT,
+                signature_status TEXT NOT NULL,
+                key_status TEXT NOT NULL,
+                chain_id TEXT,
+                chain_sequence INTEGER,
+                package_path TEXT,
+                metadata_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS trust_alerts (
+                alert_id TEXT PRIMARY KEY,
+                alert_type TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                status TEXT NOT NULL,
+                title TEXT NOT NULL,
+                message TEXT NOT NULL,
+                source_kind TEXT NOT NULL,
+                source_id TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                acknowledged_at TEXT,
+                metadata_json TEXT NOT NULL
+            );
             """
         )
         try:
@@ -389,6 +432,31 @@ class Database:
                 "previous_receipt_hash": "TEXT",
                 "receipt_content_hash": "TEXT",
                 "verification_status": "TEXT",
+            },
+        )
+        self._ensure_columns(
+            "signing_keys",
+            {
+                "rotated_from_key_id": "TEXT",
+                "last_used_at": "TEXT",
+                "signing_enabled": "INTEGER",
+                "revoked_at": "TEXT",
+            },
+        )
+        self._ensure_columns(
+            "provenance_manifests",
+            {
+                "signature": "TEXT",
+                "signing_key_id": "TEXT",
+                "chain_id": "TEXT",
+                "chain_sequence": "INTEGER",
+                "package_path": "TEXT",
+            },
+        )
+        self._ensure_columns(
+            "trust_alerts",
+            {
+                "acknowledged_at": "TEXT",
             },
         )
         self.connection.commit()
@@ -618,6 +686,17 @@ class Database:
         item["prompt_injection_warnings"] = json.loads(str(item.pop("prompt_injection_warnings_json")))
         item["usage"] = json.loads(str(item.pop("usage_json")))
         return item
+
+    def list_rows(self, table: str, *, order_by: str | None = None) -> list[dict[str, object]]:
+        sql = f"SELECT * FROM {table}"
+        if order_by:
+            sql += f" ORDER BY {order_by}"
+        rows = self.connection.execute(sql).fetchall()
+        return [dict(row) for row in rows]
+
+    def fetch_row(self, table: str, where: str, params: tuple[object, ...]) -> dict[str, object] | None:
+        row = self.connection.execute(f"SELECT * FROM {table} WHERE {where}", params).fetchone()
+        return dict(row) if row else None
 
 
 def _make_snippet(content: str, query: str, radius: int = 120) -> str:

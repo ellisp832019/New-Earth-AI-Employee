@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gaia_dashboard_module/gaia_dashboard_module.dart';
+import 'package:gaia_integration_client/gaia_integration_client.dart';
 
 import 'controller.dart';
 import 'models.dart';
@@ -33,6 +35,7 @@ class _GaiaShellState extends State<GaiaShell> {
     _Destination('Action Centre', Icons.play_circle_outline, Icons.play_circle),
     _Destination('Receipts', Icons.receipt_long_outlined, Icons.receipt_long),
     _Destination('Trust Centre', Icons.verified_user_outlined, Icons.verified_user),
+    _Destination('Embedded Workspace', Icons.view_column_outlined, Icons.view_column),
     _Destination('Integration', Icons.cable_outlined, Icons.cable),
     _Destination('Daily Brief', Icons.event_note_outlined, Icons.event_note),
     _Destination('VS Code Ops', Icons.code_outlined, Icons.code),
@@ -69,6 +72,7 @@ class _GaiaShellState extends State<GaiaShell> {
         ActionsScreen(controller: controller),
         ReceiptsScreen(controller: controller),
         TrustCentreScreen(controller: controller),
+        EmbeddedWorkspaceScreen(controller: controller),
         IntegrationScreen(controller: controller),
         DailyBriefScreen(controller: controller),
         VscodeOpsScreen(controller: controller),
@@ -1759,7 +1763,7 @@ class AboutScreen extends StatelessWidget {
       title: 'About',
       subtitle: 'Local-first, evidence-backed desktop control centre',
       child: SectionCard(
-        title: 'GAIA v0.6.0',
+        title: 'GAIA v0.7.0',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2071,7 +2075,7 @@ class _ActionsScreenState extends State<ActionsScreen> {
 
   Future<void> _createAction(BuildContext context) async {
     final titleController = TextEditingController(text: 'Export approved output');
-    final contentController = TextEditingController(text: 'Hello from GAIA v0.6.0');
+    final contentController = TextEditingController(text: 'Hello from GAIA v0.7.0');
     final targetController = TextEditingController(text: 'workspace/approved_outputs/demo.md');
     String manifestId = widget.controller.selectedManifestId ?? (widget.controller.permissionManifests.isNotEmpty ? widget.controller.permissionManifests.first['manifest_id'] as String : '');
     await showDialog<void>(
@@ -2245,6 +2249,58 @@ class TrustCentreScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class EmbeddedWorkspaceScreen extends StatefulWidget {
+  const EmbeddedWorkspaceScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<EmbeddedWorkspaceScreen> createState() => _EmbeddedWorkspaceScreenState();
+}
+
+class _EmbeddedWorkspaceScreenState extends State<EmbeddedWorkspaceScreen> {
+  late final GaiaDashboardController dashboardController;
+
+  @override
+  void initState() {
+    super.initState();
+    dashboardController = GaiaDashboardController(
+      client: GaiaIntegrationClient(baseUri: Uri.parse(widget.controller.settings.backendUrl)),
+    );
+    unawaited(dashboardController.refresh());
+  }
+
+  @override
+  void dispose() {
+    dashboardController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        MaterialBanner(
+          leading: const Icon(Icons.shield_outlined),
+          content: const Text(
+            'The embedded workspace is read-only. It can inspect capabilities, provenance, trust alerts and retention posture, but it cannot execute actions.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => dashboardController.refresh(),
+              child: const Text('Refresh'),
+            ),
+          ],
+        ),
+        const Divider(height: 1),
+        Expanded(
+          child: GaiaDashboardView(controller: dashboardController),
+        ),
+      ],
     );
   }
 }

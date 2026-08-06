@@ -30,6 +30,10 @@ def test_scan_search_report(settings):
         assert client.get("/audit/events").status_code == 200
         assert client.get("/models/status").status_code == 200
         assert client.get("/models").status_code == 200
+        assert client.get("/integration/v1/capabilities").status_code == 200
+        assert client.get("/signing/keys").status_code == 200
+        assert client.get("/trust/alerts").status_code == 200
+        assert client.get("/retention/report").status_code == 200
 
 
 def test_agent_ask_api(settings):

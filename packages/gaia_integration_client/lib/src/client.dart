@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:http/http.dart' as http;
 
@@ -18,25 +20,63 @@ class GaiaIntegrationClient {
   final http.Client _client;
   final Duration timeout;
   final int responseLimitBytes;
+  final Map<String, _CachedJson> _cache = <String, _CachedJson>{};
 
   Uri _resolve(String path) => baseUri.resolve(path);
 
   Future<dynamic> _getJson(String path, {Map<String, String>? queryParameters}) async {
     final uri = _resolve(path).replace(queryParameters: queryParameters);
-    final response = await _client.get(uri).timeout(timeout);
-    return _decode(response);
+    final cacheKey = _cacheKey(uri);
+    return _fetchJson(
+      cacheKey,
+      () => _client.get(uri).timeout(timeout),
+      allowStale: true,
+    );
   }
 
   Future<dynamic> _postJson(String path, {Object? body, Map<String, String>? queryParameters}) async {
     final uri = _resolve(path).replace(queryParameters: queryParameters);
-    final response = await _client
-        .post(
-          uri,
-          headers: const {'content-type': 'application/json'},
-          body: body == null ? null : jsonEncode(body),
-        )
-        .timeout(timeout);
-    return _decode(response);
+    return _fetchJson(
+      _cacheKey(uri),
+      () => _client
+          .post(
+            uri,
+            headers: const {'content-type': 'application/json'},
+            body: body == null ? null : jsonEncode(body),
+          )
+          .timeout(timeout),
+      allowStale: false,
+    );
+  }
+
+  Future<dynamic> _fetchJson(String cacheKey, Future<http.Response> Function() request, {required bool allowStale}) async {
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final response = await request();
+        final decoded = _decode(response);
+        if (decoded != null) {
+          _cache[cacheKey] = _CachedJson(decoded, DateTime.now());
+        }
+        return decoded;
+      } on TimeoutException catch (error) {
+        lastError = error;
+      } on SocketException catch (error) {
+        lastError = error;
+      } on http.ClientException catch (error) {
+        lastError = error;
+      }
+      if (attempt < 2) {
+        await Future<void>.delayed(Duration(milliseconds: 150 * (attempt + 1)));
+      }
+    }
+    if (allowStale && _cache.containsKey(cacheKey)) {
+      return _cache[cacheKey]!.value;
+    }
+    if (lastError != null) {
+      throw GaiaClientError(lastError.toString());
+    }
+    throw GaiaClientError('Request failed.');
   }
 
   dynamic _decode(http.Response response) {
@@ -51,6 +91,8 @@ class GaiaIntegrationClient {
     }
     return jsonDecode(utf8.decode(response.bodyBytes));
   }
+
+  String _cacheKey(Uri uri) => uri.toString();
 
   String _message(String body) {
     try {
@@ -72,6 +114,11 @@ class GaiaIntegrationClient {
   Future<GaiaCompatibility> compatibility() async {
     final json = await _getJson('/integration/v1/compatibility') as Map<String, dynamic>;
     return GaiaCompatibility.fromJson(json);
+  }
+
+  Future<Map<String, dynamic>> capabilityPayload() async {
+    final json = await _getJson('/integration/v1/capabilities') as Map<String, dynamic>;
+    return json;
   }
 
   Future<List<GaiaProjectSummary>> projects() async {
@@ -185,6 +232,11 @@ class GaiaIntegrationClient {
     return (await _getJson('/retention/status')) as Map<String, dynamic>;
   }
 
+  Future<GaiaRetentionReport> retentionReport() async {
+    final json = await _getJson('/retention/report') as Map<String, dynamic>;
+    return GaiaRetentionReport.fromJson(json);
+  }
+
   Future<GaiaRetentionPlan> retentionPlan(String policyId) async {
     final json = await _postJson('/retention/plan', body: {'policy_id': policyId}) as Map<String, dynamic>;
     return GaiaRetentionPlan.fromJson(json);
@@ -194,4 +246,66 @@ class GaiaIntegrationClient {
     final json = await _postJson('/review-packages/verify', body: {'package_path': packagePath}) as Map<String, dynamic>;
     return GaiaReviewPackageResult.fromJson(json);
   }
+
+  Future<List<GaiaSigningKeySummary>> listSigningKeys() async {
+    final json = await _getJson('/signing/keys') as List<dynamic>;
+    return json.whereType<Map>().map((item) => GaiaSigningKeySummary.fromJson(item.cast<String, dynamic>())).toList();
+  }
+
+  Future<GaiaSigningKeySummary> createSigningKey(String keyName, {bool activate = true}) async {
+    final json = await _postJson('/signing/keys', body: {'key_name': keyName, 'activate': activate}) as Map<String, dynamic>;
+    return GaiaSigningKeySummary.fromJson(json);
+  }
+
+  Future<Map<String, dynamic>> rotateSigningKey(String keyId, {String? nextKeyName}) async {
+    return (await _postJson('/signing/keys/$keyId/rotate', body: {'next_key_name': nextKeyName})) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> revokeSigningKey(String keyId, {String reason = 'revoked'}) async {
+    return (await _postJson('/signing/keys/$keyId/revoke', body: {'reason': reason})) as Map<String, dynamic>;
+  }
+
+  Future<List<GaiaProvenanceManifest>> listProvenanceManifests() async {
+    final json = await _getJson('/provenance/manifests') as List<dynamic>;
+    return json.whereType<Map>().map((item) => GaiaProvenanceManifest.fromJson(item.cast<String, dynamic>())).toList();
+  }
+
+  Future<GaiaProvenanceManifest> createProvenanceManifest(Map<String, dynamic> body) async {
+    final json = await _postJson('/provenance/manifests', body: body) as Map<String, dynamic>;
+    return GaiaProvenanceManifest.fromJson(json);
+  }
+
+  Future<GaiaProvenanceManifest> getProvenanceManifest(String manifestId) async {
+    final json = await _getJson('/provenance/manifests/$manifestId') as Map<String, dynamic>;
+    return GaiaProvenanceManifest.fromJson(json);
+  }
+
+  Future<Map<String, dynamic>> verifyProvenanceManifest(String manifestId) async {
+    return (await _postJson('/provenance/manifests/$manifestId/verify')) as Map<String, dynamic>;
+  }
+
+  Future<List<GaiaTrustAlert>> trustAlerts() async {
+    final json = await _getJson('/trust/alerts') as List<dynamic>;
+    return json.whereType<Map>().map((item) => GaiaTrustAlert.fromJson(item.cast<String, dynamic>())).toList();
+  }
+
+  Future<List<GaiaTrustAlert>> refreshTrustAlerts() async {
+    final json = await _postJson('/trust/alerts/refresh') as List<dynamic>;
+    return json.whereType<Map>().map((item) => GaiaTrustAlert.fromJson(item.cast<String, dynamic>())).toList();
+  }
+
+  Future<Map<String, dynamic>> acknowledgeTrustAlert(String alertId, {String reviewer = 'manual', String reason = ''}) async {
+    return (await _postJson('/trust/alerts/$alertId/acknowledge', body: {'reviewer': reviewer, 'reason': reason})) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> inspectReceiptChain(String chainId) async {
+    return (await _getJson('/receipts/chains/$chainId/inspect')) as Map<String, dynamic>;
+  }
+}
+
+class _CachedJson {
+  _CachedJson(this.value, this.createdAt);
+
+  final dynamic value;
+  final DateTime createdAt;
 }

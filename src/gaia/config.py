@@ -14,10 +14,12 @@ from gaia.routing import ModelRoutingSettings, load_model_routing
 class Settings(BaseModel):
     config_path: Path = Path("config/projects.yaml")
     database_path: Path = Path("data/gaia.db")
+    signing_key_store: Path = Path("data/signing-keys")
     model_routing_path: Path = Path("config/model-routing.yaml")
     log_level: str = "INFO"
     api_host: str = "127.0.0.1"
     api_port: int = 8765
+    signing_enabled: bool = False
     max_file_bytes: int = 2_000_000
     max_git_output_bytes: int = 1_000_000
     git_timeout_seconds: int = 15
@@ -51,10 +53,12 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
     return Settings(
         config_path=path,
         database_path=Path(_env("GAIA_DATABASE_PATH", "data/gaia.db")),
+        signing_key_store=Path(_env("GAIA_SIGNING_KEY_STORE", "data/signing-keys")),
         model_routing_path=Path(_env("GAIA_MODEL_ROUTING_PATH", "config/model-routing.yaml")),
         log_level=_env("GAIA_LOG_LEVEL", "INFO"),
         api_host=_env("GAIA_API_HOST", "127.0.0.1"),
         api_port=int(_env("GAIA_API_PORT", "8765")),
+        signing_enabled=_env("GAIA_SIGNING_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
         max_file_bytes=int(_env("GAIA_MAX_FILE_BYTES", "2000000")),
         max_git_output_bytes=int(_env("GAIA_MAX_GIT_OUTPUT_BYTES", "1000000")),
         git_timeout_seconds=int(_env("GAIA_GIT_TIMEOUT_SECONDS", "15")),

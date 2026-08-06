@@ -21,6 +21,7 @@ from gaia.output_workspace import (
     PermissionManifestDecisionRequest,
 )
 from gaia.output_workspace import PermissionDeniedError as OutputPermissionDeniedError
+from gaia.provenance import ProvenanceCreateRequest
 from gaia.providers import ProviderRegistry
 from gaia.service import ProjectService
 from gaia.trust import GAIATrustService
@@ -559,6 +560,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         except Exception as exc:
             raise _output_http_error(exc) from exc
 
+    @app.get("/receipts/chains/{chain_id}/inspect")
+    def receipt_chain_inspect(chain_id: str) -> dict[str, object]:
+        try:
+            return trust_service.inspect_receipt_chain(chain_id)
+        except Exception as exc:
+            raise _output_http_error(exc) from exc
+
     @app.get("/action-templates")
     def action_templates() -> list[dict[str, object]]:
         return [template.model_dump(mode="json") for template in trust_service.list_action_templates()]
@@ -592,6 +600,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def retention_status() -> dict[str, object]:
         return trust_service.retention_status()
 
+    @app.get("/retention/report")
+    def retention_report() -> dict[str, object]:
+        return trust_service.retention_report()
+
     @app.post("/retention/plan")
     def retention_plan(policy_id: str = Body(embed=True)) -> dict[str, object]:
         try:
@@ -614,16 +626,86 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def review_package_verify(package_path: str = Body(embed=True)) -> dict[str, object]:
         return trust_service.verify_review_package(package_path)
 
+    @app.post("/review-packages/inspect")
+    def review_package_inspect(package_path: str = Body(embed=True)) -> dict[str, object]:
+        return trust_service.inspect_review_package(package_path)
+
+    @app.get("/integration/v1/capabilities")
+    def integration_capabilities() -> dict[str, object]:
+        return trust_service.provenance.capability_payload()
+
+    @app.get("/signing/keys")
+    def signing_keys() -> list[dict[str, object]]:
+        return trust_service.list_signing_keys()
+
+    @app.post("/signing/keys")
+    def create_signing_key(key_name: str = Body(embed=True), activate: bool = Body(default=True, embed=True)) -> dict[str, object]:
+        return trust_service.create_signing_key(key_name, activate=activate)
+
+    @app.post("/signing/keys/{key_id}/rotate")
+    def rotate_signing_key(key_id: str, next_key_name: str | None = Body(default=None, embed=True)) -> dict[str, object]:
+        return trust_service.rotate_signing_key(key_id, next_key_name=next_key_name)
+
+    @app.post("/signing/keys/{key_id}/revoke")
+    def revoke_signing_key(key_id: str, reason: str = Body(default="revoked", embed=True)) -> dict[str, object]:
+        return trust_service.revoke_signing_key(key_id, reason=reason)
+
+    @app.get("/provenance/manifests")
+    def provenance_manifests() -> list[dict[str, object]]:
+        return trust_service.list_provenance_manifests()
+
+    @app.post("/provenance/manifests")
+    def provenance_manifest_create(request: ProvenanceCreateRequest) -> dict[str, object]:
+        return trust_service.create_provenance_manifest(request)
+
+    @app.get("/provenance/manifests/{manifest_id}")
+    def provenance_manifest_get(manifest_id: str) -> dict[str, object]:
+        try:
+            return trust_service.get_provenance_manifest(manifest_id)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail="Provenance manifest not found") from exc
+
+    @app.post("/provenance/manifests/{manifest_id}/verify")
+    def provenance_manifest_verify(manifest_id: str) -> dict[str, object]:
+        try:
+            return trust_service.verify_provenance_manifest(manifest_id)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail="Provenance manifest not found") from exc
+
+    @app.get("/trust/alerts")
+    def trust_alerts() -> list[dict[str, object]]:
+        return trust_service.list_trust_alerts()
+
+    @app.post("/trust/alerts/refresh")
+    def trust_alerts_refresh() -> list[dict[str, object]]:
+        return trust_service.refresh_trust_alerts()
+
+    @app.post("/trust/alerts/{alert_id}/acknowledge")
+    def trust_alert_acknowledge(
+        alert_id: str,
+        reviewer: str = Body(default="manual", embed=True),
+        reason: str = Body(default="", embed=True),
+    ) -> dict[str, object]:
+        try:
+            return trust_service.acknowledge_trust_alert(alert_id, reviewer=reviewer, reason=reason)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail="Trust alert not found") from exc
+
     @app.get("/integration/v1/status")
     def integration_status() -> dict[str, object]:
         status = workflow_service.integration_status()
         status["output_workspace"] = output_service.summary()
         status["compatibility"] = trust_service.compatibility()
+        status["capabilities"] = trust_service.provenance.capability_payload()
         status["trust"] = {
             "action_templates": len(trust_service.list_action_templates()),
             "receipt_chains": len(trust_service.list_receipt_chains()),
             "retention_policies": len(trust_service.list_retention_policies()),
+            "alerts": len(trust_service.list_trust_alerts()),
+            "provenance_manifests": len(trust_service.list_provenance_manifests()),
+            "signing_keys": len(trust_service.list_signing_keys()),
         }
+        status["retention_report"] = trust_service.retention_report()
         return status
 
     @app.get("/integration/v1/projects")

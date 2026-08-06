@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +14,13 @@ from gaia.config import Settings
 from gaia.db import Database
 from gaia.models import utc_now
 from gaia.output_workspace import OutputActionCreateRequest, OutputWorkspaceService
+from gaia.provenance import (
+    ProvenanceCreateRequest,
+    ProvenanceService,
+    SigningKeyCreateRequest,
+    SigningKeyRotateRequest,
+    TrustAlertAckRequest,
+)
 
 CompatibilityStatus = Literal[
     "compatible",
@@ -240,6 +246,7 @@ class GAIATrustService:
         self.settings = settings
         self.database = database or Database(settings.database_path)
         self.workspace = OutputWorkspaceService(settings, self.database)
+        self.provenance = ProvenanceService(settings, self.database)
 
     # ------------------------------------------------------------------
     # Compatibility
@@ -251,27 +258,23 @@ class GAIATrustService:
         if backend_version.startswith("0.6"):
             warnings.append("Backend and client should stay on matching 0.6.x versions.")
             status = "compatible_with_warnings"
+        capability_payload = self.provenance.capability_payload()
+        if capability_payload["degraded_features"]:
+            warnings.extend(capability_payload["degraded_features"])
+            if status == "compatible":
+                status = "compatible_with_warnings"
         return {
             "backend_product_version": backend_version,
-            "minimum_supported_api_version": "0.6.0",
-            "maximum_tested_api_version": "0.6.0",
+            "minimum_supported_api_version": "0.7.0",
+            "maximum_tested_api_version": "0.7.0",
             "integration_contract_version": "gaia-v2",
-            "client_package_version": "0.6.0",
+            "client_package_version": "0.7.0",
             "backend_version": backend_version,
             "status": status,
             "loopback_only": True,
-            "capabilities": [
-                "project_summaries",
-                "task_proposals",
-                "draft_creation",
-                "approvals",
-                "daily_briefs",
-                "action_summaries",
-                "receipt_verification",
-                "offline_packages",
-                "retention_policies",
-                "action_templates",
-            ],
+            "capabilities": capability_payload["capabilities"],
+            "capability_version": capability_payload["capability_version"],
+            "capability_catalog": capability_payload["capability_catalog"],
             "degraded_features": [] if status == "compatible" else warnings,
             "deprecation_warnings": warnings,
         }
@@ -540,7 +543,7 @@ class GAIATrustService:
         latest_receipt = receipt[0] if receipt else None
         manifest = {
             "package_id": str(uuid4()),
-            "schema_version": "0.6.0",
+            "schema_version": "0.7.0",
             "action_id": action.action_id,
             "receipt_id": latest_receipt.receipt_id if latest_receipt else None,
             "chain_id": latest_receipt.chain_id if latest_receipt else None,
@@ -607,34 +610,7 @@ class GAIATrustService:
         return record
 
     def verify_review_package(self, package_path: str | Path) -> dict[str, Any]:
-        path = Path(package_path)
-        if not path.exists():
-            return {"status": "invalid", "reason": "Package does not exist."}
-        with tempfile.TemporaryDirectory() as tempdir:
-            with zipfile.ZipFile(path) as archive:
-                names = archive.namelist()
-                if len(names) != len(set(names)):
-                    return {"status": "invalid", "reason": "Duplicate archive entries are not allowed."}
-                for name in names:
-                    target = Path(tempdir) / name
-                    if target.is_absolute() or ".." in target.parts:
-                        return {"status": "invalid", "reason": "Archive traversal detected."}
-                    if name.lower().endswith((".exe", ".dll", ".bat", ".cmd", ".ps1")):
-                        return {"status": "invalid", "reason": "Unexpected executable content."}
-                archive.extractall(tempdir)
-            extracted = Path(tempdir)
-            hashes_path = extracted / "hashes.json"
-            if not hashes_path.exists():
-                return {"status": "invalid", "reason": "Missing hashes manifest."}
-            hashes = json.loads(hashes_path.read_text(encoding="utf-8"))
-            for name, declared in hashes.items():
-                candidate = extracted / name
-                if not candidate.exists():
-                    return {"status": "invalid", "reason": f"Missing package entry: {name}"}
-                actual = _sha256_text(candidate.read_text(encoding="utf-8"))
-                if actual != declared:
-                    return {"status": "invalid", "reason": f"Hash mismatch for {name}"}
-        return {"status": "valid", "reason": "Package verified."}
+        return self.provenance.verify_review_package(package_path).model_dump(mode="json")
 
     # ------------------------------------------------------------------
     # Retention
@@ -661,6 +637,51 @@ class GAIATrustService:
             "plans": self.list_retention_plans(),
             "receipts": self.list_retention_receipts(),
         }
+
+    def retention_report(self) -> dict[str, Any]:
+        return self.provenance.retention_report().model_dump(mode="json")
+
+    # ------------------------------------------------------------------
+    # Provenance and signing
+    # ------------------------------------------------------------------
+    def list_signing_keys(self) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in self.provenance.list_signing_keys()]
+
+    def create_signing_key(self, key_name: str, activate: bool = True) -> dict[str, Any]:
+        return self.provenance.create_signing_key(SigningKeyCreateRequest(key_name=key_name, activate=activate)).model_dump(mode="json")
+
+    def rotate_signing_key(self, key_id: str, next_key_name: str | None = None) -> dict[str, Any]:
+        return self.provenance.rotate_signing_key(SigningKeyRotateRequest(key_id=key_id, next_key_name=next_key_name))
+
+    def revoke_signing_key(self, key_id: str, reason: str = "revoked") -> dict[str, Any]:
+        return self.provenance.revoke_signing_key(key_id, reason=reason).model_dump(mode="json")
+
+    def list_provenance_manifests(self) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in self.provenance.list_provenance_manifests()]
+
+    def get_provenance_manifest(self, manifest_id: str) -> dict[str, Any]:
+        return self.provenance.get_provenance_manifest(manifest_id).model_dump(mode="json")
+
+    def create_provenance_manifest(self, request: ProvenanceCreateRequest) -> dict[str, Any]:
+        return self.provenance.create_provenance_manifest(request).model_dump(mode="json")
+
+    def verify_provenance_manifest(self, manifest_id: str) -> dict[str, Any]:
+        return self.provenance.verify_provenance_manifest(manifest_id).model_dump(mode="json")
+
+    def list_trust_alerts(self) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in self.provenance.list_trust_alerts()]
+
+    def refresh_trust_alerts(self) -> list[dict[str, Any]]:
+        return [item.model_dump(mode="json") for item in self.provenance.refresh_trust_alerts()]
+
+    def acknowledge_trust_alert(self, alert_id: str, reviewer: str = "manual", reason: str = "") -> dict[str, Any]:
+        return self.provenance.acknowledge_alert(alert_id, TrustAlertAckRequest(reviewer=reviewer, reason=reason)).model_dump(mode="json")
+
+    def inspect_receipt_chain(self, chain_id: str) -> dict[str, Any]:
+        return self.provenance.inspect_receipt_chain(chain_id).model_dump(mode="json")
+
+    def inspect_review_package(self, package_path: str | Path) -> dict[str, Any]:
+        return self.provenance.verify_review_package(package_path).model_dump(mode="json")
 
     def list_retention_plans(self) -> list[dict[str, Any]]:
         rows = self.database.connection.execute("SELECT * FROM retention_plans ORDER BY created_at DESC").fetchall()

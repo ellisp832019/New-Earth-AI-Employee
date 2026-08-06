@@ -109,3 +109,65 @@ class HealthResponse(BaseModel):
     version: str
     database_path: str
     fts5_available: bool
+
+
+class CapabilityDescriptor(BaseModel):
+    capability_id: str
+    version: str
+    state: Literal["enabled", "degraded", "disabled"]
+    summary: str
+    gated_by: list[str] = Field(default_factory=list)
+    requires_signing: bool = False
+    enabled: bool = True
+
+
+class SigningKeySummary(BaseModel):
+    key_id: str
+    key_name: str
+    public_key: str
+    status: Literal["active", "rotated", "revoked"]
+    created_at: datetime = Field(default_factory=utc_now)
+    revoked_at: datetime | None = None
+    rotated_from_key_id: str | None = None
+    last_used_at: datetime | None = None
+    signing_enabled: bool = False
+
+
+class ProvenanceManifestRecord(BaseModel):
+    manifest_id: str
+    manifest_version: int
+    subject_kind: str
+    subject_id: str
+    subject_version: int
+    content_hash: str
+    canonical_json: str
+    created_at: datetime = Field(default_factory=utc_now)
+    signing_key_id: str | None = None
+    signature: str | None = None
+    signature_status: Literal[
+        "unsigned",
+        "hash_verified",
+        "hash_chained",
+        "cryptographically_signed",
+        "signature_invalid",
+        "signing_key_revoked",
+    ] = "unsigned"
+    key_status: Literal["active", "revoked", "rotated", "unknown"] = "unknown"
+    chain_id: str | None = None
+    chain_sequence: int | None = None
+    package_path: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class TrustAlertRecord(BaseModel):
+    alert_id: str = Field(default_factory=lambda: str(uuid4()))
+    alert_type: str
+    severity: Literal["info", "warning", "critical"]
+    status: Literal["open", "acknowledged", "resolved"] = "open"
+    title: str
+    message: str
+    source_kind: str
+    source_id: str
+    created_at: datetime = Field(default_factory=utc_now)
+    acknowledged_at: datetime | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)

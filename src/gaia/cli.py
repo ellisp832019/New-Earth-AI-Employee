@@ -24,6 +24,7 @@ from gaia.output_workspace import (
     PermissionManifestCreateRequest,
     PermissionManifestDecisionRequest,
 )
+from gaia.provenance import ProvenanceCreateRequest
 from gaia.providers import ProviderRegistry
 from gaia.reports import write_report
 from gaia.service import ProjectService
@@ -59,6 +60,9 @@ receipts_app = typer.Typer(help="Execution receipts")
 templates_app = typer.Typer(help="Versioned action templates")
 retention_app = typer.Typer(help="Retention policies and plans")
 review_packages_app = typer.Typer(help="Offline review packages")
+provenance_app = typer.Typer(help="Provenance manifests and inspection")
+signing_app = typer.Typer(help="Local Ed25519 signing keys")
+trust_alerts_app = typer.Typer(help="Trust alerts and diagnostics")
 app.add_typer(project_app, name="project")
 app.add_typer(projects_app, name="projects")
 app.add_typer(models_app, name="models")
@@ -74,6 +78,9 @@ app.add_typer(receipts_app, name="receipts")
 app.add_typer(templates_app, name="templates")
 app.add_typer(retention_app, name="retention")
 app.add_typer(review_packages_app, name="review-packages")
+app.add_typer(provenance_app, name="provenance")
+app.add_typer(signing_app, name="signing")
+app.add_typer(trust_alerts_app, name="alerts")
 console = Console()
 
 
@@ -1178,6 +1185,15 @@ def retention_status(config: Path | None = typer.Option(None)) -> None:
         service.database.close()
 
 
+@retention_app.command("report")
+def retention_report(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.retention_report()))
+    finally:
+        service.database.close()
+
+
 @retention_app.command("plan")
 def retention_plan(policy_id: str = typer.Option("preserve-all"), config: Path | None = typer.Option(None)) -> None:
     service = _trust_service(config)
@@ -1224,5 +1240,122 @@ def review_packages_inspect(package_path: Path, config: Path | None = typer.Opti
     service = _trust_service(config)
     try:
         console.print_json(json.dumps(service.verify_review_package(package_path)))
+    finally:
+        service.database.close()
+
+
+@provenance_app.command("list")
+def provenance_list(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.list_provenance_manifests()))
+    finally:
+        service.database.close()
+
+
+@provenance_app.command("show")
+def provenance_show(manifest_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.get_provenance_manifest(manifest_id)))
+    finally:
+        service.database.close()
+
+
+@provenance_app.command("create")
+def provenance_create(
+    subject_kind: str,
+    subject_id: str,
+    subject_version: int = typer.Option(1),
+    payload_json: str = typer.Option("{}", help="Canonical JSON payload for the provenance record"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _trust_service(config)
+    try:
+        payload = json.loads(payload_json)
+        request = ProvenanceCreateRequest(
+            subject_kind=subject_kind,
+            subject_id=subject_id,
+            subject_version=subject_version,
+            payload=payload if isinstance(payload, dict) else {"value": payload},
+        )
+        console.print_json(json.dumps(service.create_provenance_manifest(request)))
+    finally:
+        service.database.close()
+
+
+@provenance_app.command("verify")
+def provenance_verify(manifest_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.verify_provenance_manifest(manifest_id)))
+    finally:
+        service.database.close()
+
+
+@signing_app.command("list")
+def signing_list(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.list_signing_keys()))
+    finally:
+        service.database.close()
+
+
+@signing_app.command("create")
+def signing_create(key_name: str, activate: bool = typer.Option(True), config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.create_signing_key(key_name, activate=activate)))
+    finally:
+        service.database.close()
+
+
+@signing_app.command("rotate")
+def signing_rotate(key_id: str, next_key_name: str | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.rotate_signing_key(key_id, next_key_name=next_key_name)))
+    finally:
+        service.database.close()
+
+
+@signing_app.command("revoke")
+def signing_revoke(key_id: str, reason: str = typer.Option("revoked"), config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.revoke_signing_key(key_id, reason=reason)))
+    finally:
+        service.database.close()
+
+
+@trust_alerts_app.command("list")
+def trust_alerts_list(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.list_trust_alerts()))
+    finally:
+        service.database.close()
+
+
+@trust_alerts_app.command("refresh")
+def trust_alerts_refresh(config: Path | None = typer.Option(None)) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.refresh_trust_alerts()))
+    finally:
+        service.database.close()
+
+
+@trust_alerts_app.command("acknowledge")
+def trust_alerts_acknowledge(
+    alert_id: str,
+    reviewer: str = typer.Option("manual"),
+    reason: str = typer.Option(""),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _trust_service(config)
+    try:
+        console.print_json(json.dumps(service.acknowledge_trust_alert(alert_id, reviewer=reviewer, reason=reason)))
     finally:
         service.database.close()
