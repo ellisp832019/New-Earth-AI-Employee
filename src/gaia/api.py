@@ -78,12 +78,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/projects")
     def projects() -> list[dict[str, object]]:
-        return [project.model_dump(mode="json") for project in resolved_settings.projects.values()]
+        return [project.public_payload() for project in resolved_settings.projects.values()]
 
     @app.get("/projects/{project_id}")
     def project(project_id: str) -> dict[str, object]:
         try:
-            return service.get_project(project_id).model_dump(mode="json")
+            return service.get_project(project_id).public_payload()
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Project not found") from exc
 

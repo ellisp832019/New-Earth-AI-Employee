@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 def utc_now() -> datetime:
@@ -13,19 +14,74 @@ def utc_now() -> datetime:
 
 
 class ProjectConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     project_id: str
     name: str
     root: Path
     access: Literal["read_only"] = "read_only"
+    enabled: bool = True
+    repository_type: str = "git"
+    inspection_access: str = "read_only"
+    output_access: str = "none"
+    sensitivity: str = "internal"
     approved_extensions: set[str]
     excluded_directories: set[str] = Field(default_factory=set)
     excluded_filenames: set[str] = Field(default_factory=set)
     important_paths: list[str] = Field(default_factory=list)
+    health_rules: dict[str, Any] = Field(default_factory=dict)
+    release_rules: dict[str, Any] = Field(default_factory=dict)
+    approval_requirements: dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("root", mode="before")
+    @classmethod
+    def normalise_root(cls, value: Any) -> Path:
+        return Path(value).expanduser().resolve(strict=False)
 
     @field_validator("approved_extensions")
     @classmethod
     def normalise_extensions(cls, values: set[str]) -> set[str]:
         return {value.lower() if value.startswith(".") else f".{value.lower()}" for value in values}
+
+    def config_payload(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "name": self.name,
+            "root": str(self.root),
+            "access": self.access,
+            "enabled": self.enabled,
+            "repository_type": self.repository_type,
+            "inspection_access": self.inspection_access,
+            "output_access": self.output_access,
+            "sensitivity": self.sensitivity,
+            "approved_extensions": sorted(self.approved_extensions),
+            "excluded_directories": sorted(self.excluded_directories),
+            "excluded_filenames": sorted(self.excluded_filenames),
+            "important_paths": list(self.important_paths),
+            "health_rules": self.health_rules,
+            "release_rules": self.release_rules,
+            "approval_requirements": self.approval_requirements,
+            "metadata": self.metadata,
+        }
+
+    def public_payload(self) -> dict[str, Any]:
+        return {
+            "project_id": self.project_id,
+            "name": self.name,
+            "root": str(self.root),
+            "access": self.access,
+            "approved_extensions": sorted(self.approved_extensions),
+            "excluded_directories": sorted(self.excluded_directories),
+            "excluded_filenames": sorted(self.excluded_filenames),
+            "important_paths": list(self.important_paths),
+        }
+
+    def config_fingerprint(self) -> str:
+        import hashlib
+
+        payload = json.dumps(self.config_payload(), sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 class AuditEvent(BaseModel):
@@ -66,7 +122,9 @@ class GitCommandResult(BaseModel):
 class GitState(BaseModel):
     repository_root: str
     branch: str | None
+    detached_head: bool = False
     commit_sha: str | None
+    upstream_name: str | None = None
     is_clean: bool
     status_porcelain: list[str]
     recent_commits: list[str]
@@ -76,6 +134,8 @@ class GitState(BaseModel):
     ahead: int | None = None
     behind: int | None = None
     tracked_file_count: int
+    tracked_modifications_count: int = 0
+    untracked_item_count: int = 0
     untracked_files: list[str]
     changed_files: list[str]
     warnings: list[str] = Field(default_factory=list)
@@ -171,3 +231,59 @@ class TrustAlertRecord(BaseModel):
     created_at: datetime = Field(default_factory=utc_now)
     acknowledged_at: datetime | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+ProjectHealthStatus = Literal["healthy", "attention", "blocked", "unknown"]
+
+
+class ProjectHealthEvidenceReference(BaseModel):
+    evidence_kind: str
+    evidence_id: str | None = None
+    description: str
+    freshness: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectHealthSnapshot(BaseModel):
+    snapshot_id: str = Field(default_factory=lambda: str(uuid4()))
+    schema_version: int = 1
+    project_id: str
+    project_name: str
+    project_root: str
+    project_configuration_fingerprint: str
+    capture_timestamp: datetime = Field(default_factory=utc_now)
+    normalized_status: ProjectHealthStatus = "unknown"
+    reason_codes: list[str] = Field(default_factory=list)
+    explanations: list[str] = Field(default_factory=list)
+    blocking_conditions: list[str] = Field(default_factory=list)
+    attention_conditions: list[str] = Field(default_factory=list)
+    unknown_fields: list[str] = Field(default_factory=list)
+    evidence_references: list[ProjectHealthEvidenceReference] = Field(default_factory=list)
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+    provenance_reference: str | None = None
+    audit_event_id: str | None = None
+    content_fingerprint: str = ""
+
+
+class ProjectHealthPortfolioEntry(BaseModel):
+    project_id: str
+    project_name: str
+    project_root: str
+    enabled: bool
+    repository_type: str
+    latest_snapshot_id: str | None = None
+    latest_capture_timestamp: datetime | None = None
+    normalized_status: ProjectHealthStatus = "unknown"
+    snapshot_count: int = 0
+    evidence_freshness: str = "unknown"
+    reason_codes: list[str] = Field(default_factory=list)
+    latest_snapshot: ProjectHealthSnapshot | None = None
+
+
+class ProjectHealthPortfolio(BaseModel):
+    generated_at: datetime = Field(default_factory=utc_now)
+    enabled_project_count: int = 0
+    projects: list[ProjectHealthPortfolioEntry] = Field(default_factory=list)
+    projects_without_snapshots: list[str] = Field(default_factory=list)
+    counts_by_status: dict[str, int] = Field(default_factory=dict)
+    latest_snapshot_ids: dict[str, str] = Field(default_factory=dict)

@@ -6,11 +6,17 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from gaia.conversation import AgentRunRecord
-from gaia.models import AuditEvent, DocumentRecord, RepositorySnapshot, SearchResult
+from gaia.models import (
+    AuditEvent,
+    DocumentRecord,
+    ProjectHealthSnapshot,
+    RepositorySnapshot,
+    SearchResult,
+)
 
 
 class Database:
-    SCHEMA_VERSION = 7
+    SCHEMA_VERSION = 8
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -47,6 +53,20 @@ class Database:
                 project_id TEXT NOT NULL,
                 created_at TEXT NOT NULL,
                 payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS project_health_snapshots (
+                snapshot_id TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                project_id TEXT NOT NULL,
+                project_name TEXT NOT NULL,
+                project_root TEXT NOT NULL,
+                project_configuration_fingerprint TEXT NOT NULL,
+                capture_timestamp TEXT NOT NULL,
+                normalized_status TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                provenance_reference TEXT,
+                audit_event_id TEXT
             );
             CREATE TABLE IF NOT EXISTS audit_events (
                 event_id TEXT PRIMARY KEY,
@@ -459,6 +479,15 @@ class Database:
                 "acknowledged_at": "TEXT",
             },
         )
+        self._ensure_indexes(
+            [
+                "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_project_id ON project_health_snapshots(project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_capture_timestamp ON project_health_snapshots(capture_timestamp)",
+                "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_project_timestamp ON project_health_snapshots(project_id, capture_timestamp DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_normalized_status ON project_health_snapshots(normalized_status)",
+                "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_content_fingerprint ON project_health_snapshots(content_fingerprint)",
+            ]
+        )
         self.connection.commit()
         self.connection.execute(f"PRAGMA user_version = {self.SCHEMA_VERSION}")
         self.connection.commit()
@@ -471,6 +500,10 @@ class Database:
         for name, type_name in columns.items():
             if name not in existing:
                 self.connection.execute(f"ALTER TABLE {table} ADD COLUMN {name} {type_name}")
+
+    def _ensure_indexes(self, statements: Iterable[str]) -> None:
+        for statement in statements:
+            self.connection.execute(statement)
 
     def replace_documents(self, project_id: str, records: Iterable[DocumentRecord]) -> None:
         records = list(records)
@@ -601,6 +634,77 @@ class Database:
             (project_id,),
         ).fetchone()
         return RepositorySnapshot.model_validate_json(row["payload_json"]) if row else None
+
+    def insert_project_health_snapshot(self, snapshot: ProjectHealthSnapshot) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO project_health_snapshots(
+                    snapshot_id, schema_version, project_id, project_name, project_root,
+                    project_configuration_fingerprint, capture_timestamp, normalized_status,
+                    normalized_payload_json, content_fingerprint, provenance_reference, audit_event_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    snapshot.snapshot_id,
+                    snapshot.schema_version,
+                    snapshot.project_id,
+                    snapshot.project_name,
+                    snapshot.project_root,
+                    snapshot.project_configuration_fingerprint,
+                    snapshot.capture_timestamp.isoformat(),
+                    snapshot.normalized_status,
+                    snapshot.model_dump_json(),
+                    snapshot.content_fingerprint,
+                    snapshot.provenance_reference,
+                    snapshot.audit_event_id,
+                ),
+            )
+
+    def update_project_health_snapshot_audit_event(self, snapshot_id: str, audit_event_id: str) -> None:
+        with self.connection:
+            self.connection.execute(
+                "UPDATE project_health_snapshots SET audit_event_id = ? WHERE snapshot_id = ?",
+                (audit_event_id, snapshot_id),
+            )
+
+    def get_project_health_snapshot(self, snapshot_id: str) -> ProjectHealthSnapshot | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_health_snapshots WHERE snapshot_id = ?",
+            (snapshot_id,),
+        ).fetchone()
+        return ProjectHealthSnapshot.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_project_health_snapshots(self, project_id: str) -> list[ProjectHealthSnapshot]:
+        rows = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_health_snapshots WHERE project_id = ? ORDER BY capture_timestamp DESC, snapshot_id DESC",
+            (project_id,),
+        ).fetchall()
+        return [ProjectHealthSnapshot.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def latest_project_health_snapshot(self, project_id: str) -> ProjectHealthSnapshot | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_health_snapshots WHERE project_id = ? ORDER BY capture_timestamp DESC, snapshot_id DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()
+        return ProjectHealthSnapshot.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_latest_project_health_snapshots(self) -> list[ProjectHealthSnapshot]:
+        rows = self.connection.execute(
+            """
+            SELECT project_id, MAX(capture_timestamp) AS capture_timestamp
+            FROM project_health_snapshots
+            GROUP BY project_id
+            ORDER BY project_id
+            """
+        ).fetchall()
+        snapshots: list[ProjectHealthSnapshot] = []
+        for row in rows:
+            project_id = str(row["project_id"])
+            snapshot = self.latest_project_health_snapshot(project_id)
+            if snapshot is not None:
+                snapshots.append(snapshot)
+        return snapshots
 
     def insert_audit_event(self, event: AuditEvent) -> None:
         with self.connection:

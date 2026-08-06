@@ -27,6 +27,17 @@ This package collects planning and architecture materials for upcoming GAIA mile
 - [Phase B Codex Prompt](v0_9/GAIA_V0_9_PHASE_B_CODEX_PROMPT.md)
 - [Planning Handoff](v0_9/GAIA_V0_9_PLANNING_HANDOFF.md)
 
+## v0.9 B1 Implementation
+
+- [Start Here](../implementation/v0_9_b1/START_HERE.md)
+- [Project Registry Implementation](../implementation/v0_9_b1/PROJECT_REGISTRY_IMPLEMENTATION.md)
+- [Project Health Model](../implementation/v0_9_b1/PROJECT_HEALTH_MODEL.md)
+- [Health Normalisation Rules](../implementation/v0_9_b1/HEALTH_NORMALISATION_RULES.md)
+- [Database Migration](../implementation/v0_9_b1/DATABASE_MIGRATION.md)
+- [Security and Isolation Proof](../implementation/v0_9_b1/SECURITY_AND_ISOLATION_PROOF.md)
+- [Validation Evidence](../implementation/v0_9_b1/VALIDATION_EVIDENCE.md)
+- [Handoff to B2](../implementation/v0_9_b1/HANDOFF_TO_B2.md)
+
 ## Related
 
 - [Released v0.8 notes](../releases/GAIA_V0_8_0_RELEASE_NOTES.md)

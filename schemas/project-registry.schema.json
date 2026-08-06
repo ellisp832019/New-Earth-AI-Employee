@@ -14,10 +14,19 @@
           "name": {"type": "string"},
           "root": {"type": "string"},
           "access": {"const": "read_only"},
+          "enabled": {"type": "boolean"},
+          "repository_type": {"type": "string"},
+          "inspection_access": {"type": "string"},
+          "output_access": {"type": "string"},
+          "sensitivity": {"type": "string"},
           "approved_extensions": {"type": "array", "items": {"type": "string"}},
           "excluded_directories": {"type": "array", "items": {"type": "string"}},
           "excluded_filenames": {"type": "array", "items": {"type": "string"}},
-          "important_paths": {"type": "array", "items": {"type": "string"}}
+          "important_paths": {"type": "array", "items": {"type": "string"}},
+          "health_rules": {"type": "object"},
+          "release_rules": {"type": "object"},
+          "approval_requirements": {"type": "object"},
+          "metadata": {"type": "object"}
         },
         "additionalProperties": false
       }

@@ -15,6 +15,8 @@ def test_projects(settings):
         response = client.get("/projects")
         assert response.status_code == 200
         assert response.json()[0]["project_id"] == "sample"
+        assert "health_rules" not in response.json()[0]
+        assert "metadata" not in response.json()[0]
 
 
 def test_scan_search_report(settings):
