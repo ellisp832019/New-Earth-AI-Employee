@@ -1,6 +1,6 @@
 name: gaia_dashboard_module
 description: Reusable GAIA dashboard widgets and controller for embedding in external hosts
-version: 0.7.0
+version: 0.8.0
 publish_to: "none"
 
 environment:

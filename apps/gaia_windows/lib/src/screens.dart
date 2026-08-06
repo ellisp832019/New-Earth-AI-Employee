@@ -1763,7 +1763,7 @@ class AboutScreen extends StatelessWidget {
       title: 'About',
       subtitle: 'Local-first, evidence-backed desktop control centre',
       child: SectionCard(
-        title: 'GAIA v0.7.0',
+        title: 'GAIA v0.8.0',
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2075,7 +2075,7 @@ class _ActionsScreenState extends State<ActionsScreen> {
 
   Future<void> _createAction(BuildContext context) async {
     final titleController = TextEditingController(text: 'Export approved output');
-    final contentController = TextEditingController(text: 'Hello from GAIA v0.7.0');
+    final contentController = TextEditingController(text: 'Hello from GAIA v0.8.0');
     final targetController = TextEditingController(text: 'workspace/approved_outputs/demo.md');
     String manifestId = widget.controller.selectedManifestId ?? (widget.controller.permissionManifests.isNotEmpty ? widget.controller.permissionManifests.first['manifest_id'] as String : '');
     await showDialog<void>(
