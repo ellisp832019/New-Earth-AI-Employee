@@ -1,25 +1,26 @@
 [CmdletBinding()]
-param()
+param(
+    [string]$PythonPath = $null
+)
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
+. "$PSScriptRoot\python_runtime_common.ps1"
 . "$PSScriptRoot\managed_backend_common.ps1"
 
 $repoRoot = $PWD.Path
-$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot
-$python = $paths.PythonExe
-if (-not (Test-Path $python)) {
-    throw "Virtual environment missing. Run scripts\setup_windows.ps1 first."
-}
+$pythonRuntime = Resolve-GaiaPythonRuntime -RepoRoot $repoRoot -PythonPath $PythonPath
+$python = $pythonRuntime.Path
+$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot -PythonPath $python
 
-$packageVersion = (& $python -c "import gaia; print(gaia.__version__)").Trim()
+$packageVersion = (Invoke-GaiaPython -PythonPath $python -Arguments @('-c', 'import gaia; print(gaia.__version__)') | Out-String).Trim()
 $flutterMachine = (& flutter --version --machine | Out-String).Trim()
 $flutterInfo = $flutterMachine | ConvertFrom-Json
 $branch = (& git branch --show-current).Trim()
 $sha = (& git rev-parse HEAD).Trim()
 $expectedVersion = $packageVersion
-$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port 8000 -ExpectedBackendVersion $expectedVersion
+$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port 8000 -ExpectedBackendVersion $expectedVersion -PythonPath $python
 
 $flutterVersion = $flutterInfo.flutterVersion
 if (-not $flutterVersion) { $flutterVersion = $flutterInfo.frameworkVersion }

@@ -1,6 +1,9 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
-& .\.venv\Scripts\python.exe -m compileall src\gaia
-& .\.venv\Scripts\python.exe -m gaia templates list
-& .\.venv\Scripts\python.exe -m gaia receipts chains
+
+. "$PSScriptRoot\python_runtime_common.ps1"
+$pythonRuntime = Resolve-GaiaPythonRuntime -RepoRoot $root
+Invoke-GaiaPython -PythonPath $pythonRuntime.Path -Arguments @('-m', 'compileall', 'src\gaia') | Out-Null
+Invoke-GaiaPython -PythonPath $pythonRuntime.Path -Arguments @('-m', 'gaia', 'templates', 'list') | Out-Null
+Invoke-GaiaPython -PythonPath $pythonRuntime.Path -Arguments @('-m', 'gaia', 'receipts', 'chains') | Out-Null

@@ -2,6 +2,12 @@
 
 Recorded during the closeout pass.
 
+## CI repair note
+
+- The first GitHub Actions `windows_validation` run failed at `Export OpenAPI contract` because the script assumed a repository `.venv` on the clean runner.
+- The portability repair added a shared Windows Python resolver that prefers `.venv`, accepts `-PythonPath`, honors `GAIA_PYTHON`, and falls back to `python` on PATH.
+- The repaired resolver was verified locally in default, explicit-path, and PATH-based modes.
+
 ## Passed
 
 - Python compileall on `src` and `tests`
@@ -13,6 +19,7 @@ Recorded during the closeout pass.
 - Dashboard module analyze and test
 - Example dashboard host analyze and test
 - v0.6 validation scripts
+- OpenAPI contract export on the local `.venv` and explicit interpreter paths
 
 ## Pending
 

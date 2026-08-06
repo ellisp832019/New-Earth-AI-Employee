@@ -1,4 +1,7 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
-& .\.venv\Scripts\python.exe -m gaia retention status
+
+. "$PSScriptRoot\python_runtime_common.ps1"
+$pythonRuntime = Resolve-GaiaPythonRuntime -RepoRoot $root
+Invoke-GaiaPython -PythonPath $pythonRuntime.Path -Arguments @('-m', 'gaia', 'retention', 'status') | Out-Null

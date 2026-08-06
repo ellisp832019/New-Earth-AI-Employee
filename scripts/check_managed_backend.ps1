@@ -1,22 +1,22 @@
 [CmdletBinding()]
 param(
-    [int]$Port = 8000
+    [int]$Port = 8000,
+    [string]$PythonPath = $null
 )
 
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
+. "$PSScriptRoot\python_runtime_common.ps1"
 . "$PSScriptRoot\managed_backend_common.ps1"
 
 $repoRoot = $PWD.Path
-$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot
-$python = $paths.PythonExe
-if (-not (Test-Path $python)) {
-    throw "Virtual environment missing. Run scripts\setup_windows.ps1 first."
-}
+$pythonRuntime = Resolve-GaiaPythonRuntime -RepoRoot $repoRoot -PythonPath $PythonPath
+$python = $pythonRuntime.Path
+$paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot -PythonPath $python
 
-$expectedVersion = (& $python -c "import gaia; print(gaia.__version__)").Trim()
-$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port $Port -ExpectedBackendVersion $expectedVersion
+$expectedVersion = (Invoke-GaiaPython -PythonPath $python -Arguments @('-c', 'import gaia; print(gaia.__version__)') | Out-String).Trim()
+$snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port $Port -ExpectedBackendVersion $expectedVersion -PythonPath $python
 
 $summary = [pscustomobject]@{
     state = $snapshot.State

@@ -1,9 +1,13 @@
 param(
   [Parameter(Mandatory = $true)]
-  [string]$PackagePath
+  [string]$PackagePath,
+  [string]$PythonPath = $null
 )
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
-& .\.venv\Scripts\python.exe -m gaia review-packages verify $PackagePath
+
+. "$PSScriptRoot\python_runtime_common.ps1"
+$pythonRuntime = Resolve-GaiaPythonRuntime -RepoRoot $root -PythonPath $PythonPath
+Invoke-GaiaPython -PythonPath $pythonRuntime.Path -Arguments @('-m', 'gaia', 'review-packages', 'verify', $PackagePath) | Out-Null

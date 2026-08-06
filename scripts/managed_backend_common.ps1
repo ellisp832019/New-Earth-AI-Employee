@@ -4,12 +4,17 @@ param()
 function Get-GaiaManagedBackendPaths {
     param(
         [Parameter(Mandatory = $true)]
-        [string]$RepoRoot
+        [string]$RepoRoot,
+        [string]$PythonPath = $null
     )
 
     [pscustomobject]@{
         RepoRoot = $RepoRoot
-        PythonExe = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+        PythonExe = if ([string]::IsNullOrWhiteSpace($PythonPath)) {
+            Join-Path $RepoRoot ".venv\Scripts\python.exe"
+        } else {
+            $PythonPath
+        }
         RuntimeDir = Join-Path $RepoRoot "data\runtime"
         LogDir = Join-Path $RepoRoot "data\logs"
         PidFile = Join-Path (Join-Path $RepoRoot "data\runtime") "gaia-backend.pid"
@@ -233,10 +238,11 @@ function Get-GaiaManagedBackendSnapshot {
         [Parameter(Mandatory = $true)]
         [string]$RepoRoot,
         [int]$Port = 8000,
-        [string]$ExpectedBackendVersion = $null
+        [string]$ExpectedBackendVersion = $null,
+        [string]$PythonPath = $null
     )
 
-    $paths = Get-GaiaManagedBackendPaths -RepoRoot $RepoRoot
+    $paths = Get-GaiaManagedBackendPaths -RepoRoot $RepoRoot -PythonPath $PythonPath
     $pidRecord = Read-GaiaManagedPidRecord -PidFile $paths.PidFile
     $listener = Get-GaiaBackendListener -Port $Port
     $metaRecord = Read-GaiaManagedBackendMeta -MetaFile $paths.MetaFile
