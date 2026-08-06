@@ -15,7 +15,14 @@ $python = $pythonRuntime.Path
 $paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot -PythonPath $python
 
 $packageVersion = (Invoke-GaiaPython -PythonPath $python -Arguments @('-c', 'import gaia; print(gaia.__version__)') | Out-String).Trim()
-$flutterMachine = & flutter --version --machine 2>&1 | Out-String
+$previousErrorActionPreference = $ErrorActionPreference
+$flutterMachine = $null
+try {
+    $ErrorActionPreference = "Continue"
+    $flutterMachine = & flutter --version --machine 2>&1 | Out-String
+} finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
 if ($null -eq $flutterMachine) {
     throw "flutter --version --machine returned no output."
 }
