@@ -15,8 +15,20 @@ $python = $pythonRuntime.Path
 $paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot -PythonPath $python
 
 $packageVersion = (Invoke-GaiaPython -PythonPath $python -Arguments @('-c', 'import gaia; print(gaia.__version__)') | Out-String).Trim()
-$flutterMachine = (& flutter --version --machine | Out-String).Trim()
-$flutterInfo = $flutterMachine | ConvertFrom-Json
+$flutterMachine = & flutter --version --machine | Out-String
+$flutterLines = @($flutterMachine -split "`r?`n")
+$flutterStart = -1
+for ($index = 0; $index -lt $flutterLines.Count; $index++) {
+    if ($flutterLines[$index].TrimStart().StartsWith("{")) {
+        $flutterStart = $index
+        break
+    }
+}
+if ($flutterStart -lt 0) {
+    throw "flutter --version --machine did not return JSON output."
+}
+$flutterJson = ($flutterLines[$flutterStart..($flutterLines.Count - 1)] -join "`n").Trim()
+$flutterInfo = $flutterJson | ConvertFrom-Json
 $branch = (& git branch --show-current).Trim()
 $sha = (& git rev-parse HEAD).Trim()
 $expectedVersion = $packageVersion
