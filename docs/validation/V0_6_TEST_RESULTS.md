@@ -8,6 +8,8 @@ Recorded during the closeout pass.
 - The portability repair added a shared Windows Python resolver that prefers `.venv`, accepts `-PythonPath`, honors `GAIA_PYTHON`, and falls back to `python` on PATH.
 - The repaired resolver was verified locally in default, explicit-path, and PATH-based modes.
 - A follow-up CI-only parser hardening was required in `scripts/version_status.ps1` because GitHub's `flutter --version --machine` output can include a `Resolving...` preamble before the JSON payload.
+- The next clean-runner Windows defect was detached-HEAD branch parsing in `scripts/version_status.ps1`; the status helper now reports `gitBranch`, `gitRefState`, and `gitSha` safely for named branches, pull-request checkouts, tags, and detached HEAD states.
+- The managed-backend validator now uses `try/finally` cleanup so a backend started during validation is stopped even if a later check fails.
 
 ## Passed
 
@@ -21,6 +23,8 @@ Recorded during the closeout pass.
 - Example dashboard host analyze and test
 - v0.6 validation scripts
 - OpenAPI contract export on the local `.venv` and explicit interpreter paths
+- Detached-HEAD regression coverage for `scripts/version_status.ps1` on a temporary worktree
+- GitHub-style `GITHUB_HEAD_REF` and `GITHUB_REF_NAME` coverage for `scripts/version_status.ps1`
 
 ## Pending
 

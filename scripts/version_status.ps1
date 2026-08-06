@@ -40,8 +40,6 @@ $flutterInfo = $flutterJson | ConvertFrom-Json
 if ($null -eq $flutterInfo) {
     throw "flutter --version --machine output did not contain parseable JSON."
 }
-$branch = (& git branch --show-current).Trim()
-$sha = (& git rev-parse HEAD).Trim()
 $expectedVersion = $packageVersion
 $snapshot = Get-GaiaManagedBackendSnapshot -RepoRoot $repoRoot -Port 8000 -ExpectedBackendVersion $expectedVersion -PythonPath $python
 
@@ -70,12 +68,89 @@ function Get-GaiaJsonPropertyValue {
 }
 
 $flutterVersion = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "flutterVersion"
-$flutterVersion = if (-not $flutterVersion) { Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "frameworkVersion" } else { $flutterVersion }
+if (-not $flutterVersion) { $flutterVersion = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "frameworkVersion" }
 $flutterChannel = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "flutterChannel"
-$flutterChannel = if (-not $flutterChannel) { Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "channel" } else { $flutterChannel }
+if (-not $flutterChannel) { $flutterChannel = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "channel" }
 $dartVersion = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "dartVersion"
-$dartVersion = if (-not $dartVersion) { Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "dartSdkVersion" } else { $dartVersion }
+if (-not $dartVersion) { $dartVersion = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "dartSdkVersion" }
 $frameworkRevision = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "frameworkRevision"
+
+function Get-GaiaGitStatus {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RepoRoot
+    )
+
+    function Get-GaiaTrimmedNativeOutput {
+        param(
+            [Parameter(Mandatory = $true)]
+            [string]$Command,
+            [Parameter(Mandatory = $true)]
+            [string[]]$Arguments
+        )
+
+        $output = & $Command @Arguments 2>$null | Out-String
+        return ([string]$output).Trim()
+    }
+
+    $branchName = Get-GaiaTrimmedNativeOutput -Command git -Arguments @("branch", "--show-current")
+    if ($branchName) {
+        return [pscustomobject]@{
+            GitBranch = $branchName
+            GitRefState = "branch"
+        }
+    }
+
+    $headRef = ([string]$env:GITHUB_HEAD_REF).Trim()
+    if ($headRef) {
+        return [pscustomobject]@{
+            GitBranch = $headRef
+            GitRefState = "pull_request"
+        }
+    }
+
+    $refType = ([string]$env:GITHUB_REF_TYPE).Trim()
+    $refName = ([string]$env:GITHUB_REF_NAME).Trim()
+    if ($refType -ieq "tag" -and $refName) {
+        return [pscustomobject]@{
+            GitBranch = $refName
+            GitRefState = "tag"
+        }
+    }
+
+    $tagName = Get-GaiaTrimmedNativeOutput -Command git -Arguments @("tag", "--points-at", "HEAD")
+    if ($tagName) {
+        $tagLines = @($tagName -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        if ($tagLines.Count -gt 0) {
+            return [pscustomobject]@{
+                GitBranch = $tagLines[0].Trim()
+                GitRefState = "tag"
+            }
+        }
+    }
+
+    if ($refName -and $refName -notmatch '^\d+/merge$') {
+        return [pscustomobject]@{
+            GitBranch = $refName
+            GitRefState = "branch"
+        }
+    }
+
+    return [pscustomobject]@{
+        GitBranch = "detached"
+        GitRefState = "detached"
+    }
+}
+
+$gitStatus = Get-GaiaGitStatus -RepoRoot $repoRoot
+$branch = $gitStatus.GitBranch
+$gitRefState = $gitStatus.GitRefState
+
+[string]$shaOutput = & git rev-parse HEAD 2>$null | Out-String
+$sha = $shaOutput.Trim()
+if (-not $sha) {
+    throw "git rev-parse HEAD did not return a commit SHA."
+}
 
 [pscustomobject]@{
     pythonPackageVersion = $packageVersion
@@ -84,6 +159,7 @@ $frameworkRevision = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "frame
     dartVersion = $dartVersion
     frameworkRevision = $frameworkRevision
     gitBranch = $branch
+    gitRefState = $gitRefState
     gitSha = $sha
     backendOwnershipState = $snapshot.State
     backendCompatibility = $snapshot.BackendCompatibility

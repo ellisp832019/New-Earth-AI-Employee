@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -14,6 +15,7 @@ pytestmark = pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell port
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = REPO_ROOT / "scripts"
+REPO_PYTHON = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
 
 
 def _run_powershell(command: str, *, cwd: Path | None = None, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -32,6 +34,11 @@ def _runtime_from_output(stdout: str) -> dict[str, str]:
     return json.loads(lines[-1])
 
 
+def _version_status_from_output(stdout: str) -> dict[str, object]:
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    return json.loads(lines[-1])
+
+
 def _helper_command(extra: str = "") -> str:
     helper = SCRIPTS_DIR / "python_runtime_common.ps1"
     base = (
@@ -40,6 +47,47 @@ def _helper_command(extra: str = "") -> str:
         "$runtime | ConvertTo-Json -Compress"
     )
     return base
+
+
+def _run_version_status(
+    *,
+    cwd: Path,
+    python_path: Path,
+    script_path: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
+    version_status_script = script_path or (SCRIPTS_DIR / "version_status.ps1")
+    command = [
+        "powershell",
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        str(version_status_script),
+        "-PythonPath",
+        str(python_path),
+    ]
+    return subprocess.run(command, cwd=cwd, env=env, check=False, capture_output=True, text=True)
+
+
+def _create_detached_worktree(tmp_path: Path) -> Path:
+    worktree = tmp_path / "detached-worktree"
+    subprocess.run(
+        ["git", "worktree", "add", str(worktree)],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(worktree), "switch", "--detach", "HEAD"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    shutil.copy2(SCRIPTS_DIR / "version_status.ps1", worktree / "scripts" / "version_status.ps1")
+    return worktree
 
 
 def test_local_venv_resolution_works() -> None:
@@ -106,7 +154,7 @@ def test_invalid_explicit_path_fails() -> None:
 def test_openapi_export_is_stable_with_explicit_python() -> None:
     contract = REPO_ROOT / "contracts" / "openapi" / "gaia-v1.json"
     before = contract.read_text(encoding="utf-8")
-    explicit_python = Path(sys.executable)
+    explicit_python = REPO_PYTHON
     command = f"& '{SCRIPTS_DIR / 'export_openapi_contract.ps1'}' -PythonPath '{explicit_python}'"
     result = _run_powershell(command, cwd=REPO_ROOT)
     assert result.returncode == 0, result.stderr
@@ -128,3 +176,83 @@ def test_scripts_do_not_embed_personal_absolute_paths() -> None:
         content = script_path.read_text(encoding="utf-8")
         for fragment in forbidden_fragments:
             assert fragment not in content, f"{fragment} leaked into {script_path}"
+
+
+def test_version_status_reports_named_branch() -> None:
+    explicit_python = REPO_PYTHON
+    result = _run_version_status(cwd=REPO_ROOT, python_path=explicit_python)
+    assert result.returncode == 0, result.stderr
+    status = _version_status_from_output(result.stdout)
+    assert status["gitRefState"] == "branch"
+    assert status["gitBranch"] == "gaia-v0.6-dashboard-integration-and-trust"
+    assert status["gitSha"] == subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=REPO_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
+def test_version_status_reports_detached_head(tmp_path: Path) -> None:
+    explicit_python = REPO_PYTHON
+    worktree = _create_detached_worktree(tmp_path)
+    try:
+        result = _run_version_status(
+            cwd=worktree,
+            python_path=explicit_python,
+            script_path=worktree / "scripts" / "version_status.ps1",
+        )
+        assert result.returncode == 0, result.stderr
+        status = _version_status_from_output(result.stdout)
+        assert status["gitRefState"] == "detached"
+        assert status["gitBranch"] == "detached"
+        assert status["gitSha"] == subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=worktree,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    finally:
+        subprocess.run(
+            ["git", "worktree", "remove", "--force", str(worktree)],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+
+def test_version_status_honors_github_head_ref(tmp_path: Path) -> None:
+    explicit_python = REPO_PYTHON
+    worktree = _create_detached_worktree(tmp_path)
+    env = os.environ.copy()
+    env["GITHUB_HEAD_REF"] = "gaia-v0.6-dashboard-integration-and-trust"
+    env["GITHUB_REF_NAME"] = "6/merge"
+    try:
+        result = _run_version_status(
+            cwd=worktree,
+            python_path=explicit_python,
+            script_path=worktree / "scripts" / "version_status.ps1",
+            env=env,
+        )
+        assert result.returncode == 0, result.stderr
+        status = _version_status_from_output(result.stdout)
+        assert status["gitRefState"] == "pull_request"
+        assert status["gitBranch"] == "gaia-v0.6-dashboard-integration-and-trust"
+        assert status["gitSha"] == subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=worktree,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    finally:
+        subprocess.run(
+            ["git", "worktree", "remove", "--force", str(worktree)],
+            cwd=REPO_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
