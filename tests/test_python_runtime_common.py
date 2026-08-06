@@ -184,7 +184,7 @@ def test_version_status_reports_named_branch() -> None:
     assert result.returncode == 0, result.stderr
     status = _version_status_from_output(result.stdout)
     assert status["gitRefState"] == "branch"
-    assert status["gitBranch"] == "gaia-v0.7-embedded-operations-and-provenance"
+    assert status["gitBranch"] == "release/gaia-v0.8.0-cross-repository-acceptance"
     assert status["gitSha"] == subprocess.run(
         ["git", "rev-parse", "HEAD"],
         cwd=REPO_ROOT,
