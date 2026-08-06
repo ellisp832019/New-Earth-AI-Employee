@@ -15,7 +15,11 @@ $python = $pythonRuntime.Path
 $paths = Get-GaiaManagedBackendPaths -RepoRoot $repoRoot -PythonPath $python
 
 $packageVersion = (Invoke-GaiaPython -PythonPath $python -Arguments @('-c', 'import gaia; print(gaia.__version__)') | Out-String).Trim()
-$flutterMachine = [string](& flutter --version --machine | Out-String)
+$flutterMachine = & flutter --version --machine 2>&1 | Out-String
+if ($null -eq $flutterMachine) {
+    throw "flutter --version --machine returned no output."
+}
+$flutterMachine = [string]$flutterMachine
 if ([string]::IsNullOrWhiteSpace($flutterMachine)) {
     throw "flutter --version --machine returned no output."
 }
@@ -26,6 +30,9 @@ if ($flutterJsonStart -lt 0) {
 }
 $flutterJson = $flutterMachine.Substring($flutterJsonStart).Trim()
 $flutterInfo = $flutterJson | ConvertFrom-Json
+if ($null -eq $flutterInfo) {
+    throw "flutter --version --machine output did not contain parseable JSON."
+}
 $branch = (& git branch --show-current).Trim()
 $sha = (& git rev-parse HEAD).Trim()
 $expectedVersion = $packageVersion
@@ -43,6 +50,10 @@ function Get-GaiaJsonPropertyValue {
         [string]$Name
     )
 
+    if ($null -eq $Object) {
+        return $null
+    }
+
     $property = $Object.PSObject.Properties[$Name]
     if ($property) {
         return $property.Value
@@ -52,11 +63,11 @@ function Get-GaiaJsonPropertyValue {
 }
 
 $flutterVersion = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "flutterVersion"
-if (-not $flutterVersion) { $flutterVersion = $flutterInfo.frameworkVersion }
+$flutterVersion = if (-not $flutterVersion) { Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "frameworkVersion" } else { $flutterVersion }
 $flutterChannel = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "flutterChannel"
-if (-not $flutterChannel) { $flutterChannel = $flutterInfo.channel }
+$flutterChannel = if (-not $flutterChannel) { Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "channel" } else { $flutterChannel }
 $dartVersion = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "dartVersion"
-if (-not $dartVersion) { $dartVersion = $flutterInfo.dartSdkVersion }
+$dartVersion = if (-not $dartVersion) { Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "dartSdkVersion" } else { $dartVersion }
 $frameworkRevision = Get-GaiaJsonPropertyValue -Object $flutterInfo -Name "frameworkRevision"
 
 [pscustomobject]@{
