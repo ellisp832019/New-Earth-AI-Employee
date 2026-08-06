@@ -41,7 +41,9 @@ class GaiaCompatibility {
     required this.backendVersion,
     required this.status,
     required this.loopbackOnly,
+    required this.capabilityVersion,
     required this.capabilities,
+    required this.capabilityCatalog,
     required this.degradedFeatures,
     required this.deprecationWarnings,
   });
@@ -55,8 +57,11 @@ class GaiaCompatibility {
         backendVersion: json['backend_version'] as String? ?? json['backend_product_version'] as String? ?? 'unknown',
         status: json['status'] as String? ?? 'unknown',
         loopbackOnly: json['loopback_only'] as bool? ?? true,
-        capabilities: (json['capabilities'] as List<dynamic>? ?? const <dynamic>[])
-            .whereType<String>()
+        capabilityVersion: json['capability_version'] as String? ?? 'unknown',
+        capabilities: (json['capabilities'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
+        capabilityCatalog: (json['capability_catalog'] as List<dynamic>? ?? const <dynamic>[])
+            .whereType<Map>()
+            .map((item) => GaiaCapabilityDescriptor.fromJson(item.cast<String, dynamic>()))
             .toList(),
         degradedFeatures: (json['degraded_features'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
         deprecationWarnings: (json['deprecation_warnings'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
@@ -70,9 +75,206 @@ class GaiaCompatibility {
   final String backendVersion;
   final String status;
   final bool loopbackOnly;
+  final String capabilityVersion;
   final List<String> capabilities;
+  final List<GaiaCapabilityDescriptor> capabilityCatalog;
   final List<String> degradedFeatures;
   final List<String> deprecationWarnings;
+}
+
+class GaiaCapabilityDescriptor {
+  GaiaCapabilityDescriptor({
+    required this.capabilityId,
+    required this.version,
+    required this.state,
+    required this.summary,
+    required this.gatedBy,
+    required this.requiresSigning,
+    required this.enabled,
+  });
+
+  factory GaiaCapabilityDescriptor.fromJson(Map<String, dynamic> json) => GaiaCapabilityDescriptor(
+        capabilityId: json['capability_id'] as String? ?? '',
+        version: json['version'] as String? ?? '',
+        state: json['state'] as String? ?? 'disabled',
+        summary: json['summary'] as String? ?? '',
+        gatedBy: (json['gated_by'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
+        requiresSigning: json['requires_signing'] as bool? ?? false,
+        enabled: json['enabled'] as bool? ?? false,
+      );
+
+  final String capabilityId;
+  final String version;
+  final String state;
+  final String summary;
+  final List<String> gatedBy;
+  final bool requiresSigning;
+  final bool enabled;
+}
+
+class GaiaSigningKeySummary {
+  GaiaSigningKeySummary({
+    required this.keyId,
+    required this.keyName,
+    required this.publicKey,
+    required this.status,
+    required this.createdAt,
+    required this.revokedAt,
+    required this.rotatedFromKeyId,
+    required this.lastUsedAt,
+    required this.signingEnabled,
+  });
+
+  factory GaiaSigningKeySummary.fromJson(Map<String, dynamic> json) => GaiaSigningKeySummary(
+        keyId: json['key_id'] as String? ?? '',
+        keyName: json['key_name'] as String? ?? '',
+        publicKey: json['public_key'] as String? ?? '',
+        status: json['status'] as String? ?? 'unknown',
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        revokedAt: json['revoked_at'] == null ? null : DateTime.parse(json['revoked_at'] as String),
+        rotatedFromKeyId: json['rotated_from_key_id'] as String?,
+        lastUsedAt: json['last_used_at'] == null ? null : DateTime.parse(json['last_used_at'] as String),
+        signingEnabled: json['signing_enabled'] as bool? ?? false,
+      );
+
+  final String keyId;
+  final String keyName;
+  final String publicKey;
+  final String status;
+  final DateTime createdAt;
+  final DateTime? revokedAt;
+  final String? rotatedFromKeyId;
+  final DateTime? lastUsedAt;
+  final bool signingEnabled;
+}
+
+class GaiaProvenanceManifest {
+  GaiaProvenanceManifest({
+    required this.manifestId,
+    required this.manifestVersion,
+    required this.subjectKind,
+    required this.subjectId,
+    required this.subjectVersion,
+    required this.contentHash,
+    required this.canonicalJson,
+    required this.createdAt,
+    required this.signingKeyId,
+    required this.signature,
+    required this.signatureStatus,
+    required this.keyStatus,
+    required this.chainId,
+    required this.chainSequence,
+    required this.packagePath,
+    required this.metadata,
+  });
+
+  factory GaiaProvenanceManifest.fromJson(Map<String, dynamic> json) => GaiaProvenanceManifest(
+        manifestId: json['manifest_id'] as String? ?? '',
+        manifestVersion: json['manifest_version'] as int? ?? 1,
+        subjectKind: json['subject_kind'] as String? ?? '',
+        subjectId: json['subject_id'] as String? ?? '',
+        subjectVersion: json['subject_version'] as int? ?? 1,
+        contentHash: json['content_hash'] as String? ?? '',
+        canonicalJson: json['canonical_json'] as String? ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        signingKeyId: json['signing_key_id'] as String?,
+        signature: json['signature'] as String?,
+        signatureStatus: json['signature_status'] as String? ?? 'unsigned',
+        keyStatus: json['key_status'] as String? ?? 'unknown',
+        chainId: json['chain_id'] as String?,
+        chainSequence: json['chain_sequence'] as int?,
+        packagePath: json['package_path'] as String?,
+        metadata: (json['metadata'] as Map<String, dynamic>? ?? <String, dynamic>{}),
+      );
+
+  final String manifestId;
+  final int manifestVersion;
+  final String subjectKind;
+  final String subjectId;
+  final int subjectVersion;
+  final String contentHash;
+  final String canonicalJson;
+  final DateTime createdAt;
+  final String? signingKeyId;
+  final String? signature;
+  final String signatureStatus;
+  final String keyStatus;
+  final String? chainId;
+  final int? chainSequence;
+  final String? packagePath;
+  final Map<String, dynamic> metadata;
+}
+
+class GaiaTrustAlert {
+  GaiaTrustAlert({
+    required this.alertId,
+    required this.alertType,
+    required this.severity,
+    required this.status,
+    required this.title,
+    required this.message,
+    required this.sourceKind,
+    required this.sourceId,
+    required this.createdAt,
+    required this.acknowledgedAt,
+    required this.metadata,
+  });
+
+  factory GaiaTrustAlert.fromJson(Map<String, dynamic> json) => GaiaTrustAlert(
+        alertId: json['alert_id'] as String? ?? '',
+        alertType: json['alert_type'] as String? ?? '',
+        severity: json['severity'] as String? ?? 'info',
+        status: json['status'] as String? ?? 'open',
+        title: json['title'] as String? ?? '',
+        message: json['message'] as String? ?? '',
+        sourceKind: json['source_kind'] as String? ?? '',
+        sourceId: json['source_id'] as String? ?? '',
+        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        acknowledgedAt: json['acknowledged_at'] == null ? null : DateTime.parse(json['acknowledged_at'] as String),
+        metadata: (json['metadata'] as Map<String, dynamic>? ?? <String, dynamic>{}),
+      );
+
+  final String alertId;
+  final String alertType;
+  final String severity;
+  final String status;
+  final String title;
+  final String message;
+  final String sourceKind;
+  final String sourceId;
+  final DateTime createdAt;
+  final DateTime? acknowledgedAt;
+  final Map<String, dynamic> metadata;
+}
+
+class GaiaRetentionReport {
+  GaiaRetentionReport({
+    required this.generatedAt,
+    required this.policyCount,
+    required this.planCount,
+    required this.receiptCount,
+    required this.enabledPolicyCount,
+    required this.issues,
+    required this.summary,
+  });
+
+  factory GaiaRetentionReport.fromJson(Map<String, dynamic> json) => GaiaRetentionReport(
+        generatedAt: DateTime.parse(json['generated_at'] as String? ?? DateTime.now().toIso8601String()),
+        policyCount: json['policy_count'] as int? ?? 0,
+        planCount: json['plan_count'] as int? ?? 0,
+        receiptCount: json['receipt_count'] as int? ?? 0,
+        enabledPolicyCount: json['enabled_policy_count'] as int? ?? 0,
+        issues: (json['issues'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
+        summary: (json['summary'] as Map<String, dynamic>? ?? <String, dynamic>{}),
+      );
+
+  final DateTime generatedAt;
+  final int policyCount;
+  final int planCount;
+  final int receiptCount;
+  final int enabledPolicyCount;
+  final List<String> issues;
+  final Map<String, dynamic> summary;
 }
 
 class GaiaProjectSummary {

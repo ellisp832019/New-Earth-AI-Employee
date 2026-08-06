@@ -211,6 +211,24 @@
         "title": "AskRequest",
         "type": "object"
       },
+      "Body_create_signing_key_signing_keys_post": {
+        "properties": {
+          "activate": {
+            "default": true,
+            "title": "Activate",
+            "type": "boolean"
+          },
+          "key_name": {
+            "title": "Key Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key_name"
+        ],
+        "title": "Body_create_signing_key_signing_keys_post",
+        "type": "object"
+      },
       "Body_receipt_verify_chain_receipts_verify_chain_post": {
         "properties": {
           "chain_id": {
@@ -260,6 +278,19 @@
         "title": "Body_retention_plan_retention_plan_post",
         "type": "object"
       },
+      "Body_review_package_inspect_review_packages_inspect_post": {
+        "properties": {
+          "package_path": {
+            "title": "Package Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "package_path"
+        ],
+        "title": "Body_review_package_inspect_review_packages_inspect_post",
+        "type": "object"
+      },
       "Body_review_package_verify_review_packages_verify_post": {
         "properties": {
           "package_path": {
@@ -271,6 +302,50 @@
           "package_path"
         ],
         "title": "Body_review_package_verify_review_packages_verify_post",
+        "type": "object"
+      },
+      "Body_revoke_signing_key_signing_keys__key_id__revoke_post": {
+        "properties": {
+          "reason": {
+            "default": "revoked",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "title": "Body_revoke_signing_key_signing_keys__key_id__revoke_post",
+        "type": "object"
+      },
+      "Body_rotate_signing_key_signing_keys__key_id__rotate_post": {
+        "properties": {
+          "next_key_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Key Name"
+          }
+        },
+        "title": "Body_rotate_signing_key_signing_keys__key_id__rotate_post",
+        "type": "object"
+      },
+      "Body_trust_alert_acknowledge_trust_alerts__alert_id__acknowledge_post": {
+        "properties": {
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          },
+          "reviewer": {
+            "default": "manual",
+            "title": "Reviewer",
+            "type": "string"
+          }
+        },
+        "title": "Body_trust_alert_acknowledge_trust_alerts__alert_id__acknowledge_post",
         "type": "object"
       },
       "DraftCreateRequest": {
@@ -795,6 +870,76 @@
         "title": "PermissionManifestDecisionRequest",
         "type": "object"
       },
+      "ProvenanceCreateRequest": {
+        "properties": {
+          "chain_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Id"
+          },
+          "chain_sequence": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Chain Sequence"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
+          },
+          "package_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Path"
+          },
+          "payload": {
+            "additionalProperties": true,
+            "title": "Payload",
+            "type": "object"
+          },
+          "subject_id": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Subject Id",
+            "type": "string"
+          },
+          "subject_kind": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Subject Kind",
+            "type": "string"
+          },
+          "subject_version": {
+            "default": 1,
+            "title": "Subject Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "subject_kind",
+          "subject_id"
+        ],
+        "title": "ProvenanceCreateRequest",
+        "type": "object"
+      },
       "TaskCreateRequest": {
         "properties": {
           "approval_requirement": {
@@ -1264,7 +1409,7 @@
   "info": {
     "description": "Read-only local project inspection and evidence reporting.",
     "title": "GAIA Project-Control API",
-    "version": "0.6.0"
+    "version": "0.7.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3198,6 +3343,26 @@
         "summary": "Integration Briefs Latest"
       }
     },
+    "/integration/v1/capabilities": {
+      "get": {
+        "operationId": "integration_capabilities_integration_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Integration Capabilities Integration V1 Capabilities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Integration Capabilities"
+      }
+    },
     "/integration/v1/compatibility": {
       "get": {
         "operationId": "integration_compatibility_integration_v1_compatibility_get",
@@ -3959,6 +4124,149 @@
         "summary": "Latest Snapshot"
       }
     },
+    "/provenance/manifests": {
+      "get": {
+        "operationId": "provenance_manifests_provenance_manifests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Provenance Manifests Provenance Manifests Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Provenance Manifests"
+      },
+      "post": {
+        "operationId": "provenance_manifest_create_provenance_manifests_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProvenanceCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Provenance Manifest Create Provenance Manifests Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Provenance Manifest Create"
+      }
+    },
+    "/provenance/manifests/{manifest_id}": {
+      "get": {
+        "operationId": "provenance_manifest_get_provenance_manifests__manifest_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manifest_id",
+            "required": true,
+            "schema": {
+              "title": "Manifest Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Provenance Manifest Get Provenance Manifests  Manifest Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Provenance Manifest Get"
+      }
+    },
+    "/provenance/manifests/{manifest_id}/verify": {
+      "post": {
+        "operationId": "provenance_manifest_verify_provenance_manifests__manifest_id__verify_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "manifest_id",
+            "required": true,
+            "schema": {
+              "title": "Manifest Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Provenance Manifest Verify Provenance Manifests  Manifest Id  Verify Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Provenance Manifest Verify"
+      }
+    },
     "/receipts": {
       "get": {
         "operationId": "receipts_receipts_get",
@@ -4079,6 +4387,47 @@
           }
         },
         "summary": "Receipt Chain"
+      }
+    },
+    "/receipts/chains/{chain_id}/inspect": {
+      "get": {
+        "operationId": "receipt_chain_inspect_receipts_chains__chain_id__inspect_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "chain_id",
+            "required": true,
+            "schema": {
+              "title": "Chain Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Receipt Chain Inspect Receipts Chains  Chain Id  Inspect Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receipt Chain Inspect"
       }
     },
     "/receipts/verify-chain": {
@@ -4306,6 +4655,26 @@
         "summary": "Retention Policies"
       }
     },
+    "/retention/report": {
+      "get": {
+        "operationId": "retention_report_retention_report_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Retention Report Retention Report Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Retention Report"
+      }
+    },
     "/retention/status": {
       "get": {
         "operationId": "retention_status_retention_status_get",
@@ -4324,6 +4693,46 @@
           }
         },
         "summary": "Retention Status"
+      }
+    },
+    "/review-packages/inspect": {
+      "post": {
+        "operationId": "review_package_inspect_review_packages_inspect_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_review_package_inspect_review_packages_inspect_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Review Package Inspect Review Packages Inspect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Review Package Inspect"
       }
     },
     "/review-packages/verify": {
@@ -4364,6 +4773,167 @@
           }
         },
         "summary": "Review Package Verify"
+      }
+    },
+    "/signing/keys": {
+      "get": {
+        "operationId": "signing_keys_signing_keys_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Signing Keys Signing Keys Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Signing Keys"
+      },
+      "post": {
+        "operationId": "create_signing_key_signing_keys_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_signing_key_signing_keys_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Create Signing Key Signing Keys Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Signing Key"
+      }
+    },
+    "/signing/keys/{key_id}/revoke": {
+      "post": {
+        "operationId": "revoke_signing_key_signing_keys__key_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_revoke_signing_key_signing_keys__key_id__revoke_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revoke Signing Key Signing Keys  Key Id  Revoke Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Signing Key"
+      }
+    },
+    "/signing/keys/{key_id}/rotate": {
+      "post": {
+        "operationId": "rotate_signing_key_signing_keys__key_id__rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key_id",
+            "required": true,
+            "schema": {
+              "title": "Key Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_rotate_signing_key_signing_keys__key_id__rotate_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Rotate Signing Key Signing Keys  Key Id  Rotate Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rotate Signing Key"
       }
     },
     "/tasks": {
@@ -4816,6 +5386,102 @@
           }
         },
         "summary": "Transition Task"
+      }
+    },
+    "/trust/alerts": {
+      "get": {
+        "operationId": "trust_alerts_trust_alerts_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Trust Alerts Trust Alerts Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Trust Alerts"
+      }
+    },
+    "/trust/alerts/refresh": {
+      "post": {
+        "operationId": "trust_alerts_refresh_trust_alerts_refresh_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Trust Alerts Refresh Trust Alerts Refresh Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Trust Alerts Refresh"
+      }
+    },
+    "/trust/alerts/{alert_id}/acknowledge": {
+      "post": {
+        "operationId": "trust_alert_acknowledge_trust_alerts__alert_id__acknowledge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "alert_id",
+            "required": true,
+            "schema": {
+              "title": "Alert Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_trust_alert_acknowledge_trust_alerts__alert_id__acknowledge_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Trust Alert Acknowledge Trust Alerts  Alert Id  Acknowledge Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Trust Alert Acknowledge"
       }
     }
   }

@@ -6,10 +6,15 @@ import 'package:http/testing.dart';
 import 'package:test/test.dart';
 
 void main() {
-  test('parses compatibility and summaries', () async {
+  test('parses compatibility and summaries with stale cache fallback', () async {
+    var healthCalls = 0;
     final client = MockClient((request) async {
       final path = request.url.path;
       if (path == '/health') {
+        healthCalls += 1;
+        if (healthCalls > 1) {
+          throw http.ClientException('offline', request.url);
+        }
         return http.Response(
           jsonEncode({
             'status': 'ok',
@@ -23,15 +28,27 @@ void main() {
       if (path == '/integration/v1/compatibility') {
         return http.Response(
           jsonEncode({
-            'backend_product_version': '0.6.0',
-            'minimum_supported_api_version': '0.6.0',
-            'maximum_tested_api_version': '0.6.0',
+            'backend_product_version': '0.7.0',
+            'minimum_supported_api_version': '0.7.0',
+            'maximum_tested_api_version': '0.7.0',
             'integration_contract_version': 'gaia-v2',
-            'client_package_version': '0.6.0',
-            'backend_version': '0.6.0',
+            'client_package_version': '0.7.0',
+            'backend_version': '0.7.0',
             'status': 'compatible_with_warnings',
             'loopback_only': true,
+            'capability_version': '0.7.0',
             'capabilities': ['actions', 'receipts', 'retention_policies'],
+            'capability_catalog': [
+              {
+                'capability_id': 'embedded_operations_workspace',
+                'version': '0.7.0',
+                'state': 'enabled',
+                'summary': 'Embedded operations workspace',
+                'gated_by': const [],
+                'requires_signing': false,
+                'enabled': true,
+              },
+            ],
             'degraded_features': ['offline_packages'],
             'deprecation_warnings': ['v1 contract is deprecated'],
           }),
@@ -73,6 +90,19 @@ void main() {
           200,
         );
       }
+      if (path == '/integration/v1/capabilities') {
+        return http.Response(
+          jsonEncode({
+            'capability_version': '0.7.0',
+            'capabilities': ['embedded_operations_workspace'],
+            'capability_catalog': const [],
+            'degraded_features': const [],
+            'signing_enabled': false,
+            'signing_key_count': 0,
+          }),
+          200,
+        );
+      }
       if (path == '/receipts/receipt-1/verify') {
         return http.Response(
           jsonEncode({
@@ -94,11 +124,18 @@ void main() {
 
     final health = await gaia.health();
     expect(health.version, '0.5.0');
+    final cachedHealth = await gaia.health();
+    expect(cachedHealth.status, 'ok');
 
     final compatibility = await gaia.compatibility();
     expect(compatibility.integrationContractVersion, 'gaia-v2');
     expect(compatibility.status, 'compatible_with_warnings');
     expect(compatibility.capabilities, contains('actions'));
+    expect(compatibility.capabilityVersion, '0.7.0');
+    expect(compatibility.capabilityCatalog.single.capabilityId, 'embedded_operations_workspace');
+
+    final capabilityPayload = await gaia.capabilityPayload();
+    expect(capabilityPayload['capability_version'], '0.7.0');
 
     final actionSummary = await gaia.actionSummary(projectId: 'sample');
     expect(actionSummary.completed, 1);

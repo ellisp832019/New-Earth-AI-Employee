@@ -14,15 +14,27 @@ void main() {
       if (path == '/integration/v1/compatibility') {
         return http.Response(
           jsonEncode({
-            'backend_product_version': '0.6.0',
-            'minimum_supported_api_version': '0.6.0',
-            'maximum_tested_api_version': '0.6.0',
+            'backend_product_version': '0.7.0',
+            'minimum_supported_api_version': '0.7.0',
+            'maximum_tested_api_version': '0.7.0',
             'integration_contract_version': 'gaia-v2',
-            'client_package_version': '0.6.0',
-            'backend_version': '0.6.0',
+            'client_package_version': '0.7.0',
+            'backend_version': '0.7.0',
             'status': 'compatible',
             'loopback_only': true,
+            'capability_version': '0.7.0',
             'capabilities': ['actions', 'receipts'],
+            'capability_catalog': [
+              {
+                'capability_id': 'embedded_operations_workspace',
+                'version': '0.7.0',
+                'state': 'enabled',
+                'summary': 'Embedded operations workspace',
+                'gated_by': const [],
+                'requires_signing': false,
+                'enabled': true,
+              },
+            ],
             'degraded_features': const [],
             'deprecation_warnings': const [],
           }),
@@ -59,6 +71,31 @@ void main() {
       if (path == '/retention/status') {
         return http.Response(jsonEncode({'policies': [], 'plans': [], 'receipts': []}), 200);
       }
+      if (path == '/integration/v1/capabilities') {
+        return http.Response(
+          jsonEncode({
+            'capability_version': '0.7.0',
+            'capabilities': ['embedded_operations_workspace'],
+            'capability_catalog': const [],
+            'degraded_features': const [],
+            'signing_enabled': false,
+            'signing_key_count': 0,
+          }),
+          200,
+        );
+      }
+      if (path == '/signing/keys') {
+        return http.Response(jsonEncode([]), 200);
+      }
+      if (path == '/provenance/manifests') {
+        return http.Response(jsonEncode([]), 200);
+      }
+      if (path == '/trust/alerts') {
+        return http.Response(jsonEncode([]), 200);
+      }
+      if (path == '/retention/report') {
+        return http.Response(jsonEncode({'generated_at': '2026-08-06T00:00:00Z', 'policy_count': 0, 'plan_count': 0, 'receipt_count': 0, 'enabled_policy_count': 0, 'issues': const [], 'summary': const {}}), 200);
+      }
       return http.Response('{}', 404);
     });
 
@@ -71,8 +108,11 @@ void main() {
     await tester.runAsync(controller.refresh);
     await tester.pumpAndSettle();
 
-    expect(find.text('Compatibility'), findsWidgets);
+    expect(find.text('Capabilities'), findsWidgets);
+    await tester.tap(find.text('Capabilities').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Capability discovery'), findsOneWidget);
     expect(find.text('Trust'), findsWidgets);
-    expect(find.text('compatible'), findsOneWidget);
+    expect(find.text('embedded_operations_workspace'), findsOneWidget);
   });
 }

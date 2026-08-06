@@ -65,7 +65,7 @@ packages:
       path: "../gaia_integration_client"
       relative: true
     source: path
-    version: "0.6.0"
+    version: "0.7.0"
   http:
     dependency: "direct dev"
     description:
