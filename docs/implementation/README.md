@@ -8,3 +8,5 @@ This folder collects milestone implementation evidence for GAIA v0.9 and later.
 - [v0.9 B2 - Snapshot Comparison and Change Intelligence](v0_9_b2/START_HERE.md)
 - [v0.9 B3 - Recommendation and Deterministic Prioritisation](v0_9_b3/START_HERE.md)
 - [v0.9 B4 - Human-Reviewable Work-Package Builder](v0_9_b4/START_HERE.md)
+- [v0.9 B5 - Windows Project Officer Workspace](v0_9_b5/START_HERE.md)
+- [v0.9 B6 - API, CLI and Integration-Client Compatibility](v0_9_b6/START_HERE.md)
