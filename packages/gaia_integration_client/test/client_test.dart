@@ -146,4 +146,176 @@ void main() {
     final verification = await gaia.verifyReceipt('receipt-1');
     expect(verification.status, 'valid');
   });
+
+  test('supports project officer compatibility and lifecycle endpoints', () async {
+    final client = MockClient((request) async {
+      final path = request.url.path;
+      if (path == '/integration/v1/project-officer/capabilities') {
+        return http.Response(
+          jsonEncode({
+            'api_version': '0.9.0',
+            'contract_version': 'gaia-v3',
+            'capability_version': '0.9.0',
+            'capabilities': ['project_officer_portfolio', 'project_officer_work_packages'],
+            'capability_catalog': [
+              {
+                'capability_id': 'project_officer_portfolio',
+                'version': '0.9.0',
+                'state': 'enabled',
+                'summary': 'Inspect the portfolio of project-health and planning evidence.',
+                'authority_level': 'read_only',
+                'gated_by': const [],
+                'requires_signing': false,
+                'enabled': true,
+              },
+            ],
+            'degraded_features': const [],
+          }),
+          200,
+        );
+      }
+      if (path == '/integration/v1/project-officer/projects/sample/health') {
+        return http.Response(
+          jsonEncode({
+            'snapshot_id': 'snap-1',
+            'project_id': 'sample',
+            'project_name': 'Sample',
+            'project_root': '/tmp/sample',
+            'project_configuration_fingerprint': 'abc',
+            'capture_timestamp': '2026-08-07T00:00:00Z',
+            'normalized_status': 'healthy',
+            'reason_codes': const [],
+            'explanations': const [],
+            'blocking_conditions': const [],
+            'attention_conditions': const [],
+            'unknown_fields': const [],
+            'evidence_references': const [],
+            'normalized_payload': const {},
+            'provenance_reference': null,
+            'audit_event_id': null,
+            'content_fingerprint': 'fp',
+          }),
+          200,
+        );
+      }
+      if (path == '/integration/v1/project-officer/projects/sample/changes/findings') {
+        expect(request.url.queryParameters['severity'], 'high');
+        expect(request.url.queryParameters['limit'], '1');
+        return http.Response(
+          jsonEncode([
+            {
+              'finding_id': 'finding-1',
+              'schema_version': 1,
+              'comparison_id': 'cmp-1',
+              'project_id': 'sample',
+              'finding_type': 'documentation_drift',
+              'change_class': 'documentation_drift',
+              'severity': 'high',
+              'direction': 'changed',
+              'confidence': 'high',
+              'status': 'active',
+              'capture_timestamp': '2026-08-07T00:00:00Z',
+              'previous_snapshot_id': 'snap-a',
+              'current_snapshot_id': 'snap-b',
+              'previous_snapshot_fingerprint': 'prev',
+              'current_snapshot_fingerprint': 'curr',
+              'reason_codes': const [],
+              'explanation': 'Docs changed',
+              'evidence_references': const [],
+              'evidence': const {},
+              'normalized_payload': const {},
+              'detector_version': '1.0.0',
+              'provenance_reference': null,
+              'audit_event_id': null,
+              'content_fingerprint': 'fp',
+            },
+          ]),
+          200,
+        );
+      }
+      if (path == '/integration/v1/project-officer/recommendations') {
+        expect(request.url.queryParameters['priority_tier'], 'P1');
+        return http.Response(
+          jsonEncode([
+            {
+              'recommendation_id': 'rec-1',
+              'schema_version': 1,
+              'project_id': 'sample',
+              'recommendation_type': 'review_project_configuration_change',
+              'recommendation_policy_version': '1',
+              'created_timestamp': '2026-08-07T00:00:00Z',
+              'updated_timestamp': '2026-08-07T00:00:00Z',
+              'lifecycle_state': 'active',
+              'priority_tier': 'P1',
+              'deterministic_score': 91,
+              'score_breakdown': {'total_score': 91},
+              'title': 'Review config',
+              'concise_summary': 'Review config',
+              'rationale': '',
+              'why_it_matters': '',
+              'why_it_received_this_score': '',
+              'reasons_to_proceed': const [],
+              'reasons_not_to_proceed': const [],
+              'blockers': const [],
+              'dependencies': const [],
+              'uncertainty': 'low',
+              'source_finding_ids': const [],
+              'source_comparison_ids': const [],
+              'source_snapshot_ids': const [],
+              'evidence_fingerprints': const [],
+              'evidence_freshness': 'fresh',
+              'evidence_references': const [],
+              'semantic_fingerprint': 'sem',
+              'content_fingerprint': 'fp',
+              'provenance_reference': null,
+              'audit_event_id': null,
+              'supersedes_recommendation_id': null,
+              'superseded_by_recommendation_id': null,
+              'normalized_payload': const {},
+            },
+          ]),
+          200,
+        );
+      }
+      if (path == '/integration/v1/project-officer/work-packages/wp-1/prompt') {
+        expect(request.url.queryParameters['revision_number'], '2');
+        return http.Response(jsonEncode({'work_package_id': 'wp-1', 'revision_number': 2, 'prompt': 'prompt text'}), 200);
+      }
+      if (path == '/integration/v1/project-officer/work-packages/wp-1/submit-for-review') {
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['revision_number'], 2);
+        expect(body['actor'], 'manual');
+        return http.Response(
+          jsonEncode({
+            'work_package_id': 'wp-1',
+            'project_id': 'sample',
+            'revision_number': 2,
+            'approval_state': 'under_review',
+          }),
+          200,
+        );
+      }
+      return http.Response('{}', 404);
+    });
+
+    final gaia = GaiaIntegrationClient(baseUri: Uri.parse('http://127.0.0.1:8765'), client: client);
+
+    final capabilities = await gaia.projectOfficerCapabilities();
+    expect(capabilities['contract_version'], 'gaia-v3');
+
+    final health = await gaia.projectOfficerProjectHealth('sample');
+    expect(health['normalized_status'], 'healthy');
+
+    final findings = await gaia.projectOfficerChangeFindings('sample', severity: 'high', limit: 1);
+    expect(findings.single['finding_id'], 'finding-1');
+
+    final recommendations = await gaia.projectOfficerRecommendations(projectId: 'sample', priorityTier: 'P1');
+    expect(recommendations.single['recommendation_id'], 'rec-1');
+
+    final prompt = await gaia.projectOfficerWorkPackagePrompt('wp-1', revisionNumber: 2);
+    expect(prompt['prompt'], 'prompt text');
+
+    final updated = await gaia.projectOfficerSubmitForReview('wp-1', revisionNumber: 2);
+    expect(updated['approval_state'], 'under_review');
+  });
 }

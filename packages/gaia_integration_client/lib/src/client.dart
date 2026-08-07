@@ -98,7 +98,11 @@ class GaiaIntegrationClient {
     try {
       final decoded = jsonDecode(body);
       if (decoded is Map && decoded['detail'] != null) {
-        return decoded['detail'].toString();
+        final detail = decoded['detail'];
+        if (detail is Map && detail['message'] != null) {
+          return detail['message'].toString();
+        }
+        return detail.toString();
       }
     } catch (_) {
       // Fall through to the raw body below.
@@ -119,6 +123,240 @@ class GaiaIntegrationClient {
   Future<Map<String, dynamic>> capabilityPayload() async {
     final json = await _getJson('/integration/v1/capabilities') as Map<String, dynamic>;
     return json;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerCapabilities() async {
+    return (await _getJson('/integration/v1/project-officer/capabilities')) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerPortfolio() async {
+    return (await _getJson('/integration/v1/project-officer/portfolio')) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerProjects() async {
+    final json = await _getJson('/integration/v1/project-officer/projects') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerProjectHealth(String projectId) async {
+    return (await _getJson('/integration/v1/project-officer/projects/$projectId/health')) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerProjectHealthSnapshots(
+    String projectId, {
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final json = await _getJson(
+      '/integration/v1/project-officer/projects/$projectId/health/snapshots',
+      queryParameters: stringQuery({'limit': limit, 'offset': offset}),
+    ) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerHealthSnapshot(String snapshotId) async {
+    return (await _getJson('/integration/v1/project-officer/health-snapshots/$snapshotId')) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerChangePortfolio() async {
+    return (await _getJson('/integration/v1/project-officer/changes/portfolio')) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerChangeFindings(
+    String projectId, {
+    String? severity,
+    String? direction,
+    String? changeType,
+    String? status,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final json = await _getJson(
+      '/integration/v1/project-officer/projects/$projectId/changes/findings',
+      queryParameters: stringQuery({
+        'severity': severity,
+        'direction': direction,
+        'change_type': changeType,
+        'status': status,
+        'limit': limit,
+        'offset': offset,
+      }),
+    ) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerChangeFinding(String findingId) async {
+    return (await _getJson('/integration/v1/project-officer/change-findings/$findingId')) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerRecentChangeFindings({String? projectId, int limit = 100}) async {
+    final json = await _getJson(
+      '/integration/v1/project-officer/changes/recent',
+      queryParameters: stringQuery({'project_id': projectId, 'limit': limit}),
+    ) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerRecommendationPortfolio() async {
+    return (await _getJson('/integration/v1/project-officer/recommendations/portfolio')) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerRecommendations({
+    String? projectId,
+    String? priorityTier,
+    String? lifecycleState,
+    bool blockedOnly = false,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final json = await _getJson(
+      '/integration/v1/project-officer/recommendations',
+      queryParameters: stringQuery({
+        'project_id': projectId,
+        'priority_tier': priorityTier,
+        'lifecycle_state': lifecycleState,
+        'blocked_only': blockedOnly,
+        'limit': limit,
+        'offset': offset,
+      }),
+    ) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerRecommendation(String recommendationId) async {
+    return (await _getJson('/integration/v1/project-officer/recommendations/$recommendationId')) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerWorkPackages({
+    String? projectId,
+    String? approvalState,
+    String? stalenessState,
+    String? riskClassification,
+    int limit = 100,
+    int offset = 0,
+  }) async {
+    final json = await _getJson(
+      '/integration/v1/project-officer/work-packages',
+      queryParameters: stringQuery({
+        'project_id': projectId,
+        'approval_state': approvalState,
+        'staleness_state': stalenessState,
+        'risk_classification': riskClassification,
+        'limit': limit,
+        'offset': offset,
+      }),
+    ) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerWorkPackage(String workPackageId) async {
+    return (await _getJson('/integration/v1/project-officer/work-packages/$workPackageId')) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerWorkPackageSummary(String workPackageId) async {
+    return (await _getJson('/integration/v1/project-officer/work-packages/$workPackageId/summary')) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerWorkPackagePrompt(String workPackageId, {int? revisionNumber}) async {
+    return (await _getJson(
+      '/integration/v1/project-officer/work-packages/$workPackageId/prompt',
+      queryParameters: stringQuery({'revision_number': revisionNumber}),
+    )) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerWorkPackageRevisions(String workPackageId) async {
+    final json = await _getJson('/integration/v1/project-officer/work-packages/$workPackageId/revisions') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerWorkPackageRevision(String revisionId) async {
+    return (await _getJson('/integration/v1/project-officer/work-package-revisions/$revisionId')) as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerWorkPackageApprovalDecisions(String workPackageId) async {
+    final json = await _getJson('/integration/v1/project-officer/work-packages/$workPackageId/approval-decisions') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerWorkPackageHandoffs(String workPackageId) async {
+    final json = await _getJson('/integration/v1/project-officer/work-packages/$workPackageId/handoffs') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> projectOfficerWorkPackageOutcomes(String workPackageId) async {
+    final json = await _getJson('/integration/v1/project-officer/work-packages/$workPackageId/outcomes') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  Future<Map<String, dynamic>> projectOfficerSubmitForReview(
+    String workPackageId, {
+    required int revisionNumber,
+    String actor = 'manual',
+    String? humanNote,
+  }) async {
+    return (await _postJson(
+      '/integration/v1/project-officer/work-packages/$workPackageId/submit-for-review',
+      body: {'revision_number': revisionNumber, 'actor': actor, 'human_note': humanNote},
+    )) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerApprove(
+    String workPackageId, {
+    required int revisionNumber,
+    String actor = 'manual',
+    String? humanNote,
+  }) async {
+    return (await _postJson(
+      '/integration/v1/project-officer/work-packages/$workPackageId/approve',
+      body: {'revision_number': revisionNumber, 'actor': actor, 'human_note': humanNote},
+    )) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerReject(
+    String workPackageId, {
+    required int revisionNumber,
+    String actor = 'manual',
+    String? humanNote,
+  }) async {
+    return (await _postJson(
+      '/integration/v1/project-officer/work-packages/$workPackageId/reject',
+      body: {'revision_number': revisionNumber, 'actor': actor, 'human_note': humanNote},
+    )) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerExpire(String workPackageId, {String reason = 'manual expiry'}) async {
+    return (await _postJson('/integration/v1/project-officer/work-packages/$workPackageId/expire', body: reason)) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerHandoff(
+    String workPackageId, {
+    required int revisionNumber,
+    String approvedBy = 'manual',
+    String nextManualAction = 'Copy the approved Codex prompt into Codex.',
+    String rollbackReference = 'Return to the recorded baseline commit or last approved revision.',
+  }) async {
+    return (await _postJson(
+      '/integration/v1/project-officer/work-packages/$workPackageId/handoff',
+      body: {
+        'revision_number': revisionNumber,
+        'approved_by': approvedBy,
+        'next_manual_action': nextManualAction,
+        'rollback_reference': rollbackReference,
+      },
+    )) as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> projectOfficerOutcome(
+    String workPackageId, {
+    required int revisionNumber,
+    required String outcome,
+    String actor = 'manual',
+    String? note,
+  }) async {
+    return (await _postJson(
+      '/integration/v1/project-officer/work-packages/$workPackageId/outcome',
+      body: {'revision_number': revisionNumber, 'outcome': outcome, 'actor': actor, 'note': note},
+    )) as Map<String, dynamic>;
   }
 
   Future<List<GaiaProjectSummary>> projects() async {

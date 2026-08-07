@@ -22,6 +22,14 @@ from gaia.output_workspace import (
     PermissionManifestDecisionRequest,
 )
 from gaia.output_workspace import PermissionDeniedError as OutputPermissionDeniedError
+from gaia.project_officer import (
+    ProjectOfficerApiError,
+    ProjectOfficerAuthorityLevel,
+    ProjectOfficerHandoffRequest,
+    ProjectOfficerLifecycleRequest,
+    ProjectOfficerOutcomeRequest,
+    ProjectOfficerService,
+)
 from gaia.provenance import ProvenanceCreateRequest
 from gaia.providers import ProviderRegistry
 from gaia.service import ProjectService
@@ -50,6 +58,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     workflow_service = TaskWorkflowService(resolved_settings, database)
     output_service = OutputWorkspaceService(resolved_settings, database)
     trust_service = GAIATrustService(resolved_settings, database)
+    project_officer_service = ProjectOfficerService(service)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -445,6 +454,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if isinstance(error, ConflictError):
             return HTTPException(status_code=409, detail=str(error))
         return HTTPException(status_code=500, detail=str(error))
+
+    def _project_officer_http_error(
+        error: Exception,
+        *,
+        resource_type: str,
+        resource_id: str | None = None,
+        authority_level: ProjectOfficerAuthorityLevel | None = None,
+        details: dict[str, object] | None = None,
+    ) -> HTTPException:
+        message = str(error)
+        error_code = f"backend_{type(error).__name__.lower()}"
+        status_code = 400
+        if isinstance(error, KeyError):
+            status_code = 404
+            error_code = {
+                "project": "unknown_project",
+                "project_health_snapshot": "unknown_snapshot",
+                "change_finding": "unknown_finding",
+                "recommendation": "unknown_recommendation",
+                "work_package": "unknown_work_package",
+                "work_package_revision": "unknown_revision",
+            }.get(resource_type, "not_found")
+        elif isinstance(error, PermissionError):
+            status_code = 409
+            error_code = "blocked_action"
+        elif isinstance(error, ValueError):
+            status_code = 409
+            lowered = message.lower()
+            if "stale or expired work packages cannot transition" in lowered:
+                error_code = "stale_package"
+            elif "blocked work packages cannot be approved or handed off" in lowered:
+                error_code = "blocked_action"
+            elif "prior approval decision is required before handoff" in lowered:
+                error_code = "blocked_action"
+            elif "cross-project" in lowered:
+                error_code = "project_revision_mismatch"
+            else:
+                error_code = "invalid_state_transition"
+        error_payload = ProjectOfficerApiError(
+            error_code=error_code,
+            message=message,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            authority_level=authority_level,
+            details=details or {},
+        )
+        return HTTPException(status_code=status_code, detail=error_payload.model_dump(mode="json"))
 
     @app.get("/agent/runs")
     def agent_runs(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, object]]:
@@ -882,6 +938,262 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/integration/v1/capabilities")
     def integration_capabilities() -> dict[str, object]:
         return trust_service.provenance.capability_payload()
+
+    @app.get("/integration/v1/project-officer/capabilities")
+    def project_officer_capabilities() -> dict[str, object]:
+        return project_officer_service.capabilities().model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/portfolio")
+    def project_officer_portfolio() -> dict[str, object]:
+        return project_officer_service.portfolio().model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/projects")
+    def project_officer_projects() -> list[dict[str, object]]:
+        return [project.model_dump(mode="json") for project in project_officer_service.projects()]
+
+    @app.get("/integration/v1/project-officer/projects/{project_id}/health")
+    def project_officer_project_health(project_id: str) -> dict[str, object]:
+        try:
+            return project_officer_service.project_health(project_id).model_dump(mode="json")
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="project", resource_id=project_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/projects/{project_id}/health/snapshots")
+    def project_officer_project_health_snapshots(
+        project_id: str,
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ) -> list[dict[str, object]]:
+        try:
+            return [
+                item.model_dump(mode="json")
+                for item in project_officer_service.project_health_snapshots(project_id)[offset : offset + limit]
+            ]
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="project", resource_id=project_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/health-snapshots/{snapshot_id}")
+    def project_officer_health_snapshot(snapshot_id: str) -> dict[str, object]:
+        snapshot = project_officer_service.project_health_snapshot(snapshot_id)
+        if snapshot is None:
+            raise _project_officer_http_error(KeyError(snapshot_id), resource_type="project_health_snapshot", resource_id=snapshot_id, authority_level="read_only")
+        return snapshot.model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/changes/portfolio")
+    def project_officer_change_portfolio() -> dict[str, object]:
+        return project_officer_service.change_portfolio().model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/projects/{project_id}/changes/findings")
+    def project_officer_change_findings(
+        project_id: str,
+        severity: str | None = Query(default=None),
+        direction: str | None = Query(default=None),
+        change_type: str | None = Query(default=None),
+        status: str | None = Query(default=None),
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ) -> list[dict[str, object]]:
+        try:
+            return [
+                item.model_dump(mode="json")
+                for item in project_officer_service.change_findings(
+                    project_id,
+                    severity=severity,
+                    direction=direction,
+                    change_type=change_type,
+                    status=status,
+                    limit=limit,
+                    offset=offset,
+                )
+            ]
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="project", resource_id=project_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/change-findings/{finding_id}")
+    def project_officer_change_finding(finding_id: str) -> dict[str, object]:
+        finding = project_officer_service.change_finding(finding_id)
+        if finding is None:
+            raise _project_officer_http_error(KeyError(finding_id), resource_type="change_finding", resource_id=finding_id, authority_level="read_only")
+        return finding.model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/changes/recent")
+    def project_officer_recent_change_findings(
+        project_id: str | None = None,
+        limit: int = Query(default=100, ge=1, le=500),
+    ) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in project_officer_service.recent_change_findings(project_id=project_id, limit=limit)]
+
+    @app.get("/integration/v1/project-officer/recommendations/portfolio")
+    def project_officer_recommendation_portfolio() -> dict[str, object]:
+        return project_officer_service.recommendation_portfolio().model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/recommendations")
+    def project_officer_recommendations(
+        project_id: str | None = None,
+        priority_tier: str | None = None,
+        lifecycle_state: str | None = None,
+        blocked_only: bool = False,
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ) -> list[dict[str, object]]:
+        return [
+            item.model_dump(mode="json")
+            for item in project_officer_service.recommendations(
+                project_id=project_id,
+                priority_tier=priority_tier,
+                lifecycle_state=lifecycle_state,
+                blocked_only=blocked_only,
+                limit=limit,
+                offset=offset,
+            )
+        ]
+
+    @app.get("/integration/v1/project-officer/recommendations/{recommendation_id}")
+    def project_officer_recommendation(recommendation_id: str) -> dict[str, object]:
+        recommendation = project_officer_service.recommendation(recommendation_id)
+        if recommendation is None:
+            raise _project_officer_http_error(KeyError(recommendation_id), resource_type="recommendation", resource_id=recommendation_id, authority_level="read_only")
+        return recommendation.model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/work-packages")
+    def project_officer_work_packages(
+        project_id: str | None = None,
+        approval_state: str | None = None,
+        staleness_state: str | None = None,
+        risk_classification: str | None = None,
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ) -> list[dict[str, object]]:
+        return [
+            item.model_dump(mode="json")
+            for item in project_officer_service.work_packages(
+                project_id=project_id,
+                approval_state=approval_state,
+                staleness_state=staleness_state,
+                risk_classification=risk_classification,
+                limit=limit,
+                offset=offset,
+            )
+        ]
+
+    @app.get("/integration/v1/project-officer/projects/{project_id}/work-packages")
+    def project_officer_project_work_packages(
+        project_id: str,
+        approval_state: str | None = None,
+        staleness_state: str | None = None,
+        risk_classification: str | None = None,
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ) -> list[dict[str, object]]:
+        return [
+            item.model_dump(mode="json")
+            for item in project_officer_service.work_packages(
+                project_id=project_id,
+                approval_state=approval_state,
+                staleness_state=staleness_state,
+                risk_classification=risk_classification,
+                limit=limit,
+                offset=offset,
+            )
+        ]
+
+    @app.get("/integration/v1/project-officer/work-packages/{work_package_id}")
+    def project_officer_work_package(work_package_id: str) -> dict[str, object]:
+        package = project_officer_service.work_package(work_package_id)
+        if package is None:
+            raise _project_officer_http_error(KeyError(work_package_id), resource_type="work_package", resource_id=work_package_id, authority_level="gaia_local_state")
+        return package.model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/work-packages/{work_package_id}/summary")
+    def project_officer_work_package_summary(work_package_id: str) -> dict[str, object]:
+        try:
+            return project_officer_service.work_package_summary(work_package_id)
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/work-packages/{work_package_id}/prompt")
+    def project_officer_work_package_prompt(work_package_id: str, revision_number: int | None = None) -> dict[str, object]:
+        try:
+            return project_officer_service.work_package_prompt(work_package_id, revision_number=revision_number)
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/work-packages/{work_package_id}/revisions")
+    def project_officer_work_package_revisions(work_package_id: str) -> list[dict[str, object]]:
+        try:
+            return [item.model_dump(mode="json") for item in project_officer_service.work_package_revisions(work_package_id)]
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/work-package-revisions/{revision_id}")
+    def project_officer_work_package_revision(revision_id: str) -> dict[str, object]:
+        revision = project_officer_service.work_package_revision(revision_id)
+        if revision is None:
+            raise _project_officer_http_error(KeyError(revision_id), resource_type="work_package_revision", resource_id=revision_id, authority_level="read_only")
+        return revision.model_dump(mode="json")
+
+    @app.get("/integration/v1/project-officer/work-packages/{work_package_id}/approval-decisions")
+    def project_officer_work_package_approval_decisions(work_package_id: str) -> list[dict[str, object]]:
+        try:
+            return [item.model_dump(mode="json") for item in project_officer_service.approval_decisions(work_package_id)]
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/work-packages/{work_package_id}/handoffs")
+    def project_officer_work_package_handoffs(work_package_id: str) -> list[dict[str, object]]:
+        try:
+            return [item.model_dump(mode="json") for item in project_officer_service.handoffs(work_package_id)]
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="read_only") from exc
+
+    @app.get("/integration/v1/project-officer/work-packages/{work_package_id}/outcomes")
+    def project_officer_work_package_outcomes(work_package_id: str) -> list[dict[str, object]]:
+        try:
+            return [item.model_dump(mode="json") for item in project_officer_service.outcomes(work_package_id)]
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="read_only") from exc
+
+    @app.post("/integration/v1/project-officer/work-packages/{work_package_id}/submit-for-review")
+    def project_officer_submit_for_review(work_package_id: str, request: ProjectOfficerLifecycleRequest) -> dict[str, object]:
+        try:
+            return project_officer_service.submit_for_review(work_package_id, request).model_dump(mode="json")
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="gaia_local_state") from exc
+
+    @app.post("/integration/v1/project-officer/work-packages/{work_package_id}/approve")
+    def project_officer_approve(work_package_id: str, request: ProjectOfficerLifecycleRequest) -> dict[str, object]:
+        try:
+            return project_officer_service.approve(work_package_id, request).model_dump(mode="json")
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="gaia_local_state") from exc
+
+    @app.post("/integration/v1/project-officer/work-packages/{work_package_id}/reject")
+    def project_officer_reject(work_package_id: str, request: ProjectOfficerLifecycleRequest) -> dict[str, object]:
+        try:
+            return project_officer_service.reject(work_package_id, request).model_dump(mode="json")
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="gaia_local_state") from exc
+
+    @app.post("/integration/v1/project-officer/work-packages/{work_package_id}/expire")
+    def project_officer_expire(work_package_id: str, reason: str = Body(default="manual expiry")) -> dict[str, object]:
+        try:
+            return project_officer_service.expire(work_package_id, reason=reason).model_dump(mode="json")
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="gaia_local_state") from exc
+
+    @app.post("/integration/v1/project-officer/work-packages/{work_package_id}/handoff")
+    def project_officer_handoff(work_package_id: str, request: ProjectOfficerHandoffRequest) -> dict[str, object]:
+        try:
+            return project_officer_service.handoff(work_package_id, request).model_dump(mode="json")
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="manual_handoff_only") from exc
+
+    @app.post("/integration/v1/project-officer/work-packages/{work_package_id}/outcome")
+    def project_officer_outcome(work_package_id: str, request: ProjectOfficerOutcomeRequest) -> dict[str, object]:
+        try:
+            return project_officer_service.record_outcome(work_package_id, request).model_dump(mode="json")
+        except Exception as exc:
+            raise _project_officer_http_error(exc, resource_type="work_package", resource_id=work_package_id, authority_level="gaia_local_state") from exc
 
     @app.get("/signing/keys")
     def signing_keys() -> list[dict[str, object]]:

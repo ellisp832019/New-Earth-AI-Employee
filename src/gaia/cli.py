@@ -18,11 +18,18 @@ from gaia.agent import AgentService
 from gaia.api import create_app
 from gaia.config import load_settings
 from gaia.db import Database
+from gaia.models import WorkPackageOutcome
 from gaia.output_workspace import (
     OutputActionCreateRequest,
     OutputWorkspaceService,
     PermissionManifestCreateRequest,
     PermissionManifestDecisionRequest,
+)
+from gaia.project_officer import (
+    ProjectOfficerHandoffRequest,
+    ProjectOfficerLifecycleRequest,
+    ProjectOfficerOutcomeRequest,
+    ProjectOfficerService,
 )
 from gaia.provenance import ProvenanceCreateRequest
 from gaia.providers import ProviderRegistry
@@ -63,6 +70,8 @@ review_packages_app = typer.Typer(help="Offline review packages")
 provenance_app = typer.Typer(help="Provenance manifests and inspection")
 signing_app = typer.Typer(help="Local Ed25519 signing keys")
 trust_alerts_app = typer.Typer(help="Trust alerts and diagnostics")
+project_officer_app = typer.Typer(help="Project Officer planning surfaces")
+project_officer_work_package_app = typer.Typer(help="Work package lifecycle commands")
 app.add_typer(project_app, name="project")
 app.add_typer(projects_app, name="projects")
 app.add_typer(models_app, name="models")
@@ -81,6 +90,8 @@ app.add_typer(review_packages_app, name="review-packages")
 app.add_typer(provenance_app, name="provenance")
 app.add_typer(signing_app, name="signing")
 app.add_typer(trust_alerts_app, name="alerts")
+app.add_typer(project_officer_app, name="project-officer")
+project_officer_app.add_typer(project_officer_work_package_app, name="work-package")
 console = Console()
 
 
@@ -111,6 +122,12 @@ def _workspace_service(config: Path | None = None) -> OutputWorkspaceService:
 def _trust_service(config: Path | None = None) -> GAIATrustService:
     settings = load_settings(config)
     return GAIATrustService(settings, Database(settings.database_path))
+
+
+def _project_officer_service(config: Path | None = None) -> ProjectOfficerService:
+    settings = load_settings(config)
+    service = ProjectService(settings, Database(settings.database_path))
+    return ProjectOfficerService(service)
 
 
 def _print_models(records: Sequence[BaseModel]) -> None:
@@ -366,6 +383,413 @@ def serve(
     """Start the local FastAPI service."""
     settings = load_settings(config)
     uvicorn.run(create_app(settings), host=host or settings.api_host, port=port or settings.api_port)
+
+
+@project_officer_app.command("capabilities")
+def project_officer_capabilities(config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(service.capabilities())
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("portfolio")
+def project_officer_portfolio(config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(service.portfolio())
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("projects")
+def project_officer_projects(config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(service.projects())
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("health")
+def project_officer_health(project_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(service.project_health(project_id))
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("health-snapshots")
+def project_officer_health_snapshots(
+    project_id: str,
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(service.project_health_snapshots(project_id)[offset : offset + limit])
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("health-snapshot")
+def project_officer_health_snapshot(snapshot_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        snapshot = service.project_health_snapshot(snapshot_id)
+        if snapshot is None:
+            raise typer.BadParameter("Snapshot not found")
+        _print_model(snapshot)
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("change-portfolio")
+def project_officer_change_portfolio(config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(service.change_portfolio())
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("changes")
+def project_officer_changes(
+    project_id: str,
+    severity: str | None = typer.Option(None),
+    direction: str | None = typer.Option(None),
+    change_type: str | None = typer.Option(None),
+    status: str | None = typer.Option(None),
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(
+            service.change_findings(
+                project_id,
+                severity=severity,
+                direction=direction,
+                change_type=change_type,
+                status=status,
+                limit=limit,
+                offset=offset,
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("change")
+def project_officer_change(finding_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        finding = service.change_finding(finding_id)
+        if finding is None:
+            raise typer.BadParameter("Change finding not found")
+        _print_model(finding)
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("recent-changes")
+def project_officer_recent_changes(
+    project_id: str | None = typer.Option(None),
+    limit: int = typer.Option(100, min=1, max=500),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(service.recent_change_findings(project_id=project_id, limit=limit))
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("recommendation-portfolio")
+def project_officer_recommendation_portfolio(config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(service.recommendation_portfolio())
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("recommendations")
+def project_officer_recommendations(
+    project_id: str | None = typer.Option(None),
+    priority_tier: str | None = typer.Option(None),
+    lifecycle_state: str | None = typer.Option(None),
+    blocked_only: bool = typer.Option(False),
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(
+            service.recommendations(
+                project_id=project_id,
+                priority_tier=priority_tier,
+                lifecycle_state=lifecycle_state,
+                blocked_only=blocked_only,
+                limit=limit,
+                offset=offset,
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("recommendation")
+def project_officer_recommendation(recommendation_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        recommendation = service.recommendation(recommendation_id)
+        if recommendation is None:
+            raise typer.BadParameter("Recommendation not found")
+        _print_model(recommendation)
+    finally:
+        service.database.close()
+
+
+@project_officer_app.command("work-packages")
+def project_officer_work_packages(
+    project_id: str | None = typer.Option(None),
+    approval_state: str | None = typer.Option(None),
+    staleness_state: str | None = typer.Option(None),
+    risk_classification: str | None = typer.Option(None),
+    limit: int = typer.Option(100, min=1, max=500),
+    offset: int = typer.Option(0, min=0),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(
+            service.work_packages(
+                project_id=project_id,
+                approval_state=approval_state,
+                staleness_state=staleness_state,
+                risk_classification=risk_classification,
+                limit=limit,
+                offset=offset,
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("show")
+def project_officer_work_package_show(work_package_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        package = service.work_package(work_package_id)
+        if package is None:
+            raise typer.BadParameter("Work package not found")
+        _print_model(package)
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("summary")
+def project_officer_work_package_summary(work_package_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        console.print_json(json.dumps(service.work_package_summary(work_package_id)))
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("prompt")
+def project_officer_work_package_prompt(
+    work_package_id: str,
+    revision_number: int | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        console.print_json(json.dumps(service.work_package_prompt(work_package_id, revision_number=revision_number)))
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("revisions")
+def project_officer_work_package_revisions(work_package_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(service.work_package_revisions(work_package_id))
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("revision")
+def project_officer_work_package_revision(revision_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        revision = service.work_package_revision(revision_id)
+        if revision is None:
+            raise typer.BadParameter("Revision not found")
+        _print_model(revision)
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("approval-decisions")
+def project_officer_work_package_approval_decisions(
+    work_package_id: str,
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(service.approval_decisions(work_package_id))
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("handoffs")
+def project_officer_work_package_handoffs(work_package_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(service.handoffs(work_package_id))
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("outcomes")
+def project_officer_work_package_outcomes(work_package_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_models(service.outcomes(work_package_id))
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("submit-for-review")
+def project_officer_work_package_submit_for_review(
+    work_package_id: str,
+    revision_number: int = typer.Option(..., min=1),
+    actor: str = typer.Option("manual"),
+    human_note: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(
+            service.submit_for_review(
+                work_package_id,
+                ProjectOfficerLifecycleRequest(revision_number=revision_number, actor=actor, human_note=human_note),
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("approve")
+def project_officer_work_package_approve(
+    work_package_id: str,
+    revision_number: int = typer.Option(..., min=1),
+    actor: str = typer.Option("manual"),
+    human_note: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(
+            service.approve(
+                work_package_id,
+                ProjectOfficerLifecycleRequest(revision_number=revision_number, actor=actor, human_note=human_note),
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("reject")
+def project_officer_work_package_reject(
+    work_package_id: str,
+    revision_number: int = typer.Option(..., min=1),
+    actor: str = typer.Option("manual"),
+    human_note: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(
+            service.reject(
+                work_package_id,
+                ProjectOfficerLifecycleRequest(revision_number=revision_number, actor=actor, human_note=human_note),
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("expire")
+def project_officer_work_package_expire(
+    work_package_id: str,
+    reason: str = typer.Option("manual expiry"),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(service.expire(work_package_id, reason=reason))
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("handoff")
+def project_officer_work_package_handoff(
+    work_package_id: str,
+    revision_number: int = typer.Option(..., min=1),
+    approved_by: str = typer.Option("manual"),
+    next_manual_action: str = typer.Option("Copy the approved Codex prompt into Codex."),
+    rollback_reference: str = typer.Option("Return to the recorded baseline commit or last approved revision."),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(
+            service.handoff(
+                work_package_id,
+                ProjectOfficerHandoffRequest(
+                    revision_number=revision_number,
+                    approved_by=approved_by,
+                    next_manual_action=next_manual_action,
+                    rollback_reference=rollback_reference,
+                ),
+            )
+        )
+    finally:
+        service.database.close()
+
+
+@project_officer_work_package_app.command("outcome")
+def project_officer_work_package_outcome(
+    work_package_id: str,
+    revision_number: int = typer.Option(..., min=1),
+    outcome: WorkPackageOutcome = typer.Option(...),
+    actor: str = typer.Option("manual"),
+    note: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _project_officer_service(config)
+    try:
+        _print_model(
+            service.record_outcome(
+                work_package_id,
+                ProjectOfficerOutcomeRequest(
+                    revision_number=revision_number,
+                    outcome=outcome,
+                    actor=actor,
+                    note=note,
+                ),
+            )
+        )
+    finally:
+        service.database.close()
 
 
 @tasks_app.command("list")

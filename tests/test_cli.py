@@ -26,3 +26,18 @@ def test_ask_and_runs(settings_file):
     result = runner.invoke(app, ["agent", "runs", "list", "--config", str(settings_file)])
     assert result.exit_code == 0
     assert "run_id" in result.output
+
+
+def test_project_officer_commands(settings_file):
+    runner = CliRunner()
+    result = runner.invoke(app, ["project-officer", "capabilities", "--config", str(settings_file)])
+    assert result.exit_code == 0
+    assert "project_officer_portfolio" in result.output
+
+    result = runner.invoke(app, ["project-officer", "health", "sample", "--config", str(settings_file)])
+    assert result.exit_code == 0
+    assert "normalized_status" in result.output
+
+    result = runner.invoke(app, ["project-officer", "work-packages", "--config", str(settings_file)])
+    assert result.exit_code == 0
+    assert result.output
