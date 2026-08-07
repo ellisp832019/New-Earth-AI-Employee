@@ -18,11 +18,17 @@ from gaia.models import (
     ProjectRecommendationPortfolio,
     RepositorySnapshot,
     SearchResult,
+    WorkPackageApprovalDecisionRecord,
+    WorkPackageHandoffRecord,
+    WorkPackageOutcomeRecord,
+    WorkPackageRecord,
+    WorkPackageRevisionRecord,
 )
 from gaia.project_health import ProjectHealthService
 from gaia.recommendations import RecommendationService
 from gaia.reports import foundation_report_json, foundation_report_markdown
 from gaia.scanner import DocumentScanner
+from gaia.work_packages import WorkPackageService
 
 
 class ProjectService:
@@ -34,6 +40,7 @@ class ProjectService:
         self.project_health_service = ProjectHealthService(settings, self.database, self.audit, self.git)
         self.change_intelligence_service = ChangeIntelligenceService(settings, self.database, self.audit)
         self.recommendation_service = RecommendationService(settings, self.database, self.audit)
+        self.work_package_service = WorkPackageService(settings, self.database, self.audit)
         self.scanner = DocumentScanner(settings.max_file_bytes)
 
     def get_project(self, project_id: str) -> ProjectConfig:
@@ -199,3 +206,128 @@ class ProjectService:
 
     def project_recommendation_portfolio(self) -> ProjectRecommendationPortfolio:
         return self.recommendation_service.project_recommendation_portfolio()
+
+    def generate_work_package(self, recommendation_id: str) -> WorkPackageRecord:
+        return self.work_package_service.generate_work_package(recommendation_id)
+
+    def work_packages(
+        self,
+        *,
+        project_id: str | None = None,
+        approval_state: str | None = None,
+        staleness_state: str | None = None,
+    ) -> list[WorkPackageRecord]:
+        return self.work_package_service.list_work_packages(
+            project_id=project_id,
+            approval_state=approval_state,
+            staleness_state=staleness_state,
+        )
+
+    def get_work_package(self, work_package_id: str) -> WorkPackageRecord | None:
+        return self.work_package_service.get_work_package(work_package_id)
+
+    def work_package_revisions(self, work_package_id: str) -> list[WorkPackageRevisionRecord]:
+        return self.work_package_service.list_work_package_revisions(work_package_id)
+
+    def work_package_approval_decisions(self, work_package_id: str) -> list[WorkPackageApprovalDecisionRecord]:
+        return self.work_package_service.list_work_package_approval_decisions(work_package_id)
+
+    def work_package_handoffs(self, work_package_id: str) -> list[WorkPackageHandoffRecord]:
+        return self.work_package_service.list_work_package_handoffs(work_package_id)
+
+    def work_package_outcomes(self, work_package_id: str) -> list[WorkPackageOutcomeRecord]:
+        return self.work_package_service.list_work_package_outcomes(work_package_id)
+
+    def work_package_submit_for_review(self, work_package_id: str, revision_number: int, *, actor: str = "manual") -> WorkPackageRecord:
+        return self.work_package_service.submit_for_review(work_package_id, revision_number=revision_number, actor=actor)
+
+    def work_package_approve(
+        self,
+        work_package_id: str,
+        revision_number: int,
+        *,
+        actor: str,
+        human_note: str | None = None,
+    ) -> WorkPackageRecord:
+        return self.work_package_service.approve_work_package(
+            work_package_id,
+            revision_number=revision_number,
+            actor=actor,
+            human_note=human_note,
+        )
+
+    def work_package_reject(
+        self,
+        work_package_id: str,
+        revision_number: int,
+        *,
+        actor: str,
+        human_note: str | None = None,
+    ) -> WorkPackageRecord:
+        return self.work_package_service.reject_work_package(
+            work_package_id,
+            revision_number=revision_number,
+            actor=actor,
+            human_note=human_note,
+        )
+
+    def work_package_handoff(
+        self,
+        work_package_id: str,
+        revision_number: int,
+        *,
+        approved_by: str,
+        next_manual_action: str = "Copy the approved Codex prompt into Codex.",
+        rollback_reference: str = "Return to the recorded baseline commit or last approved revision.",
+    ) -> WorkPackageRecord:
+        return self.work_package_service.handoff_work_package(
+            work_package_id,
+            revision_number=revision_number,
+            approved_by=approved_by,
+            next_manual_action=next_manual_action,
+            rollback_reference=rollback_reference,
+        )
+
+    def work_package_record_outcome(
+        self,
+        work_package_id: str,
+        revision_number: int,
+        *,
+        outcome: str,
+        actor: str,
+        note: str | None = None,
+    ) -> WorkPackageRecord:
+        return self.work_package_service.record_outcome(
+            work_package_id,
+            revision_number=revision_number,
+            outcome=outcome,  # type: ignore[arg-type]
+            actor=actor,
+            note=note,
+        )
+
+    def revise_work_package(
+        self,
+        work_package_id: str,
+        *,
+        change_reason: str,
+        field_updates: dict[str, object] | None = None,
+        actor: str = "manual",
+    ) -> WorkPackageRecord:
+        return self.work_package_service.revise_work_package(
+            work_package_id,
+            change_reason=change_reason,
+            field_updates=field_updates,
+            actor=actor,
+        )
+
+    def detect_work_package_staleness(self, work_package_id: str) -> WorkPackageRecord:
+        return self.work_package_service.detect_staleness(work_package_id)
+
+    def expire_work_package(self, work_package_id: str, reason: str) -> WorkPackageRecord:
+        return self.work_package_service.expire_work_package(work_package_id, reason=reason)
+
+    def render_work_package_prompt(self, work_package_id: str, revision_number: int | None = None) -> str:
+        return self.work_package_service.render_codex_prompt(work_package_id, revision_number=revision_number)
+
+    def work_package_summary(self, work_package_id: str) -> dict[str, object]:
+        return self.work_package_service.render_summary(work_package_id)

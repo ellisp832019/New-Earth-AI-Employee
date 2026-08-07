@@ -508,3 +508,178 @@ class ProjectRecommendationPortfolio(BaseModel):
     recommendation_queue: list[ProjectRecommendation] = Field(default_factory=list)
     counts_by_priority: dict[str, int] = Field(default_factory=dict)
     counts_by_state: dict[str, int] = Field(default_factory=dict)
+
+
+WorkPackageApprovalState = Literal[
+    "proposed",
+    "under_review",
+    "approved",
+    "rejected",
+    "superseded",
+    "expired",
+    "handed_off",
+    "completed",
+    "failed",
+    "rolled_back",
+]
+WorkPackageStalenessState = Literal["fresh", "stale", "expired"]
+WorkPackageGateState = Literal["open", "blocked"]
+WorkPackageRiskClassification = Literal["low", "medium", "high", "critical", "unknown"]
+WorkPackageOutcome = Literal["completed", "failed", "rolled_back"]
+WorkPackageDecision = Literal["approved", "rejected"]
+
+
+class WorkPackageEvidenceLink(BaseModel):
+    work_package_id: str
+    revision_id: str
+    evidence_kind: str
+    evidence_identity: str
+    evidence_id: str | None = None
+    description: str
+    freshness: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkPackageCore(BaseModel):
+    title: str = ""
+    objective: str = ""
+    reason: str = ""
+    expected_outcome: str = ""
+    source_recommendation_id: str = ""
+    source_recommendation_type: str = ""
+    source_recommendation_policy_version: str = ""
+    source_recommendation_semantic_fingerprint: str = ""
+    source_recommendation_content_fingerprint: str = ""
+    source_recommendation_lifecycle_state: str = ""
+    source_recommendation_priority_tier: str = ""
+    source_recommendation_dependencies: list[str] = Field(default_factory=list)
+    source_recommendation_blockers: list[RecommendationBlocker] = Field(default_factory=list)
+    source_recommendation_reasons_to_proceed: list[str] = Field(default_factory=list)
+    source_recommendation_reasons_not_to_proceed: list[str] = Field(default_factory=list)
+    source_recommendation_evidence_fingerprints: list[str] = Field(default_factory=list)
+    source_recommendation_evidence_freshness: str = "unknown"
+    source_finding_ids: list[str] = Field(default_factory=list)
+    source_comparison_ids: list[str] = Field(default_factory=list)
+    source_snapshot_ids: list[str] = Field(default_factory=list)
+    evidence_references: list[ProjectHealthEvidenceReference] = Field(default_factory=list)
+    evidence_fingerprints: list[str] = Field(default_factory=list)
+    evidence_freshness: str = "unknown"
+    in_scope_areas: list[str] = Field(default_factory=list)
+    non_goals: list[str] = Field(default_factory=list)
+    affected_areas: list[str] = Field(default_factory=list)
+    expected_files: list[str] = Field(default_factory=list)
+    explicit_exclusions: list[str] = Field(default_factory=list)
+    project_access_mode: str = "read_only"
+    security_boundaries: list[str] = Field(default_factory=list)
+    authority_restrictions: list[str] = Field(default_factory=list)
+    prohibited_operations: list[str] = Field(default_factory=list)
+    required_approvals: list[str] = Field(default_factory=list)
+    risk_classification: WorkPackageRiskClassification = "unknown"
+    identified_risks: list[str] = Field(default_factory=list)
+    reversibility: str = "unknown"
+    impact_if_unsuccessful: str = ""
+    reasons_not_to_proceed: list[str] = Field(default_factory=list)
+    backup_requirements: list[str] = Field(default_factory=list)
+    prerequisites: list[str] = Field(default_factory=list)
+    implementation_stages: list[str] = Field(default_factory=list)
+    validation_plan: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    rollback_plan: list[str] = Field(default_factory=list)
+    generated_codex_prompt: str = ""
+    prompt_template_version: str = ""
+    prompt_content_fingerprint: str = ""
+    generator_version: str = ""
+    package_template_version: str = ""
+    semantic_fingerprint: str = ""
+    content_fingerprint: str = ""
+    package_fingerprint: str = ""
+    approval_target_fingerprint: str = ""
+    provenance_reference: str | None = None
+    audit_reference: str | None = None
+    approval_state: WorkPackageApprovalState = "proposed"
+    gate_state: WorkPackageGateState = "open"
+    staleness_state: WorkPackageStalenessState = "fresh"
+    staleness_reason: str | None = None
+    expiry_timestamp: datetime | None = None
+    project_configuration_fingerprint: str = ""
+    source_health_snapshot_fingerprints: list[str] = Field(default_factory=list)
+    source_health_snapshot_ids: list[str] = Field(default_factory=list)
+    current_revision_id: str | None = None
+    current_revision_number: int = 1
+
+
+class WorkPackageRecord(WorkPackageCore):
+    work_package_id: str = Field(default_factory=lambda: str(uuid4()))
+    schema_version: int = 1
+    project_id: str
+    created_timestamp: datetime = Field(default_factory=utc_now)
+    updated_timestamp: datetime = Field(default_factory=utc_now)
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkPackageRevisionRecord(WorkPackageCore):
+    revision_id: str = Field(default_factory=lambda: str(uuid4()))
+    work_package_id: str
+    project_id: str
+    revision_number: int
+    previous_revision_id: str | None = None
+    changed_fields: list[str] = Field(default_factory=list)
+    change_reason: str = ""
+    approval_state_at_creation: WorkPackageApprovalState = "proposed"
+    staleness_state_at_creation: WorkPackageStalenessState = "fresh"
+    staleness_reason_at_creation: str | None = None
+    created_timestamp: datetime = Field(default_factory=utc_now)
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkPackageApprovalDecisionRecord(BaseModel):
+    decision_id: str = Field(default_factory=lambda: str(uuid4()))
+    work_package_id: str
+    revision_id: str
+    revision_number: int
+    project_id: str
+    decision: WorkPackageDecision
+    actor: str
+    decision_timestamp: datetime = Field(default_factory=utc_now)
+    evidence_fingerprint: str = ""
+    approval_target_fingerprint: str = ""
+    human_note: str | None = None
+    audit_reference: str | None = None
+    previous_state: WorkPackageApprovalState = "proposed"
+    next_state: WorkPackageApprovalState = "proposed"
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkPackageHandoffRecord(BaseModel):
+    handoff_id: str = Field(default_factory=lambda: str(uuid4()))
+    work_package_id: str
+    revision_id: str
+    revision_number: int
+    project_id: str
+    approval_decision_id: str
+    approved_by: str
+    approved_at: datetime = Field(default_factory=utc_now)
+    prompt_fingerprint: str
+    next_manual_action: str
+    rollback_reference: str
+    source_evidence_ids: list[str] = Field(default_factory=list)
+    source_evidence_fingerprints: list[str] = Field(default_factory=list)
+    approval_target_fingerprint: str = ""
+    audit_reference: str | None = None
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class WorkPackageOutcomeRecord(BaseModel):
+    outcome_id: str = Field(default_factory=lambda: str(uuid4()))
+    work_package_id: str
+    revision_id: str
+    revision_number: int
+    project_id: str
+    outcome: WorkPackageOutcome
+    actor: str
+    recorded_at: datetime = Field(default_factory=utc_now)
+    note: str | None = None
+    evidence_fingerprint: str = ""
+    approval_target_fingerprint: str = ""
+    audit_reference: str | None = None
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)

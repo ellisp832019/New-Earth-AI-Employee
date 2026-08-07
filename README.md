@@ -28,6 +28,8 @@ GAIA v0.9 B2 adds snapshot comparison, change-intelligence findings, and determi
 
 GAIA v0.9 B3 adds deterministic recommendation ranking, explainable scoring, and dependency-aware prioritisation on top of B2 evidence.
 
+GAIA v0.9 B4 adds human-reviewable work-package building, revisioning, approval state tracking, deterministic handoff records, and Codex prompt preparation on top of B3 recommendations.
+
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
 Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).
 Release notes for v0.4 live under [docs/releases](docs/releases/GAIA_V0_4_0_RELEASE_NOTES.md).
@@ -40,6 +42,7 @@ The v0.9 planning package starts at [docs/planning/README.md](docs/planning/READ
 The v0.9 B1 implementation package starts at [docs/implementation/v0_9_b1/START_HERE.md](docs/implementation/v0_9_b1/START_HERE.md).
 The v0.9 B2 implementation package starts at [docs/implementation/v0_9_b2/START_HERE.md](docs/implementation/v0_9_b2/START_HERE.md).
 The v0.9 B3 implementation package starts at [docs/implementation/v0_9_b3/START_HERE.md](docs/implementation/v0_9_b3/START_HERE.md).
+The v0.9 B4 implementation package starts at [docs/implementation/v0_9_b4/START_HERE.md](docs/implementation/v0_9_b4/START_HERE.md).
 
 ## Repository relationship
 

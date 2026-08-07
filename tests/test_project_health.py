@@ -159,7 +159,7 @@ def test_schema_migrates_from_version_seven(tmp_path: Path) -> None:
         table_exists = database.connection.execute(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'project_health_snapshots'"
         ).fetchone()
-        assert user_version == 10
+        assert user_version == 11
         assert table_exists is not None
     finally:
         database.close()
