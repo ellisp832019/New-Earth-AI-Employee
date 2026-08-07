@@ -50,6 +50,8 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
             raise ValueError(f"Project '{project_id}' must be a mapping")
         projects[project_id] = ProjectConfig(project_id=project_id, **value)
 
+    _validate_project_roots(projects)
+
     return Settings(
         config_path=path,
         database_path=Path(_env("GAIA_DATABASE_PATH", "data/gaia.db")),
@@ -65,3 +67,16 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
         projects=projects,
         model_routing=load_model_routing(Path(_env("GAIA_MODEL_ROUTING_PATH", "config/model-routing.yaml"))),
     )
+
+
+def _validate_project_roots(projects: dict[str, ProjectConfig]) -> None:
+    seen: dict[str, str] = {}
+    for project_id, project in projects.items():
+        canonical = Path(project.root).resolve(strict=False)
+        key = str(canonical).casefold()
+        other = seen.get(key)
+        if other and other != project_id:
+            raise ValueError(
+                f"Projects '{other}' and '{project_id}' share the same canonical root: {canonical}"
+            )
+        seen[key] = project_id

@@ -6,7 +6,14 @@ from gaia.audit import AuditRecorder
 from gaia.config import Settings
 from gaia.db import Database
 from gaia.git_inspector import GitInspector
-from gaia.models import ProjectConfig, RepositorySnapshot, SearchResult
+from gaia.models import (
+    ProjectConfig,
+    ProjectHealthPortfolio,
+    ProjectHealthSnapshot,
+    RepositorySnapshot,
+    SearchResult,
+)
+from gaia.project_health import ProjectHealthService
 from gaia.reports import foundation_report_json, foundation_report_markdown
 from gaia.scanner import DocumentScanner
 
@@ -17,6 +24,7 @@ class ProjectService:
         self.database = database or Database(settings.database_path)
         self.audit = AuditRecorder(self.database)
         self.git = GitInspector(settings.git_timeout_seconds, settings.max_git_output_bytes)
+        self.project_health_service = ProjectHealthService(settings, self.database, self.audit, self.git)
         self.scanner = DocumentScanner(settings.max_file_bytes)
 
     def get_project(self, project_id: str) -> ProjectConfig:
@@ -126,3 +134,18 @@ class ProjectService:
             metadata={"snapshot_id": snapshot.snapshot_id, "format": format_name},
         )
         return foundation_report_json(snapshot) if format_name == "json" else foundation_report_markdown(snapshot)
+
+    def project_health(self, project_id: str) -> ProjectHealthSnapshot:
+        return self.project_health_service.capture_project_health(project_id)
+
+    def project_health_snapshot(self, snapshot_id: str) -> ProjectHealthSnapshot | None:
+        return self.project_health_service.get_project_health_snapshot(snapshot_id)
+
+    def project_health_snapshots(self, project_id: str) -> list[ProjectHealthSnapshot]:
+        return self.project_health_service.list_project_health_snapshots(project_id)
+
+    def latest_project_health_snapshot(self, project_id: str) -> ProjectHealthSnapshot | None:
+        return self.project_health_service.latest_project_health_snapshot(project_id)
+
+    def project_health_portfolio(self) -> ProjectHealthPortfolio:
+        return self.project_health_service.portfolio_view()

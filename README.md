@@ -1,8 +1,10 @@
 # New Earth AI Employee
 
-**GAIA v0.6.0 - Dashboard integration and trust layer**
+**GAIA v0.8.0 - Cross-repository acceptance baseline**
 
-This repository is a local-first, read-only foundation for a controlled AI employee. Its first role is to inspect the external MicroGrow V1 repository, index approved text documents, capture Git state, produce deterministic evidence reports, and expose those capabilities through a CLI, FastAPI service, and a Windows desktop control centre.
+This repository is a local-first, read-only foundation for a controlled AI employee. GAIA v0.8.0 is the released baseline, and GAIA v0.9 is now extending it with a multi-project registry and project-health model while keeping the existing read-only boundary in place.
+
+Its original role was to inspect the external MicroGrow V1 repository, index approved text documents, capture Git state, produce deterministic evidence reports, and expose those capabilities through a CLI, FastAPI service, and a Windows desktop control centre.
 
 GAIA v0.1 does **not** modify MicroGrow, execute unrestricted shell commands, send email, control equipment, or make autonomous changes.
 
@@ -18,12 +20,20 @@ GAIA v0.5.1 is a focused hotfix for managed backend ownership checks, safe start
 
 GAIA v0.6.0 adds the reusable dashboard module, example dashboard host, stronger compatibility and degraded-mode reporting, tamper-evident receipt chains, offline review packages, versioned action templates, retention policy scaffolding, and Trust Centre/integration screens.
 
+GAIA v0.8.0 adds cross-repository acceptance work, release closeout, and a safer platform for the next control milestones.
+
+GAIA v0.9 B1 adds the canonical multi-project registry and deterministic project-health model for GAIA, MicroGrow V1, and the New Earth Command Dashboard.
+
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
 Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).
 Release notes for v0.4 live under [docs/releases](docs/releases/GAIA_V0_4_0_RELEASE_NOTES.md).
 Release notes for v0.5 live under [docs/releases](docs/releases/GAIA_V0_5_0_RELEASE_NOTES.md).
 Release notes for v0.5.1 live under [docs/releases](docs/releases/GAIA_V0_5_1_RELEASE_NOTES.md).
 Release notes for v0.6.0 live under [docs/releases](docs/releases/GAIA_V0_6_0_RELEASE_NOTES.md).
+The v0.7 handoff is preserved under [docs/releases](docs/releases/GAIA_V0_7_HANDOFF.md).
+Release notes and closeout evidence for v0.8.0 live under [docs/releases](docs/releases/GAIA_V0_8_0_RELEASE_NOTES.md).
+The v0.9 planning package starts at [docs/planning/README.md](docs/planning/README.md).
+The v0.9 B1 implementation package starts at [docs/implementation/v0_9_b1/START_HERE.md](docs/implementation/v0_9_b1/START_HERE.md).
 
 ## Repository relationship
 

@@ -3,6 +3,11 @@ projects:
     name: MicroGrow V1
     root: 'D:\Dev\Projects\MicroGrow V1'
     access: read_only
+    enabled: true
+    repository_type: git
+    inspection_access: read_only
+    output_access: none
+    sensitivity: internal
     approved_extensions:
       - .md
       - .txt
@@ -48,3 +53,106 @@ projects:
       - docs/releases
       - platformio.ini
       - pubspec.yaml
+    health_rules:
+      evidence_freshness_hours: 48
+      required_paths:
+        - README.md
+        - docs
+    release_rules:
+      require_release_branch: false
+      assume_unknown_when_no_upstream: true
+    approval_requirements:
+      registry_review: required
+    metadata:
+      owner: microgrow
+
+  new-earth-command-dashboard:
+    name: New Earth Command Dashboard
+    root: 'D:\Dev\Projects\New Earth - Command Dashboard'
+    access: read_only
+    enabled: true
+    repository_type: git
+    inspection_access: read_only
+    output_access: none
+    sensitivity: internal
+    approved_extensions:
+      - .dart
+      - .md
+      - .yaml
+      - .yml
+      - .json
+      - .txt
+    excluded_directories:
+      - .git
+      - build
+      - .dart_tool
+      - .venv
+      - __pycache__
+    excluded_filenames:
+      - .env
+      - secrets.json
+    important_paths:
+      - README.md
+      - lib
+      - pubspec.yaml
+    health_rules:
+      evidence_freshness_hours: 24
+      required_paths:
+        - README.md
+        - lib
+    release_rules:
+      require_release_branch: false
+      assume_unknown_when_no_upstream: true
+    approval_requirements:
+      registry_review: required
+    metadata:
+      owner: dashboard
+
+  gaia:
+    name: New Earth AI Employee
+    root: 'D:\Dev\Projects\New-Earth-AI-Employee'
+    access: read_only
+    enabled: true
+    repository_type: git
+    inspection_access: read_only
+    output_access: none
+    sensitivity: internal
+    approved_extensions:
+      - .py
+      - .md
+      - .json
+      - .yaml
+      - .yml
+      - .toml
+      - .ps1
+      - .txt
+    excluded_directories:
+      - .git
+      - .venv
+      - __pycache__
+      - .pytest_cache
+      - .mypy_cache
+      - .ruff_cache
+      - build
+      - dist
+    excluded_filenames:
+      - .env
+      - secrets.json
+      - credentials.json
+    important_paths:
+      - README.md
+      - docs
+      - src/gaia
+      - scripts
+    health_rules:
+      evidence_freshness_hours: 24
+      required_paths:
+        - README.md
+        - src
+    release_rules:
+      require_release_branch: false
+      assume_unknown_when_no_upstream: true
+    approval_requirements:
+      registry_review: required
+    metadata:
+      owner: gaia

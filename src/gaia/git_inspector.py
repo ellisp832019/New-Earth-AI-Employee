@@ -59,6 +59,12 @@ class GitInspector:
         status = self._run(repo, "status_porcelain", ["status", "--porcelain=v1", "--untracked-files=all"]).stdout
         branch_result = self._run(repo, "current_branch", ["branch", "--show-current"], allow_failure=True)
         commit_result = self._run(repo, "commit_sha", ["rev-parse", "HEAD"], allow_failure=True)
+        upstream_name = self._run(
+            repo,
+            "upstream_name",
+            ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"],
+            allow_failure=True,
+        )
         recent = self._run(
             repo,
             "recent_commits",
@@ -79,6 +85,7 @@ class GitInspector:
         lines = status.splitlines() if status else []
         untracked = [line[3:] for line in lines if line.startswith("?? ")]
         changed = [line[3:] for line in lines if not line.startswith("?? ") and len(line) >= 4]
+        detached_head = not bool(branch_result.stdout)
         ahead = behind = None
         if upstream.return_code == 0 and upstream.stdout:
             parts = re.split(r"\s+", upstream.stdout.strip())
@@ -94,7 +101,9 @@ class GitInspector:
         return GitState(
             repository_root=root or str(repo),
             branch=branch_result.stdout or None,
+            detached_head=detached_head,
             commit_sha=commit_result.stdout or None,
+            upstream_name=upstream_name.stdout or None,
             is_clean=not bool(lines),
             status_porcelain=lines,
             recent_commits=recent.stdout.splitlines() if recent.stdout else [],
@@ -104,6 +113,8 @@ class GitInspector:
             ahead=ahead,
             behind=behind,
             tracked_file_count=len(tracked.stdout.splitlines()) if tracked.stdout else 0,
+            tracked_modifications_count=len(changed),
+            untracked_item_count=len(untracked),
             untracked_files=untracked,
             changed_files=changed,
             warnings=warnings,
