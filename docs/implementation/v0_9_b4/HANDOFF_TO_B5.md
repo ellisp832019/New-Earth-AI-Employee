@@ -12,6 +12,6 @@ B4 completes the human-reviewable packaging layer.
 
 ## B5 should build on this
 
-- downstream execution orchestration;
-- richer operator-facing review surfaces;
-- release-oriented packaging and traceability improvements.
+- Windows Project Officer review surfaces for portfolio, health, changes, recommendations and work packages;
+- human approval, rejection, handoff and staleness visibility for B1-B4 planning workflows;
+- read-only preparation only, with no autonomous execution or external repository writes.

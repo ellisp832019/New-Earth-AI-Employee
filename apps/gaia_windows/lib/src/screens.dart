@@ -23,6 +23,7 @@ class _GaiaShellState extends State<GaiaShell> {
   static const _destinations = <_Destination>[
     _Destination('Home', Icons.home_outlined, Icons.home),
     _Destination('Projects', Icons.folder_outlined, Icons.folder),
+    _Destination('Project Officer', Icons.cases_outlined, Icons.cases),
     _Destination('Ask GAIA', Icons.chat_bubble_outline, Icons.chat_bubble),
     _Destination('Evidence', Icons.fact_check_outlined, Icons.fact_check),
     _Destination('Snapshots', Icons.camera_alt_outlined, Icons.camera_alt),
@@ -60,6 +61,7 @@ class _GaiaShellState extends State<GaiaShell> {
       children: [
         HomeScreen(controller: controller),
         ProjectsScreen(controller: controller),
+        ProjectOfficerWorkspaceScreen(controller: controller),
         AskScreen(controller: controller),
         EvidenceScreen(controller: controller),
         SnapshotsScreen(controller: controller),
@@ -414,6 +416,465 @@ class ProjectsScreen extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class ProjectOfficerWorkspaceScreen extends StatefulWidget {
+  const ProjectOfficerWorkspaceScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<ProjectOfficerWorkspaceScreen> createState() => _ProjectOfficerWorkspaceScreenState();
+}
+
+class _ProjectOfficerWorkspaceScreenState extends State<ProjectOfficerWorkspaceScreen> {
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final selectedProject = controller.selectedProject;
+    final selectedRecommendation = controller.selectedRecommendation;
+    final selectedWorkPackage = controller.selectedWorkPackage;
+    final selectedProjectId = selectedProject?.projectId ?? controller.selectedProjectId;
+    return _ScreenScaffold(
+      title: 'Project Officer Workspace',
+      subtitle: 'B1-B4 planning control centre for review, traceability and handoff preparation',
+      child: ListView(
+        children: [
+          SectionCard(
+            title: 'Planning Portfolio',
+            subtitle: 'Health, change intelligence, recommendations and work packages',
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: controller.busy || selectedProjectId == null
+                      ? null
+                      : () => controller.refreshPlanningWorkspaceForProject(selectedProjectId),
+                  child: const Text('Refresh planning data'),
+                ),
+                OutlinedButton(
+                  onPressed: controller.busy || selectedProjectId == null
+                      ? null
+                      : () => controller.captureProjectHealth(selectedProjectId),
+                  child: const Text('Capture health'),
+                ),
+                OutlinedButton(
+                  onPressed: controller.busy || selectedProjectId == null
+                      ? null
+                      : () => controller.generateRecommendations(selectedProjectId),
+                  child: const Text('Generate recommendations'),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _keyValueGrid([
+                  ('Health projects', _portfolioCount(controller.healthPortfolio, 'projects')),
+                  ('Change projects', _portfolioCount(controller.changePortfolio, 'projects')),
+                  ('Recommendation queue', _portfolioCount(controller.recommendationPortfolio, 'recommendation_queue')),
+                  ('Work packages', controller.workPackages.length.toString()),
+                ]),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final project in controller.projects)
+                      ActionChip(
+                        label: Text(
+                          '${project.name} | ${_portfolioProjectState(controller.healthPortfolio, project.projectId)} | ${_portfolioProjectPriority(controller.recommendationPortfolio, project.projectId)}',
+                        ),
+                        onPressed: () {
+                          controller.selectProject(project.projectId);
+                          unawaited(controller.refreshPlanningWorkspaceForProject(project.projectId));
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Selected Project',
+            subtitle: selectedProject?.name ?? 'No project selected',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (selectedProject == null)
+                  const Text('Select a project to review its planning state.')
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _keyValueGrid([
+                        ('Project ID', selectedProject.projectId),
+                        ('Access', selectedProject.access),
+                        ('Health snapshots', controller.projectHealthSnapshots.length.toString()),
+                        ('Change findings', controller.projectChangeFindings.length.toString()),
+                        ('Recommendations', controller.projectRecommendations.length.toString()),
+                        ('Work packages', controller.workPackages.length.toString()),
+                      ]),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: controller.busy ? null : () => controller.refreshPlanningWorkspaceForProject(selectedProject.projectId),
+                            child: const Text('Refresh project view'),
+                          ),
+                          OutlinedButton(
+                            onPressed: controller.busy ? null : () => controller.captureProjectHealth(selectedProject.projectId),
+                            child: const Text('Capture new health snapshot'),
+                          ),
+                          OutlinedButton(
+                            onPressed: controller.busy ? null : () => controller.generateRecommendations(selectedProject.projectId),
+                            child: const Text('Regenerate recommendations'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Project Health',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: selectedProject == null
+                ? const Text('No project selected.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _keyValueGrid([
+                        ('Latest status', _mapString(controller.healthPortfolio, 'projects', selectedProject.projectId, 'normalized_status')),
+                        ('Latest snapshot', _mapString(controller.healthPortfolio, 'projects', selectedProject.projectId, 'latest_snapshot_id')),
+                        ('Freshness', _mapString(controller.healthPortfolio, 'projects', selectedProject.projectId, 'evidence_freshness')),
+                        ('Reason codes', _mapList(controller.healthPortfolio, 'projects', selectedProject.projectId, 'reason_codes')),
+                      ]),
+                      const SizedBox(height: 12),
+                      Text('Latest health snapshots', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      for (final snapshot in controller.projectHealthSnapshots.take(3))
+                        Card(
+                          child: ListTile(
+                            title: Text(snapshot['snapshot_id']?.toString() ?? 'Snapshot'),
+                            subtitle: Text(
+                              '${snapshot['normalized_status'] ?? 'unknown'} | ${snapshot['capture_timestamp'] ?? ''}',
+                            ),
+                            trailing: Text(_shortFingerprint(snapshot['content_fingerprint'])),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Change Intelligence',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: selectedProject == null
+                ? const Text('No project selected.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _keyValueGrid([
+                        ('Latest comparison', _mapString(controller.changePortfolio, 'projects', selectedProject.projectId, 'latest_comparison_id')),
+                        ('Latest change', _mapString(controller.changePortfolio, 'projects', selectedProject.projectId, 'latest_meaningful_change_timestamp')),
+                        ('Stale evidence', _mapBool(controller.changePortfolio, 'projects', selectedProject.projectId, 'stale_evidence')),
+                        ('Severity counts', _mapNested(controller.changePortfolio, 'projects', selectedProject.projectId, 'counts_by_severity')),
+                      ]),
+                      const SizedBox(height: 12),
+                      Text('Recent findings', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 8),
+                      for (final finding in controller.projectChangeFindings.take(5))
+                        Card(
+                          child: ListTile(
+                            title: Text(finding['change_class']?.toString() ?? 'Change'),
+                            subtitle: Text(finding['explanation']?.toString() ?? ''),
+                            trailing: Text('${finding['severity'] ?? 'info'} | ${finding['direction'] ?? 'unknown'}'),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Recommendations',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (controller.projectRecommendations.isEmpty)
+                  const Text('No recommendations available yet.')
+                else
+                  for (final recommendation in controller.projectRecommendations)
+                    Card(
+                      child: ListTile(
+                        selected: recommendation['recommendation_id'] == controller.selectedRecommendationId,
+                        onTap: () => controller.selectRecommendation(recommendation['recommendation_id']?.toString()),
+                        title: Text(recommendation['title']?.toString() ?? 'Recommendation'),
+                        subtitle: Text(
+                          '${recommendation['recommendation_type'] ?? ''} | ${recommendation['priority_tier'] ?? ''} | ${recommendation['lifecycle_state'] ?? ''}',
+                        ),
+                        trailing: FilledButton.tonal(
+                          onPressed: controller.busy
+                              ? null
+                              : () async {
+                                  final recommendationId = recommendation['recommendation_id']?.toString();
+                                  if (recommendationId == null || recommendationId.isEmpty) {
+                                    return;
+                                  }
+                                  await controller.generateWorkPackage(recommendationId);
+                                  controller.selectRecommendation(recommendationId);
+                                  await controller.refreshPlanningWorkspaceForProject(selectedProjectId ?? recommendation['project_id']?.toString() ?? '');
+                                },
+                          child: const Text('Build package'),
+                        ),
+                      ),
+                    ),
+                const SizedBox(height: 12),
+                if (selectedRecommendation != null) ...[
+                  Text('Selected recommendation', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 8),
+                  _keyValueGrid([
+                    ('Recommendation ID', selectedRecommendation['recommendation_id']?.toString() ?? ''),
+                    ('Type', selectedRecommendation['recommendation_type']?.toString() ?? ''),
+                    ('Priority', selectedRecommendation['priority_tier']?.toString() ?? ''),
+                    ('State', selectedRecommendation['lifecycle_state']?.toString() ?? ''),
+                    ('Score', selectedRecommendation['deterministic_score']?.toString() ?? ''),
+                    ('Evidence freshness', selectedRecommendation['evidence_freshness']?.toString() ?? ''),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(selectedRecommendation['rationale']?.toString() ?? ''),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Work Packages',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (controller.workPackages.isEmpty)
+                  const Text('Generate a work package from a recommendation to begin review.')
+                else
+                  for (final workPackage in controller.workPackages)
+                    Card(
+                      child: ListTile(
+                        selected: workPackage['work_package_id'] == controller.selectedWorkPackageId,
+                        onTap: () => controller.selectWorkPackage(workPackage['work_package_id']?.toString()),
+                        title: Text(workPackage['title']?.toString() ?? 'Work package'),
+                        subtitle: Text(
+                          '${workPackage['approval_state'] ?? ''} | ${workPackage['staleness_state'] ?? ''} | rev ${workPackage['current_revision_number'] ?? ''}',
+                        ),
+                        trailing: Text(workPackage['gate_state']?.toString() ?? ''),
+                      ),
+                    ),
+                const SizedBox(height: 12),
+                if (selectedWorkPackage != null)
+                  _WorkPackageDetail(
+                    controller: controller,
+                    workPackage: selectedWorkPackage,
+                    summary: controller.selectedWorkPackageSummary,
+                    revisions: controller.selectedWorkPackageRevisions,
+                    decisions: controller.selectedWorkPackageApprovalDecisions,
+                    handoffs: controller.selectedWorkPackageHandoffs,
+                    outcomes: controller.selectedWorkPackageOutcomes,
+                  )
+                else
+                  const Text('Select a work package to inspect revision history, prompt text, and handoff evidence.'),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Evidence and Provenance',
+            subtitle: selectedWorkPackage?['work_package_id']?.toString() ?? 'No work package selected',
+            child: selectedWorkPackage == null
+                ? const Text('Select a work package to inspect provenance.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _keyValueGrid([
+                        ('Provenance', selectedWorkPackage['provenance_reference']?.toString() ?? 'None'),
+                        ('Audit reference', selectedWorkPackage['audit_reference']?.toString() ?? 'None'),
+                        ('Prompt fingerprint', selectedWorkPackage['prompt_content_fingerprint']?.toString() ?? ''),
+                        ('Approval target', selectedWorkPackage['approval_target_fingerprint']?.toString() ?? ''),
+                        ('Source snapshots', _joinList(selectedWorkPackage['source_health_snapshot_ids'])),
+                        ('Source evidence', _joinList(selectedWorkPackage['source_finding_ids'])),
+                      ]),
+                      const SizedBox(height: 12),
+                      SelectableText(encodeJsonPretty({
+                        'evidence_references': selectedWorkPackage['evidence_references'],
+                        'security_boundaries': selectedWorkPackage['security_boundaries'],
+                        'prohibited_operations': selectedWorkPackage['prohibited_operations'],
+                        'required_approvals': selectedWorkPackage['required_approvals'],
+                      })),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkPackageDetail extends StatelessWidget {
+  const _WorkPackageDetail({
+    required this.controller,
+    required this.workPackage,
+    required this.summary,
+    required this.revisions,
+    required this.decisions,
+    required this.handoffs,
+    required this.outcomes,
+  });
+
+  final GaiaAppController controller;
+  final Map<String, dynamic> workPackage;
+  final Map<String, dynamic>? summary;
+  final List<Map<String, dynamic>> revisions;
+  final List<Map<String, dynamic>> decisions;
+  final List<Map<String, dynamic>> handoffs;
+  final List<Map<String, dynamic>> outcomes;
+
+  @override
+  Widget build(BuildContext context) {
+    final revisionNumber = (workPackage['current_revision_number'] as num?)?.toInt() ?? 1;
+    final prompt = workPackage['generated_codex_prompt']?.toString() ?? summary?['generated_codex_prompt']?.toString() ?? '';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _keyValueGrid([
+          ('Work package ID', workPackage['work_package_id']?.toString() ?? ''),
+          ('Revision', revisionNumber.toString()),
+          ('Approval state', workPackage['approval_state']?.toString() ?? ''),
+          ('Gate state', workPackage['gate_state']?.toString() ?? ''),
+          ('Staleness', workPackage['staleness_state']?.toString() ?? ''),
+          ('Expiry', workPackage['expiry_timestamp']?.toString() ?? 'None'),
+          ('Risk', workPackage['risk_classification']?.toString() ?? ''),
+          ('Current revision ID', workPackage['current_revision_id']?.toString() ?? ''),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.submitWorkPackageForReview(workPackage['work_package_id']?.toString() ?? '', revisionNumber, actor: 'manual'),
+              child: const Text('Submit for review'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.approveWorkPackage(
+                        workPackage['work_package_id']?.toString() ?? '',
+                        revisionNumber,
+                        actor: 'manual',
+                        humanNote: 'Approved in Project Officer Workspace',
+                      ),
+              child: const Text('Approve'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.rejectWorkPackage(
+                        workPackage['work_package_id']?.toString() ?? '',
+                        revisionNumber,
+                        actor: 'manual',
+                        humanNote: 'Rejected in Project Officer Workspace',
+                      ),
+              child: const Text('Reject'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.handoffWorkPackage(
+                        workPackage['work_package_id']?.toString() ?? '',
+                        revisionNumber,
+                        approvedBy: 'manual',
+                      ),
+              child: const Text('Handoff'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.detectWorkPackageStaleness(workPackage['work_package_id']?.toString() ?? ''),
+              child: const Text('Detect staleness'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.expireWorkPackage(workPackage['work_package_id']?.toString() ?? '', reason: 'manual expiry'),
+              child: const Text('Expire'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.reviseWorkPackage(
+                        workPackage['work_package_id']?.toString() ?? '',
+                        changeReason: 'Workspace revision',
+                        fieldUpdates: const <String, dynamic>{},
+                        actor: 'manual',
+                      ),
+              child: const Text('Revise'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text('Generated prompt', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        SelectableText(prompt.isEmpty ? 'No prompt available.' : prompt),
+        const SizedBox(height: 12),
+        Text('Revision history', style: Theme.of(context).textTheme.titleMedium),
+        for (final revision in revisions)
+          Card(
+            child: ListTile(
+              title: Text('Revision ${revision['revision_number']?.toString() ?? ''}'),
+              subtitle: Text(revision['change_reason']?.toString() ?? ''),
+              trailing: Text(revision['approval_state_at_creation']?.toString() ?? ''),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Text('Approval decisions', style: Theme.of(context).textTheme.titleMedium),
+        for (final decision in decisions)
+          Card(
+            child: ListTile(
+              title: Text(decision['decision']?.toString() ?? ''),
+              subtitle: Text(decision['human_note']?.toString() ?? ''),
+              trailing: Text(decision['actor']?.toString() ?? ''),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Text('Handoffs', style: Theme.of(context).textTheme.titleMedium),
+        for (final handoff in handoffs)
+          Card(
+            child: ListTile(
+              title: Text(handoff['approved_by']?.toString() ?? ''),
+              subtitle: Text(handoff['next_manual_action']?.toString() ?? ''),
+              trailing: Text(handoff['handoff_id']?.toString() ?? ''),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Text('Outcomes', style: Theme.of(context).textTheme.titleMedium),
+        for (final outcome in outcomes)
+          Card(
+            child: ListTile(
+              title: Text(outcome['outcome']?.toString() ?? ''),
+              subtitle: Text(outcome['note']?.toString() ?? ''),
+              trailing: Text(outcome['actor']?.toString() ?? ''),
+            ),
+          ),
+      ],
     );
   }
 }
@@ -2538,6 +2999,111 @@ Widget _keyValueGrid(List<(String, String)> values) {
         ),
     ],
   );
+}
+
+String _portfolioCount(Map<String, dynamic>? portfolio, String key) {
+  final value = portfolio?[key];
+  if (value is List) {
+    return value.length.toString();
+  }
+  if (value is Map) {
+    return value.length.toString();
+  }
+  return '0';
+}
+
+String _portfolioProjectState(Map<String, dynamic>? portfolio, String projectId) {
+  return _portfolioProjectField(portfolio, projectId, 'normalized_status') ?? 'unknown';
+}
+
+String _portfolioProjectPriority(Map<String, dynamic>? portfolio, String projectId) {
+  return _portfolioProjectField(portfolio, projectId, 'latest_priority_tier') ?? 'unknown';
+}
+
+String? _portfolioProjectField(Map<String, dynamic>? portfolio, String projectId, String field) {
+  final projects = portfolio?['projects'];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        return entry[field]?.toString();
+      }
+    }
+  }
+  return null;
+}
+
+String _mapString(Map<String, dynamic>? portfolio, String listKey, String projectId, String field) {
+  final projects = portfolio?[listKey];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        return entry[field]?.toString() ?? 'Unknown';
+      }
+    }
+  }
+  return 'Unknown';
+}
+
+String _mapList(Map<String, dynamic>? portfolio, String listKey, String projectId, String field) {
+  final projects = portfolio?[listKey];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        final value = entry[field];
+        if (value is List) {
+          return value.map((item) => item.toString()).join(', ');
+        }
+      }
+    }
+  }
+  return 'None';
+}
+
+String _mapBool(Map<String, dynamic>? portfolio, String listKey, String projectId, String field) {
+  final value = _mapValue(portfolio, listKey, projectId, field);
+  if (value == null) {
+    return 'Unknown';
+  }
+  return value is bool ? (value ? 'Yes' : 'No') : value.toString();
+}
+
+String _mapNested(Map<String, dynamic>? portfolio, String listKey, String projectId, String field) {
+  final value = _mapValue(portfolio, listKey, projectId, field);
+  if (value is Map) {
+    return value.entries.map((entry) => '${entry.key}: ${entry.value}').join(', ');
+  }
+  return value?.toString() ?? 'Unknown';
+}
+
+dynamic _mapValue(Map<String, dynamic>? portfolio, String listKey, String projectId, String field) {
+  final projects = portfolio?[listKey];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        return entry[field];
+      }
+    }
+  }
+  return null;
+}
+
+String _joinList(dynamic value) {
+  if (value is List) {
+    return value.map((item) => item.toString()).join(', ');
+  }
+  return value?.toString() ?? 'None';
+}
+
+String _shortFingerprint(dynamic value) {
+  final text = value?.toString() ?? '';
+  if (text.length <= 8) {
+    return text;
+  }
+  return text.substring(0, 8);
 }
 
 Widget _filterBox({

@@ -8,6 +8,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:gaia_windows/src/controller.dart';
+import 'package:gaia_windows/src/screens.dart';
 import 'package:gaia_windows/src/widgets.dart';
 
 void main() {
@@ -22,5 +24,21 @@ void main() {
     await tester.pump();
 
     expect(find.text('Connected'), findsOneWidget);
+  });
+
+  testWidgets('renders the project officer workspace shell', (WidgetTester tester) async {
+    final controller = GaiaAppController();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ProjectOfficerWorkspaceScreen(controller: controller),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Project Officer Workspace'), findsOneWidget);
+    expect(find.text('Planning Portfolio'), findsOneWidget);
   });
 }

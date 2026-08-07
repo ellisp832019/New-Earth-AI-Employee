@@ -118,14 +118,14 @@ packages:
       path: "../../packages/gaia_dashboard_module"
       relative: true
     source: path
-    version: "0.7.0"
+    version: "0.8.0"
   gaia_integration_client:
     dependency: "direct main"
     description:
       path: "../../packages/gaia_integration_client"
       relative: true
     source: path
-    version: "0.7.0"
+    version: "0.8.0"
   http:
     dependency: "direct main"
     description:

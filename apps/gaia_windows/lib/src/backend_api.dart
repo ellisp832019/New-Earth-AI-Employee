@@ -14,6 +14,51 @@ abstract class GaiaBackendApi {
   Future<List<DocumentRecord>> listDocuments(String projectId);
   Future<List<SearchResult>> search(String projectId, String query, {int limit = 20});
   Future<String> foundationReport(String projectId, {String format = 'markdown'});
+  Future<Map<String, dynamic>> captureProjectHealth(String projectId);
+  Future<Map<String, dynamic>> latestProjectHealth(String projectId);
+  Future<List<Map<String, dynamic>>> projectHealthSnapshots(String projectId);
+  Future<Map<String, dynamic>> projectHealthPortfolio();
+  Future<Map<String, dynamic>> projectChangePortfolio();
+  Future<List<Map<String, dynamic>>> projectChangeFindings(String projectId);
+  Future<Map<String, dynamic>> projectRecommendationPortfolio();
+  Future<List<Map<String, dynamic>>> projectRecommendations(String projectId);
+  Future<List<Map<String, dynamic>>> generateProjectRecommendations(String projectId);
+  Future<List<Map<String, dynamic>>> recommendationQueue({String? projectId});
+  Future<Map<String, dynamic>> getRecommendation(String recommendationId);
+  Future<Map<String, dynamic>> generateWorkPackage(String recommendationId);
+  Future<List<Map<String, dynamic>>> listWorkPackages({String? projectId, String? approvalState, String? stalenessState});
+  Future<Map<String, dynamic>> getWorkPackage(String workPackageId);
+  Future<List<Map<String, dynamic>>> workPackageRevisions(String workPackageId);
+  Future<List<Map<String, dynamic>>> workPackageApprovalDecisions(String workPackageId);
+  Future<List<Map<String, dynamic>>> workPackageHandoffs(String workPackageId);
+  Future<List<Map<String, dynamic>>> workPackageOutcomes(String workPackageId);
+  Future<Map<String, dynamic>> workPackageSummary(String workPackageId);
+  Future<Map<String, dynamic>> renderWorkPackagePrompt(String workPackageId, {int? revisionNumber});
+  Future<Map<String, dynamic>> detectWorkPackageStaleness(String workPackageId);
+  Future<Map<String, dynamic>> expireWorkPackage(String workPackageId, {String reason = 'manual expiry'});
+  Future<Map<String, dynamic>> submitWorkPackageForReview(String workPackageId, {required int revisionNumber, String actor = 'manual'});
+  Future<Map<String, dynamic>> approveWorkPackage(String workPackageId, {required int revisionNumber, String actor = 'manual', String? humanNote});
+  Future<Map<String, dynamic>> rejectWorkPackage(String workPackageId, {required int revisionNumber, String actor = 'manual', String? humanNote});
+  Future<Map<String, dynamic>> handoffWorkPackage(
+    String workPackageId, {
+    required int revisionNumber,
+    String approvedBy = 'manual',
+    String nextManualAction = 'Copy the approved Codex prompt into Codex.',
+    String rollbackReference = 'Return to the recorded baseline commit or last approved revision.',
+  });
+  Future<Map<String, dynamic>> recordWorkPackageOutcome(
+    String workPackageId, {
+    required int revisionNumber,
+    required String outcome,
+    String actor = 'manual',
+    String? note,
+  });
+  Future<Map<String, dynamic>> reviseWorkPackage(
+    String workPackageId, {
+    required String changeReason,
+    Map<String, dynamic>? fieldUpdates,
+    String actor = 'manual',
+  });
   Future<List<Map<String, dynamic>>> listAuditEvents({int limit = 100});
   Future<List<ModelStatus>> listModelStatus();
   Future<AskResponse> ask(AskRequestBody request, {http.Client? client});
@@ -194,6 +239,218 @@ class GaiaApiClient implements GaiaBackendApi {
       throw GaiaApiError(_safeMessage(response.body), statusCode: response.statusCode);
     }
     return utf8.decode(response.bodyBytes);
+  }
+
+  @override
+  Future<Map<String, dynamic>> captureProjectHealth(String projectId) async {
+    return (await _postJson('/projects/$projectId/health')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> latestProjectHealth(String projectId) async {
+    return (await _getJson('/projects/$projectId/health')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> projectHealthSnapshots(String projectId) async {
+    final json = await _getJson('/projects/$projectId/health/snapshots') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> projectHealthPortfolio() async {
+    return (await _getJson('/portfolio/health')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> projectChangePortfolio() async {
+    return (await _getJson('/portfolio/changes')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> projectChangeFindings(String projectId) async {
+    final json = await _getJson('/projects/$projectId/changes/findings') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> projectRecommendationPortfolio() async {
+    return (await _getJson('/portfolio/recommendations')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> projectRecommendations(String projectId) async {
+    final json = await _getJson('/projects/$projectId/recommendations') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> generateProjectRecommendations(String projectId) async {
+    final json = await _postJson('/projects/$projectId/recommendations/generate') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> recommendationQueue({String? projectId}) async {
+    final json = await _getJson('/recommendations/queue', queryParameters: projectId == null ? null : {'project_id': projectId}) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getRecommendation(String recommendationId) async {
+    return (await _getJson('/recommendations/$recommendationId')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> generateWorkPackage(String recommendationId) async {
+    return (await _postJson('/recommendations/$recommendationId/work-packages')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> listWorkPackages({String? projectId, String? approvalState, String? stalenessState}) async {
+    final query = <String, String>{};
+    if (projectId != null) query['project_id'] = projectId;
+    if (approvalState != null) query['approval_state'] = approvalState;
+    if (stalenessState != null) query['staleness_state'] = stalenessState;
+    final json = await _getJson('/work-packages', queryParameters: query.isEmpty ? null : query) as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> getWorkPackage(String workPackageId) async {
+    return (await _getJson('/work-packages/$workPackageId')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> workPackageRevisions(String workPackageId) async {
+    final json = await _getJson('/work-packages/$workPackageId/revisions') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> workPackageApprovalDecisions(String workPackageId) async {
+    final json = await _getJson('/work-packages/$workPackageId/approval-decisions') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> workPackageHandoffs(String workPackageId) async {
+    final json = await _getJson('/work-packages/$workPackageId/handoffs') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> workPackageOutcomes(String workPackageId) async {
+    final json = await _getJson('/work-packages/$workPackageId/outcomes') as List<dynamic>;
+    return json.whereType<Map>().map((item) => item.cast<String, dynamic>()).toList();
+  }
+
+  @override
+  Future<Map<String, dynamic>> workPackageSummary(String workPackageId) async {
+    return (await _getJson('/work-packages/$workPackageId/summary')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> renderWorkPackagePrompt(String workPackageId, {int? revisionNumber}) async {
+    final query = revisionNumber == null ? null : {'revision_number': revisionNumber.toString()};
+    return (await _getJson('/work-packages/$workPackageId/prompt', queryParameters: query)) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> detectWorkPackageStaleness(String workPackageId) async {
+    return (await _postJson('/work-packages/$workPackageId/staleness/detect')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> expireWorkPackage(String workPackageId, {String reason = 'manual expiry'}) async {
+    return (await _postJson('/work-packages/$workPackageId/expire', queryParameters: {'reason': reason})) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> submitWorkPackageForReview(String workPackageId, {required int revisionNumber, String actor = 'manual'}) async {
+    return (await _postJson(
+      '/work-packages/$workPackageId/submit-for-review',
+      queryParameters: {'revision_number': revisionNumber.toString(), 'actor': actor},
+    )) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> approveWorkPackage(String workPackageId, {required int revisionNumber, String actor = 'manual', String? humanNote}) async {
+    return (await _postJson(
+      '/work-packages/$workPackageId/approve',
+      queryParameters: <String, String>{
+        'revision_number': revisionNumber.toString(),
+        'actor': actor,
+        ...?(humanNote == null ? null : <String, String>{'human_note': humanNote}),
+      },
+    )) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> rejectWorkPackage(String workPackageId, {required int revisionNumber, String actor = 'manual', String? humanNote}) async {
+    return (await _postJson(
+      '/work-packages/$workPackageId/reject',
+      queryParameters: <String, String>{
+        'revision_number': revisionNumber.toString(),
+        'actor': actor,
+        ...?(humanNote == null ? null : <String, String>{'human_note': humanNote}),
+      },
+    )) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> handoffWorkPackage(
+    String workPackageId, {
+    required int revisionNumber,
+    String approvedBy = 'manual',
+    String nextManualAction = 'Copy the approved Codex prompt into Codex.',
+    String rollbackReference = 'Return to the recorded baseline commit or last approved revision.',
+  }) async {
+    return (await _postJson(
+      '/work-packages/$workPackageId/handoff',
+      queryParameters: <String, String>{
+        'revision_number': revisionNumber.toString(),
+        'approved_by': approvedBy,
+        'next_manual_action': nextManualAction,
+        'rollback_reference': rollbackReference,
+      },
+    )) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> recordWorkPackageOutcome(
+    String workPackageId, {
+    required int revisionNumber,
+    required String outcome,
+    String actor = 'manual',
+    String? note,
+  }) async {
+    return (await _postJson(
+      '/work-packages/$workPackageId/outcome',
+      queryParameters: <String, String>{
+        'revision_number': revisionNumber.toString(),
+        'outcome': outcome,
+        'actor': actor,
+        ...?(note == null ? null : <String, String>{'note': note}),
+      },
+    )) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> reviseWorkPackage(
+    String workPackageId, {
+    required String changeReason,
+    Map<String, dynamic>? fieldUpdates,
+    String actor = 'manual',
+  }) async {
+    return (await _postJson(
+      '/work-packages/$workPackageId/revise',
+      body: <String, dynamic>{
+        'change_reason': changeReason,
+        'field_updates': fieldUpdates ?? <String, dynamic>{},
+        'actor': actor,
+      },
+    )) as Map<String, dynamic>;
   }
 
   @override

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import cast
 
 from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import PlainTextResponse
@@ -146,6 +147,254 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return service.foundation_report(project_id, format)
         except KeyError as exc:
             raise HTTPException(status_code=404, detail="Project not found") from exc
+
+    @app.post("/projects/{project_id}/health")
+    def capture_project_health(project_id: str) -> dict[str, object]:
+        try:
+            return service.project_health(project_id).model_dump(mode="json")
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Project not found") from exc
+
+    @app.get("/projects/{project_id}/health")
+    def latest_project_health(project_id: str) -> dict[str, object]:
+        try:
+            snapshot = service.latest_project_health_snapshot(project_id)
+            if snapshot is None:
+                raise HTTPException(status_code=404, detail="No project health snapshot exists")
+            return snapshot.model_dump(mode="json")
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Project not found") from exc
+
+    @app.get("/projects/{project_id}/health/snapshots")
+    def project_health_snapshots(project_id: str) -> list[dict[str, object]]:
+        try:
+            service.get_project(project_id)
+            return [snapshot.model_dump(mode="json") for snapshot in service.project_health_snapshots(project_id)]
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Project not found") from exc
+
+    @app.get("/portfolio/health")
+    def health_portfolio() -> dict[str, object]:
+        return service.project_health_portfolio().model_dump(mode="json")
+
+    @app.get("/portfolio/changes")
+    def change_portfolio() -> dict[str, object]:
+        return service.project_change_portfolio().model_dump(mode="json")
+
+    @app.get("/portfolio/recommendations")
+    def recommendation_portfolio() -> dict[str, object]:
+        return service.project_recommendation_portfolio().model_dump(mode="json")
+
+    @app.get("/projects/{project_id}/changes/findings")
+    def project_change_findings(project_id: str) -> list[dict[str, object]]:
+        try:
+            service.get_project(project_id)
+            return [finding.model_dump(mode="json") for finding in service.list_project_change_findings(project_id)]
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Project not found") from exc
+
+    @app.get("/projects/{project_id}/recommendations")
+    def project_recommendations(project_id: str) -> list[dict[str, object]]:
+        try:
+            service.get_project(project_id)
+            return [item.model_dump(mode="json") for item in service.list_project_recommendations(project_id)]
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Project not found") from exc
+
+    @app.post("/projects/{project_id}/recommendations/generate")
+    def generate_project_recommendations(project_id: str) -> list[dict[str, object]]:
+        try:
+            return [item.model_dump(mode="json") for item in service.generate_project_recommendations(project_id)]
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="Project not found") from exc
+
+    @app.get("/recommendations/queue")
+    def recommendation_queue(project_id: str | None = None) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in service.recommendation_queue(project_id)]
+
+    @app.get("/recommendations/{recommendation_id}")
+    def recommendation(recommendation_id: str) -> dict[str, object]:
+        item = service.get_project_recommendation(recommendation_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Recommendation not found")
+        return item.model_dump(mode="json")
+
+    @app.post("/recommendations/{recommendation_id}/work-packages")
+    def generate_work_package(recommendation_id: str) -> dict[str, object]:
+        try:
+            return service.generate_work_package(recommendation_id).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/work-packages")
+    def work_packages(
+        project_id: str | None = None,
+        approval_state: str | None = None,
+        staleness_state: str | None = None,
+    ) -> list[dict[str, object]]:
+        return [
+            item.model_dump(mode="json")
+            for item in service.work_packages(
+                project_id=project_id,
+                approval_state=approval_state,
+                staleness_state=staleness_state,
+            )
+        ]
+
+    @app.get("/work-packages/{work_package_id}")
+    def get_work_package(work_package_id: str) -> dict[str, object]:
+        item = service.get_work_package(work_package_id)
+        if item is None:
+            raise HTTPException(status_code=404, detail="Work package not found")
+        return item.model_dump(mode="json")
+
+    @app.get("/work-packages/{work_package_id}/revisions")
+    def work_package_revisions(work_package_id: str) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in service.work_package_revisions(work_package_id)]
+
+    @app.get("/work-packages/{work_package_id}/approval-decisions")
+    def work_package_approval_decisions(work_package_id: str) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in service.work_package_approval_decisions(work_package_id)]
+
+    @app.get("/work-packages/{work_package_id}/handoffs")
+    def work_package_handoffs(work_package_id: str) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in service.work_package_handoffs(work_package_id)]
+
+    @app.get("/work-packages/{work_package_id}/outcomes")
+    def work_package_outcomes(work_package_id: str) -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in service.work_package_outcomes(work_package_id)]
+
+    @app.get("/work-packages/{work_package_id}/summary")
+    def work_package_summary(work_package_id: str) -> dict[str, object]:
+        try:
+            return service.work_package_summary(work_package_id)
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.get("/work-packages/{work_package_id}/prompt")
+    def work_package_prompt(work_package_id: str, revision_number: int | None = None) -> dict[str, object]:
+        try:
+            return {
+                "work_package_id": work_package_id,
+                "revision_number": revision_number,
+                "prompt": service.render_work_package_prompt(work_package_id, revision_number=revision_number),
+            }
+        except Exception as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    @app.post("/work-packages/{work_package_id}/staleness/detect")
+    def detect_work_package_staleness(work_package_id: str) -> dict[str, object]:
+        try:
+            return service.detect_work_package_staleness(work_package_id).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/work-packages/{work_package_id}/expire")
+    def expire_work_package(work_package_id: str, reason: str = Body(default="manual expiry")) -> dict[str, object]:
+        try:
+            return service.expire_work_package(work_package_id, reason=reason).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/work-packages/{work_package_id}/submit-for-review")
+    def submit_work_package_for_review(
+        work_package_id: str,
+        revision_number: int = Query(..., ge=1),
+        actor: str = Query(default="manual"),
+    ) -> dict[str, object]:
+        try:
+            return service.work_package_submit_for_review(work_package_id, revision_number, actor=actor).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/work-packages/{work_package_id}/approve")
+    def approve_work_package(
+        work_package_id: str,
+        revision_number: int = Query(..., ge=1),
+        actor: str = Query(default="manual"),
+        human_note: str | None = None,
+    ) -> dict[str, object]:
+        try:
+            return service.work_package_approve(
+                work_package_id,
+                revision_number,
+                actor=actor,
+                human_note=human_note,
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/work-packages/{work_package_id}/reject")
+    def reject_work_package(
+        work_package_id: str,
+        revision_number: int = Query(..., ge=1),
+        actor: str = Query(default="manual"),
+        human_note: str | None = None,
+    ) -> dict[str, object]:
+        try:
+            return service.work_package_reject(
+                work_package_id,
+                revision_number,
+                actor=actor,
+                human_note=human_note,
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/work-packages/{work_package_id}/handoff")
+    def handoff_work_package(
+        work_package_id: str,
+        revision_number: int = Query(..., ge=1),
+        approved_by: str = Query(default="manual"),
+        next_manual_action: str = Query(default="Copy the approved Codex prompt into Codex."),
+        rollback_reference: str = Query(default="Return to the recorded baseline commit or last approved revision."),
+    ) -> dict[str, object]:
+        try:
+            return service.work_package_handoff(
+                work_package_id,
+                revision_number,
+                approved_by=approved_by,
+                next_manual_action=next_manual_action,
+                rollback_reference=rollback_reference,
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.post("/work-packages/{work_package_id}/outcome")
+    def record_work_package_outcome(
+        work_package_id: str,
+        revision_number: int = Query(..., ge=1),
+        outcome: str = Query(...),
+        actor: str = Query(default="manual"),
+        note: str | None = None,
+    ) -> dict[str, object]:
+        try:
+            return service.work_package_record_outcome(
+                work_package_id,
+                revision_number,
+                outcome=outcome,
+                actor=actor,
+                note=note,
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.patch("/work-packages/{work_package_id}/revise")
+    def revise_work_package(
+        work_package_id: str,
+        request: dict[str, object] = Body(default={}),
+    ) -> dict[str, object]:
+        try:
+            raw_field_updates = request.get("field_updates")
+            field_updates = cast(dict[str, object], raw_field_updates) if isinstance(raw_field_updates, dict) else None
+            return service.revise_work_package(
+                work_package_id,
+                change_reason=str(request.get("change_reason", "revision")),
+                field_updates=field_updates,
+                actor=str(request.get("actor", "manual")),
+            ).model_dump(mode="json")
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/audit/events")
     def audit_events(limit: int = Query(default=100, ge=1, le=1000)) -> list[dict[str, object]]:
