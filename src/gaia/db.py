@@ -16,11 +16,16 @@ from gaia.models import (
     ProjectRecommendation,
     RepositorySnapshot,
     SearchResult,
+    WorkPackageApprovalDecisionRecord,
+    WorkPackageHandoffRecord,
+    WorkPackageOutcomeRecord,
+    WorkPackageRecord,
+    WorkPackageRevisionRecord,
 )
 
 
 class Database:
-    SCHEMA_VERSION = 10
+    SCHEMA_VERSION = 11
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -177,6 +182,121 @@ class Database:
                 reason TEXT NOT NULL,
                 PRIMARY KEY(recommendation_id, depends_on_recommendation_id, dependency_type),
                 FOREIGN KEY(recommendation_id) REFERENCES project_recommendations(recommendation_id)
+            );
+            CREATE TABLE IF NOT EXISTS work_packages (
+                work_package_id TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                project_id TEXT NOT NULL,
+                source_recommendation_id TEXT NOT NULL,
+                source_recommendation_semantic_fingerprint TEXT NOT NULL,
+                source_recommendation_content_fingerprint TEXT NOT NULL,
+                source_recommendation_policy_version TEXT NOT NULL,
+                current_revision_number INTEGER NOT NULL,
+                current_revision_id TEXT,
+                title TEXT NOT NULL,
+                approval_state TEXT NOT NULL,
+                gate_state TEXT NOT NULL,
+                staleness_state TEXT NOT NULL,
+                created_timestamp TEXT NOT NULL,
+                updated_timestamp TEXT NOT NULL,
+                expiry_timestamp TEXT,
+                package_fingerprint TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                prompt_template_version TEXT NOT NULL,
+                prompt_content_fingerprint TEXT NOT NULL,
+                generator_version TEXT NOT NULL,
+                project_configuration_fingerprint TEXT NOT NULL,
+                source_health_snapshot_ids_json TEXT NOT NULL,
+                source_health_snapshot_fingerprints_json TEXT NOT NULL,
+                audit_reference TEXT,
+                normalized_payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS work_package_revisions (
+                revision_id TEXT PRIMARY KEY,
+                work_package_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                previous_revision_id TEXT,
+                approval_state_at_creation TEXT NOT NULL,
+                change_reason TEXT NOT NULL,
+                changed_fields_json TEXT NOT NULL,
+                created_timestamp TEXT NOT NULL,
+                package_fingerprint TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                prompt_content_fingerprint TEXT NOT NULL,
+                audit_reference TEXT,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(work_package_id) REFERENCES work_packages(work_package_id),
+                UNIQUE(work_package_id, revision_number)
+            );
+            CREATE TABLE IF NOT EXISTS work_package_evidence_links (
+                work_package_id TEXT NOT NULL,
+                revision_id TEXT NOT NULL,
+                evidence_kind TEXT NOT NULL,
+                evidence_identity TEXT NOT NULL,
+                evidence_id TEXT,
+                description TEXT NOT NULL,
+                freshness TEXT,
+                details_json TEXT NOT NULL,
+                PRIMARY KEY(work_package_id, revision_id, evidence_kind, evidence_identity, description),
+                FOREIGN KEY(work_package_id) REFERENCES work_packages(work_package_id),
+                FOREIGN KEY(revision_id) REFERENCES work_package_revisions(revision_id)
+            );
+            CREATE TABLE IF NOT EXISTS work_package_approval_decisions (
+                decision_id TEXT PRIMARY KEY,
+                work_package_id TEXT NOT NULL,
+                revision_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                project_id TEXT NOT NULL,
+                decision TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                decision_timestamp TEXT NOT NULL,
+                evidence_fingerprint TEXT NOT NULL,
+                human_note TEXT,
+                audit_reference TEXT,
+                previous_state TEXT NOT NULL,
+                next_state TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(work_package_id) REFERENCES work_packages(work_package_id),
+                FOREIGN KEY(revision_id) REFERENCES work_package_revisions(revision_id)
+            );
+            CREATE TABLE IF NOT EXISTS work_package_handoffs (
+                handoff_id TEXT PRIMARY KEY,
+                work_package_id TEXT NOT NULL,
+                revision_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                project_id TEXT NOT NULL,
+                approval_decision_id TEXT NOT NULL,
+                approved_by TEXT NOT NULL,
+                approved_at TEXT NOT NULL,
+                prompt_fingerprint TEXT NOT NULL,
+                next_manual_action TEXT NOT NULL,
+                rollback_reference TEXT NOT NULL,
+                source_evidence_ids_json TEXT NOT NULL,
+                source_evidence_fingerprints_json TEXT NOT NULL,
+                audit_reference TEXT,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(work_package_id) REFERENCES work_packages(work_package_id),
+                FOREIGN KEY(revision_id) REFERENCES work_package_revisions(revision_id),
+                FOREIGN KEY(approval_decision_id) REFERENCES work_package_approval_decisions(decision_id)
+            );
+            CREATE TABLE IF NOT EXISTS work_package_outcomes (
+                outcome_id TEXT PRIMARY KEY,
+                work_package_id TEXT NOT NULL,
+                revision_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                project_id TEXT NOT NULL,
+                outcome TEXT NOT NULL,
+                actor TEXT NOT NULL,
+                recorded_at TEXT NOT NULL,
+                note TEXT,
+                evidence_fingerprint TEXT NOT NULL,
+                audit_reference TEXT,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(work_package_id) REFERENCES work_packages(work_package_id),
+                FOREIGN KEY(revision_id) REFERENCES work_package_revisions(revision_id)
             );
             CREATE TABLE IF NOT EXISTS audit_events (
                 event_id TEXT PRIMARY KEY,
@@ -617,6 +737,18 @@ class Database:
                 "CREATE INDEX IF NOT EXISTS idx_project_recommendation_evidence_links_recommendation_id ON project_recommendation_evidence_links(recommendation_id)",
                 "CREATE INDEX IF NOT EXISTS idx_project_recommendation_dependencies_recommendation_id ON project_recommendation_dependencies(recommendation_id)",
                 "CREATE INDEX IF NOT EXISTS idx_project_recommendation_dependencies_depends_on ON project_recommendation_dependencies(depends_on_recommendation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_packages_project_id ON work_packages(project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_packages_semantic_fingerprint ON work_packages(semantic_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_work_packages_source_recommendation_id ON work_packages(source_recommendation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_packages_approval_state ON work_packages(approval_state)",
+                "CREATE INDEX IF NOT EXISTS idx_work_packages_staleness_state ON work_packages(staleness_state)",
+                "CREATE INDEX IF NOT EXISTS idx_work_package_revisions_package_id ON work_package_revisions(work_package_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_package_revisions_revision_number ON work_package_revisions(work_package_id, revision_number DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_work_package_evidence_links_package_revision ON work_package_evidence_links(work_package_id, revision_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_package_approval_decisions_package_id ON work_package_approval_decisions(work_package_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_package_approval_decisions_revision_id ON work_package_approval_decisions(revision_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_package_handoffs_package_id ON work_package_handoffs(work_package_id)",
+                "CREATE INDEX IF NOT EXISTS idx_work_package_outcomes_package_id ON work_package_outcomes(work_package_id)",
             ]
         )
         self.connection.commit()
@@ -1195,6 +1327,329 @@ class Database:
             project_ids,
         ).fetchall()
         return [ProjectRecommendation.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def insert_work_package(self, package: WorkPackageRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO work_packages(
+                    work_package_id, schema_version, project_id, source_recommendation_id,
+                    source_recommendation_semantic_fingerprint, source_recommendation_content_fingerprint,
+                    source_recommendation_policy_version, current_revision_number, current_revision_id,
+                    title, approval_state, gate_state, staleness_state, created_timestamp,
+                    updated_timestamp, expiry_timestamp, package_fingerprint, semantic_fingerprint,
+                    content_fingerprint, prompt_template_version, prompt_content_fingerprint,
+                    generator_version, project_configuration_fingerprint, source_health_snapshot_ids_json,
+                    source_health_snapshot_fingerprints_json, audit_reference, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    package.work_package_id,
+                    package.schema_version,
+                    package.project_id,
+                    package.source_recommendation_id,
+                    package.source_recommendation_semantic_fingerprint,
+                    package.source_recommendation_content_fingerprint,
+                    package.source_recommendation_policy_version,
+                    package.current_revision_number,
+                    package.current_revision_id,
+                    package.title,
+                    package.approval_state,
+                    package.gate_state,
+                    package.staleness_state,
+                    package.created_timestamp.isoformat(),
+                    package.updated_timestamp.isoformat(),
+                    package.expiry_timestamp.isoformat() if package.expiry_timestamp else None,
+                    package.package_fingerprint,
+                    package.semantic_fingerprint,
+                    package.content_fingerprint,
+                    package.prompt_template_version,
+                    package.prompt_content_fingerprint,
+                    package.generator_version,
+                    package.project_configuration_fingerprint,
+                    json.dumps(package.source_health_snapshot_ids, default=str, sort_keys=True),
+                    json.dumps(package.source_health_snapshot_fingerprints, default=str, sort_keys=True),
+                    package.audit_reference,
+                    package.model_dump_json(),
+                ),
+            )
+
+    def insert_work_package_revision(self, revision: WorkPackageRevisionRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO work_package_revisions(
+                    revision_id, work_package_id, project_id, revision_number, previous_revision_id,
+                    approval_state_at_creation, change_reason, changed_fields_json, created_timestamp,
+                    package_fingerprint, semantic_fingerprint, content_fingerprint, prompt_content_fingerprint,
+                    audit_reference, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    revision.revision_id,
+                    revision.work_package_id,
+                    revision.project_id,
+                    revision.revision_number,
+                    revision.previous_revision_id,
+                    revision.approval_state_at_creation,
+                    revision.change_reason,
+                    json.dumps(revision.changed_fields, default=str, sort_keys=True),
+                    revision.created_timestamp.isoformat(),
+                    revision.package_fingerprint,
+                    revision.semantic_fingerprint,
+                    revision.content_fingerprint,
+                    revision.prompt_content_fingerprint,
+                    revision.audit_reference,
+                    revision.model_dump_json(),
+                ),
+            )
+            self.connection.execute(
+                "DELETE FROM work_package_evidence_links WHERE work_package_id = ? AND revision_id = ?",
+                (revision.work_package_id, revision.revision_id),
+            )
+            for evidence in revision.evidence_references:
+                self.connection.execute(
+                    """
+                    INSERT INTO work_package_evidence_links(
+                        work_package_id, revision_id, evidence_kind, evidence_identity, evidence_id,
+                        description, freshness, details_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        revision.work_package_id,
+                        revision.revision_id,
+                        evidence.evidence_kind,
+                        evidence.evidence_id or "",
+                        evidence.evidence_id,
+                        evidence.description,
+                        evidence.freshness,
+                        json.dumps(evidence.details, default=str, sort_keys=True),
+                    ),
+                )
+
+    def insert_work_package_approval_decision(self, decision: WorkPackageApprovalDecisionRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO work_package_approval_decisions(
+                    decision_id, work_package_id, revision_id, revision_number, project_id,
+                    decision, actor, decision_timestamp, evidence_fingerprint, human_note,
+                    audit_reference, previous_state, next_state, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    decision.decision_id,
+                    decision.work_package_id,
+                    decision.revision_id,
+                    decision.revision_number,
+                    decision.project_id,
+                    decision.decision,
+                    decision.actor,
+                    decision.decision_timestamp.isoformat(),
+                    decision.evidence_fingerprint,
+                    decision.human_note,
+                    decision.audit_reference,
+                    decision.previous_state,
+                    decision.next_state,
+                    decision.model_dump_json(),
+                ),
+            )
+
+    def insert_work_package_handoff(self, handoff: WorkPackageHandoffRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO work_package_handoffs(
+                    handoff_id, work_package_id, revision_id, revision_number, project_id,
+                    approval_decision_id, approved_by, approved_at, prompt_fingerprint,
+                    next_manual_action, rollback_reference, source_evidence_ids_json,
+                    source_evidence_fingerprints_json, audit_reference, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    handoff.handoff_id,
+                    handoff.work_package_id,
+                    handoff.revision_id,
+                    handoff.revision_number,
+                    handoff.project_id,
+                    handoff.approval_decision_id,
+                    handoff.approved_by,
+                    handoff.approved_at.isoformat(),
+                    handoff.prompt_fingerprint,
+                    handoff.next_manual_action,
+                    handoff.rollback_reference,
+                    json.dumps(handoff.source_evidence_ids, default=str, sort_keys=True),
+                    json.dumps(handoff.source_evidence_fingerprints, default=str, sort_keys=True),
+                    handoff.audit_reference,
+                    handoff.model_dump_json(),
+                ),
+            )
+
+    def insert_work_package_outcome(self, outcome: WorkPackageOutcomeRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO work_package_outcomes(
+                    outcome_id, work_package_id, revision_id, revision_number, project_id, outcome,
+                    actor, recorded_at, note, evidence_fingerprint, audit_reference, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    outcome.outcome_id,
+                    outcome.work_package_id,
+                    outcome.revision_id,
+                    outcome.revision_number,
+                    outcome.project_id,
+                    outcome.outcome,
+                    outcome.actor,
+                    outcome.recorded_at.isoformat(),
+                    outcome.note,
+                    outcome.evidence_fingerprint,
+                    outcome.audit_reference,
+                    outcome.model_dump_json(),
+                ),
+            )
+
+    def update_work_package_state(
+        self,
+        work_package_id: str,
+        *,
+        approval_state: str | None = None,
+        gate_state: str | None = None,
+        staleness_state: str | None = None,
+        current_revision_id: str | None = None,
+        current_revision_number: int | None = None,
+        updated_timestamp: datetime | None = None,
+        expiry_timestamp: datetime | None = None,
+        audit_reference: str | None = None,
+    ) -> None:
+        package = self.get_work_package(work_package_id)
+        if package is None:
+            return
+        updated = package.model_copy(
+            update={
+                **({"approval_state": approval_state} if approval_state is not None else {}),
+                **({"gate_state": gate_state} if gate_state is not None else {}),
+                **({"staleness_state": staleness_state} if staleness_state is not None else {}),
+                **({"current_revision_id": current_revision_id} if current_revision_id is not None else {}),
+                **({"current_revision_number": current_revision_number} if current_revision_number is not None else {}),
+                **({"updated_timestamp": updated_timestamp} if updated_timestamp is not None else {}),
+                **({"expiry_timestamp": expiry_timestamp} if expiry_timestamp is not None else {}),
+                **({"audit_reference": audit_reference} if audit_reference is not None else {}),
+            }
+        )
+        self.insert_work_package(updated)
+
+    def update_work_package_audit_reference(self, work_package_id: str, audit_reference: str) -> None:
+        package = self.get_work_package(work_package_id)
+        if package is None:
+            return
+        package.audit_reference = audit_reference
+        self.insert_work_package(package)
+
+    def get_work_package(self, work_package_id: str) -> WorkPackageRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM work_packages WHERE work_package_id = ?",
+            (work_package_id,),
+        ).fetchone()
+        return WorkPackageRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_work_package_by_semantic(self, project_id: str, semantic_fingerprint: str) -> WorkPackageRecord | None:
+        row = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM work_packages
+            WHERE project_id = ? AND semantic_fingerprint = ?
+            ORDER BY current_revision_number DESC, updated_timestamp DESC
+            LIMIT 1
+            """,
+            (project_id, semantic_fingerprint),
+        ).fetchone()
+        return WorkPackageRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_work_packages(
+        self,
+        project_id: str | None = None,
+        approval_state: str | None = None,
+        staleness_state: str | None = None,
+    ) -> list[WorkPackageRecord]:
+        clauses = []
+        params: list[object] = []
+        if project_id:
+            clauses.append("project_id = ?")
+            params.append(project_id)
+        if approval_state:
+            clauses.append("approval_state = ?")
+            params.append(approval_state)
+        if staleness_state:
+            clauses.append("staleness_state = ?")
+            params.append(staleness_state)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = self.connection.execute(
+            f"""
+            SELECT normalized_payload_json
+            FROM work_packages
+            {where}
+            ORDER BY updated_timestamp DESC, current_revision_number DESC, work_package_id DESC
+            """,
+            params,
+        ).fetchall()
+        return [WorkPackageRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def get_work_package_revision(self, revision_id: str) -> WorkPackageRevisionRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM work_package_revisions WHERE revision_id = ?",
+            (revision_id,),
+        ).fetchone()
+        return WorkPackageRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_work_package_revisions(self, work_package_id: str) -> list[WorkPackageRevisionRecord]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM work_package_revisions
+            WHERE work_package_id = ?
+            ORDER BY revision_number DESC, created_timestamp DESC
+            """,
+            (work_package_id,),
+        ).fetchall()
+        return [WorkPackageRevisionRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_work_package_approval_decisions(self, work_package_id: str) -> list[WorkPackageApprovalDecisionRecord]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM work_package_approval_decisions
+            WHERE work_package_id = ?
+            ORDER BY decision_timestamp DESC, decision_id DESC
+            """,
+            (work_package_id,),
+        ).fetchall()
+        return [WorkPackageApprovalDecisionRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_work_package_handoffs(self, work_package_id: str) -> list[WorkPackageHandoffRecord]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM work_package_handoffs
+            WHERE work_package_id = ?
+            ORDER BY approved_at DESC, handoff_id DESC
+            """,
+            (work_package_id,),
+        ).fetchall()
+        return [WorkPackageHandoffRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_work_package_outcomes(self, work_package_id: str) -> list[WorkPackageOutcomeRecord]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM work_package_outcomes
+            WHERE work_package_id = ?
+            ORDER BY recorded_at DESC, outcome_id DESC
+            """,
+            (work_package_id,),
+        ).fetchall()
+        return [WorkPackageOutcomeRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
 
     def insert_audit_event(self, event: AuditEvent) -> None:
         with self.connection:
