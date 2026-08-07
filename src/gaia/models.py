@@ -176,6 +176,7 @@ class CapabilityDescriptor(BaseModel):
     version: str
     state: Literal["enabled", "degraded", "disabled"]
     summary: str
+    authority_level: Literal["read_only", "gaia_local_state", "manual_handoff_only", "unsupported"] = "read_only"
     gated_by: list[str] = Field(default_factory=list)
     requires_signing: bool = False
     enabled: bool = True

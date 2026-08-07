@@ -88,6 +88,7 @@ class GaiaCapabilityDescriptor {
     required this.version,
     required this.state,
     required this.summary,
+    required this.authorityLevel,
     required this.gatedBy,
     required this.requiresSigning,
     required this.enabled,
@@ -98,6 +99,7 @@ class GaiaCapabilityDescriptor {
         version: json['version'] as String? ?? '',
         state: json['state'] as String? ?? 'disabled',
         summary: json['summary'] as String? ?? '',
+        authorityLevel: json['authority_level'] as String? ?? 'read_only',
         gatedBy: (json['gated_by'] as List<dynamic>? ?? const <dynamic>[]).whereType<String>().toList(),
         requiresSigning: json['requires_signing'] as bool? ?? false,
         enabled: json['enabled'] as bool? ?? false,
@@ -107,6 +109,7 @@ class GaiaCapabilityDescriptor {
   final String version;
   final String state;
   final String summary;
+  final String authorityLevel;
   final List<String> gatedBy;
   final bool requiresSigning;
   final bool enabled;

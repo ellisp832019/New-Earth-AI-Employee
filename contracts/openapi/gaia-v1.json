@@ -870,6 +870,105 @@
         "title": "PermissionManifestDecisionRequest",
         "type": "object"
       },
+      "ProjectOfficerHandoffRequest": {
+        "properties": {
+          "approved_by": {
+            "default": "manual",
+            "title": "Approved By",
+            "type": "string"
+          },
+          "next_manual_action": {
+            "default": "Copy the approved Codex prompt into Codex.",
+            "title": "Next Manual Action",
+            "type": "string"
+          },
+          "revision_number": {
+            "minimum": 1.0,
+            "title": "Revision Number",
+            "type": "integer"
+          },
+          "rollback_reference": {
+            "default": "Return to the recorded baseline commit or last approved revision.",
+            "title": "Rollback Reference",
+            "type": "string"
+          }
+        },
+        "required": [
+          "revision_number"
+        ],
+        "title": "ProjectOfficerHandoffRequest",
+        "type": "object"
+      },
+      "ProjectOfficerLifecycleRequest": {
+        "properties": {
+          "actor": {
+            "default": "manual",
+            "title": "Actor",
+            "type": "string"
+          },
+          "human_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Human Note"
+          },
+          "revision_number": {
+            "minimum": 1.0,
+            "title": "Revision Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_number"
+        ],
+        "title": "ProjectOfficerLifecycleRequest",
+        "type": "object"
+      },
+      "ProjectOfficerOutcomeRequest": {
+        "properties": {
+          "actor": {
+            "default": "manual",
+            "title": "Actor",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "outcome": {
+            "enum": [
+              "completed",
+              "failed",
+              "rolled_back"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "revision_number": {
+            "minimum": 1.0,
+            "title": "Revision Number",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "revision_number",
+          "outcome"
+        ],
+        "title": "ProjectOfficerOutcomeRequest",
+        "type": "object"
+      },
       "ProvenanceCreateRequest": {
         "properties": {
           "chain_id": {
@@ -3381,6 +3480,1550 @@
           }
         },
         "summary": "Integration Compatibility"
+      }
+    },
+    "/integration/v1/project-officer/capabilities": {
+      "get": {
+        "operationId": "project_officer_capabilities_integration_v1_project_officer_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Capabilities Integration V1 Project Officer Capabilities Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Project Officer Capabilities"
+      }
+    },
+    "/integration/v1/project-officer/change-findings/{finding_id}": {
+      "get": {
+        "operationId": "project_officer_change_finding_integration_v1_project_officer_change_findings__finding_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "finding_id",
+            "required": true,
+            "schema": {
+              "title": "Finding Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Change Finding Integration V1 Project Officer Change Findings  Finding Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Change Finding"
+      }
+    },
+    "/integration/v1/project-officer/changes/portfolio": {
+      "get": {
+        "operationId": "project_officer_change_portfolio_integration_v1_project_officer_changes_portfolio_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Change Portfolio Integration V1 Project Officer Changes Portfolio Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Project Officer Change Portfolio"
+      }
+    },
+    "/integration/v1/project-officer/changes/recent": {
+      "get": {
+        "operationId": "project_officer_recent_change_findings_integration_v1_project_officer_changes_recent_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Recent Change Findings Integration V1 Project Officer Changes Recent Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Recent Change Findings"
+      }
+    },
+    "/integration/v1/project-officer/health-snapshots/{snapshot_id}": {
+      "get": {
+        "operationId": "project_officer_health_snapshot_integration_v1_project_officer_health_snapshots__snapshot_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "snapshot_id",
+            "required": true,
+            "schema": {
+              "title": "Snapshot Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Health Snapshot Integration V1 Project Officer Health Snapshots  Snapshot Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Health Snapshot"
+      }
+    },
+    "/integration/v1/project-officer/portfolio": {
+      "get": {
+        "operationId": "project_officer_portfolio_integration_v1_project_officer_portfolio_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Portfolio Integration V1 Project Officer Portfolio Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Project Officer Portfolio"
+      }
+    },
+    "/integration/v1/project-officer/projects": {
+      "get": {
+        "operationId": "project_officer_projects_integration_v1_project_officer_projects_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Projects Integration V1 Project Officer Projects Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Project Officer Projects"
+      }
+    },
+    "/integration/v1/project-officer/projects/{project_id}/changes/findings": {
+      "get": {
+        "operationId": "project_officer_change_findings_integration_v1_project_officer_projects__project_id__changes_findings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "severity",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Severity"
+            }
+          },
+          {
+            "in": "query",
+            "name": "direction",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Direction"
+            }
+          },
+          {
+            "in": "query",
+            "name": "change_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Change Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Change Findings Integration V1 Project Officer Projects  Project Id  Changes Findings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Change Findings"
+      }
+    },
+    "/integration/v1/project-officer/projects/{project_id}/health": {
+      "get": {
+        "operationId": "project_officer_project_health_integration_v1_project_officer_projects__project_id__health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Project Health Integration V1 Project Officer Projects  Project Id  Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Project Health"
+      }
+    },
+    "/integration/v1/project-officer/projects/{project_id}/health/snapshots": {
+      "get": {
+        "operationId": "project_officer_project_health_snapshots_integration_v1_project_officer_projects__project_id__health_snapshots_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Project Health Snapshots Integration V1 Project Officer Projects  Project Id  Health Snapshots Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Project Health Snapshots"
+      }
+    },
+    "/integration/v1/project-officer/projects/{project_id}/work-packages": {
+      "get": {
+        "operationId": "project_officer_project_work_packages_integration_v1_project_officer_projects__project_id__work_packages_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approval_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approval State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "staleness_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Staleness State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "risk_classification",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Risk Classification"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Project Work Packages Integration V1 Project Officer Projects  Project Id  Work Packages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Project Work Packages"
+      }
+    },
+    "/integration/v1/project-officer/recommendations": {
+      "get": {
+        "operationId": "project_officer_recommendations_integration_v1_project_officer_recommendations_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "priority_tier",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Priority Tier"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lifecycle_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lifecycle State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "blocked_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Blocked Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Recommendations Integration V1 Project Officer Recommendations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Recommendations"
+      }
+    },
+    "/integration/v1/project-officer/recommendations/portfolio": {
+      "get": {
+        "operationId": "project_officer_recommendation_portfolio_integration_v1_project_officer_recommendations_portfolio_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Recommendation Portfolio Integration V1 Project Officer Recommendations Portfolio Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Project Officer Recommendation Portfolio"
+      }
+    },
+    "/integration/v1/project-officer/recommendations/{recommendation_id}": {
+      "get": {
+        "operationId": "project_officer_recommendation_integration_v1_project_officer_recommendations__recommendation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recommendation_id",
+            "required": true,
+            "schema": {
+              "title": "Recommendation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Recommendation Integration V1 Project Officer Recommendations  Recommendation Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Recommendation"
+      }
+    },
+    "/integration/v1/project-officer/work-package-revisions/{revision_id}": {
+      "get": {
+        "operationId": "project_officer_work_package_revision_integration_v1_project_officer_work_package_revisions__revision_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Work Package Revision Integration V1 Project Officer Work Package Revisions  Revision Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package Revision"
+      }
+    },
+    "/integration/v1/project-officer/work-packages": {
+      "get": {
+        "operationId": "project_officer_work_packages_integration_v1_project_officer_work_packages_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approval_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approval State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "staleness_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Staleness State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "risk_classification",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Risk Classification"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 100,
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "required": false,
+            "schema": {
+              "default": 0,
+              "minimum": 0,
+              "title": "Offset",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Work Packages Integration V1 Project Officer Work Packages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Packages"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}": {
+      "get": {
+        "operationId": "project_officer_work_package_integration_v1_project_officer_work_packages__work_package_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Work Package Integration V1 Project Officer Work Packages  Work Package Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/approval-decisions": {
+      "get": {
+        "operationId": "project_officer_work_package_approval_decisions_integration_v1_project_officer_work_packages__work_package_id__approval_decisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Work Package Approval Decisions Integration V1 Project Officer Work Packages  Work Package Id  Approval Decisions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package Approval Decisions"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/approve": {
+      "post": {
+        "operationId": "project_officer_approve_integration_v1_project_officer_work_packages__work_package_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOfficerLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Approve Integration V1 Project Officer Work Packages  Work Package Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Approve"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/expire": {
+      "post": {
+        "operationId": "project_officer_expire_integration_v1_project_officer_work_packages__work_package_id__expire_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": "manual expiry",
+                "title": "Reason",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Expire Integration V1 Project Officer Work Packages  Work Package Id  Expire Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Expire"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/handoff": {
+      "post": {
+        "operationId": "project_officer_handoff_integration_v1_project_officer_work_packages__work_package_id__handoff_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOfficerHandoffRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Handoff Integration V1 Project Officer Work Packages  Work Package Id  Handoff Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Handoff"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/handoffs": {
+      "get": {
+        "operationId": "project_officer_work_package_handoffs_integration_v1_project_officer_work_packages__work_package_id__handoffs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Work Package Handoffs Integration V1 Project Officer Work Packages  Work Package Id  Handoffs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package Handoffs"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/outcome": {
+      "post": {
+        "operationId": "project_officer_outcome_integration_v1_project_officer_work_packages__work_package_id__outcome_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOfficerOutcomeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Outcome Integration V1 Project Officer Work Packages  Work Package Id  Outcome Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Outcome"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/outcomes": {
+      "get": {
+        "operationId": "project_officer_work_package_outcomes_integration_v1_project_officer_work_packages__work_package_id__outcomes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Work Package Outcomes Integration V1 Project Officer Work Packages  Work Package Id  Outcomes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package Outcomes"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/prompt": {
+      "get": {
+        "operationId": "project_officer_work_package_prompt_integration_v1_project_officer_work_packages__work_package_id__prompt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_number",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Work Package Prompt Integration V1 Project Officer Work Packages  Work Package Id  Prompt Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package Prompt"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/reject": {
+      "post": {
+        "operationId": "project_officer_reject_integration_v1_project_officer_work_packages__work_package_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOfficerLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Reject Integration V1 Project Officer Work Packages  Work Package Id  Reject Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Reject"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/revisions": {
+      "get": {
+        "operationId": "project_officer_work_package_revisions_integration_v1_project_officer_work_packages__work_package_id__revisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Officer Work Package Revisions Integration V1 Project Officer Work Packages  Work Package Id  Revisions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package Revisions"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/submit-for-review": {
+      "post": {
+        "operationId": "project_officer_submit_for_review_integration_v1_project_officer_work_packages__work_package_id__submit_for_review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectOfficerLifecycleRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Submit For Review Integration V1 Project Officer Work Packages  Work Package Id  Submit For Review Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Submit For Review"
+      }
+    },
+    "/integration/v1/project-officer/work-packages/{work_package_id}/summary": {
+      "get": {
+        "operationId": "project_officer_work_package_summary_integration_v1_project_officer_work_packages__work_package_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Project Officer Work Package Summary Integration V1 Project Officer Work Packages  Work Package Id  Summary Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Officer Work Package Summary"
       }
     },
     "/integration/v1/projects": {
