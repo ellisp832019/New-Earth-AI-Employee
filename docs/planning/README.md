@@ -50,6 +50,19 @@ This package collects planning and architecture materials for upcoming GAIA mile
 - [Validation Evidence](../implementation/v0_9_b2/VALIDATION_EVIDENCE.md)
 - [Handoff to B3](../implementation/v0_9_b2/HANDOFF_TO_B3.md)
 
+## v0.9 B3 Implementation
+
+- [Start Here](../implementation/v0_9_b3/START_HERE.md)
+- [Recommendation Architecture](../implementation/v0_9_b3/RECOMMENDATION_ARCHITECTURE.md)
+- [Prioritisation Policy](../implementation/v0_9_b3/PRIORITISATION_POLICY.md)
+- [Scoring Model](../implementation/v0_9_b3/SCORING_MODEL.md)
+- [Recommendation Lifecycle](../implementation/v0_9_b3/RECOMMENDATION_LIFECYCLE.md)
+- [Dependency and Blocker Model](../implementation/v0_9_b3/DEPENDENCY_AND_BLOCKER_MODEL.md)
+- [Deduplication and Fingerprinting](../implementation/v0_9_b3/DEDUPLICATION_AND_FINGERPRINTING.md)
+- [Security and Authority Boundary](../implementation/v0_9_b3/SECURITY_AND_AUTHORITY_BOUNDARY.md)
+- [Validation Evidence](../implementation/v0_9_b3/VALIDATION_EVIDENCE.md)
+- [Handoff to B4](../implementation/v0_9_b3/HANDOFF_TO_B4.md)
+
 ## Related
 
 - [Released v0.8 notes](../releases/GAIA_V0_8_0_RELEASE_NOTES.md)
