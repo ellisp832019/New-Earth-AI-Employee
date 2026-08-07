@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from typing import Any, cast
 from uuid import NAMESPACE_URL, uuid5
 
+from pydantic import BaseModel
+
 from gaia.audit import AuditRecorder
 from gaia.config import Settings
 from gaia.db import Database
@@ -29,7 +31,6 @@ from gaia.models import (
     WorkPackageStalenessState,
     utc_now,
 )
-from pydantic import BaseModel
 
 WORK_PACKAGE_GENERATOR_VERSION = "gaia-v0.9-b4-work-package-builder-v1"
 WORK_PACKAGE_TEMPLATE_VERSION = "gaia-v0.9-b4-template-v1"
