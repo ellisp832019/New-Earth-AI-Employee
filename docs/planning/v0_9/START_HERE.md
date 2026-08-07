@@ -6,7 +6,7 @@ GAIA v0.9 is the planning and architecture milestone for a practical local-first
 
 - GAIA release: `gaia-v0.8.0`
 - GAIA main SHA: `98ed66df5bd2cbd34887bdfc65e53d590c493cbe`
-- Branch: `planning/gaia-v0.9-b1-multi-project-registry`
+- Branch: `planning/gaia-v0.9-b2-change-intelligence`
 
 ## What v0.9 Is For
 
