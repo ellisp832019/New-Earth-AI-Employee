@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Iterable
+from datetime import datetime
 from pathlib import Path
 
 from gaia.conversation import AgentRunRecord
@@ -12,13 +13,14 @@ from gaia.models import (
     ProjectChangeComparison,
     ProjectChangeFinding,
     ProjectHealthSnapshot,
+    ProjectRecommendation,
     RepositorySnapshot,
     SearchResult,
 )
 
 
 class Database:
-    SCHEMA_VERSION = 9
+    SCHEMA_VERSION = 10
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -117,6 +119,64 @@ class Database:
                 audit_event_id TEXT,
                 content_fingerprint TEXT NOT NULL,
                 FOREIGN KEY(comparison_id) REFERENCES project_change_comparisons(comparison_id)
+            );
+            CREATE TABLE IF NOT EXISTS project_recommendations (
+                recommendation_id TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                recommendation_policy_version TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                recommendation_type TEXT NOT NULL,
+                created_timestamp TEXT NOT NULL,
+                updated_timestamp TEXT NOT NULL,
+                lifecycle_state TEXT NOT NULL,
+                priority_tier TEXT NOT NULL,
+                deterministic_score INTEGER NOT NULL,
+                urgency_category TEXT NOT NULL,
+                effort_category TEXT NOT NULL,
+                reversibility_category TEXT NOT NULL,
+                score_breakdown_json TEXT NOT NULL,
+                title TEXT NOT NULL,
+                concise_summary TEXT NOT NULL,
+                rationale TEXT NOT NULL,
+                why_it_matters TEXT NOT NULL,
+                why_it_received_this_score TEXT NOT NULL,
+                reasons_to_proceed_json TEXT NOT NULL,
+                reasons_not_to_proceed_json TEXT NOT NULL,
+                blockers_json TEXT NOT NULL,
+                dependencies_json TEXT NOT NULL,
+                uncertainty TEXT NOT NULL,
+                source_finding_ids_json TEXT NOT NULL,
+                source_comparison_ids_json TEXT NOT NULL,
+                source_snapshot_ids_json TEXT NOT NULL,
+                evidence_fingerprints_json TEXT NOT NULL,
+                evidence_freshness TEXT NOT NULL,
+                evidence_references_json TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                provenance_reference TEXT,
+                audit_event_id TEXT,
+                supersedes_recommendation_id TEXT,
+                superseded_by_recommendation_id TEXT,
+                normalized_payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS project_recommendation_evidence_links (
+                recommendation_id TEXT NOT NULL,
+                evidence_kind TEXT NOT NULL,
+                evidence_identity TEXT NOT NULL,
+                evidence_id TEXT,
+                description TEXT NOT NULL,
+                freshness TEXT,
+                details_json TEXT NOT NULL,
+                PRIMARY KEY(recommendation_id, evidence_kind, description, evidence_identity),
+                FOREIGN KEY(recommendation_id) REFERENCES project_recommendations(recommendation_id)
+            );
+            CREATE TABLE IF NOT EXISTS project_recommendation_dependencies (
+                recommendation_id TEXT NOT NULL,
+                depends_on_recommendation_id TEXT NOT NULL,
+                dependency_type TEXT NOT NULL,
+                reason TEXT NOT NULL,
+                PRIMARY KEY(recommendation_id, depends_on_recommendation_id, dependency_type),
+                FOREIGN KEY(recommendation_id) REFERENCES project_recommendations(recommendation_id)
             );
             CREATE TABLE IF NOT EXISTS audit_events (
                 event_id TEXT PRIMARY KEY,
@@ -547,6 +607,16 @@ class Database:
                 "CREATE INDEX IF NOT EXISTS idx_project_change_findings_capture_timestamp ON project_change_findings(capture_timestamp)",
                 "CREATE INDEX IF NOT EXISTS idx_project_change_findings_current_snapshot_id ON project_change_findings(current_snapshot_id)",
                 "CREATE INDEX IF NOT EXISTS idx_project_change_findings_content_fingerprint ON project_change_findings(content_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendations_project_id ON project_recommendations(project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendations_policy_version ON project_recommendations(recommendation_policy_version)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendations_priority_tier ON project_recommendations(priority_tier)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendations_lifecycle_state ON project_recommendations(lifecycle_state)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendations_created_timestamp ON project_recommendations(created_timestamp)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendations_semantic_fingerprint ON project_recommendations(semantic_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendations_content_fingerprint ON project_recommendations(content_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendation_evidence_links_recommendation_id ON project_recommendation_evidence_links(recommendation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendation_dependencies_recommendation_id ON project_recommendation_dependencies(recommendation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_recommendation_dependencies_depends_on ON project_recommendation_dependencies(depends_on_recommendation_id)",
             ]
         )
         self.connection.commit()
@@ -929,6 +999,202 @@ class Database:
             [*project_ids, max(1, min(limit, 1000))],
         ).fetchall()
         return [ProjectChangeFinding.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def insert_project_recommendation(self, recommendation: ProjectRecommendation) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO project_recommendations(
+                    recommendation_id, schema_version, recommendation_policy_version, project_id,
+                    recommendation_type, created_timestamp, updated_timestamp, lifecycle_state,
+                    priority_tier, deterministic_score, urgency_category, effort_category,
+                    reversibility_category, score_breakdown_json, title, concise_summary,
+                    rationale, why_it_matters, why_it_received_this_score, reasons_to_proceed_json,
+                    reasons_not_to_proceed_json, blockers_json, dependencies_json, uncertainty,
+                    source_finding_ids_json, source_comparison_ids_json, source_snapshot_ids_json,
+                    evidence_fingerprints_json, evidence_freshness, evidence_references_json,
+                    semantic_fingerprint, content_fingerprint, provenance_reference, audit_event_id,
+                    supersedes_recommendation_id, superseded_by_recommendation_id, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    recommendation.recommendation_id,
+                    recommendation.schema_version,
+                    recommendation.recommendation_policy_version,
+                    recommendation.project_id,
+                    recommendation.recommendation_type,
+                    recommendation.created_timestamp.isoformat(),
+                    recommendation.updated_timestamp.isoformat(),
+                    recommendation.lifecycle_state,
+                    recommendation.priority_tier,
+                    recommendation.deterministic_score,
+                    recommendation.score_breakdown.urgency_category,
+                    recommendation.score_breakdown.effort_category,
+                    recommendation.score_breakdown.reversibility_category,
+                    recommendation.score_breakdown.model_dump_json(),
+                    recommendation.title,
+                    recommendation.concise_summary,
+                    recommendation.rationale,
+                    recommendation.why_it_matters,
+                    recommendation.why_it_received_this_score,
+                    json.dumps(recommendation.reasons_to_proceed, default=str, sort_keys=True),
+                    json.dumps(recommendation.reasons_not_to_proceed, default=str, sort_keys=True),
+                    json.dumps([item.model_dump(mode="json") for item in recommendation.blockers], default=str, sort_keys=True),
+                    json.dumps(recommendation.dependencies, default=str, sort_keys=True),
+                    recommendation.uncertainty,
+                    json.dumps(recommendation.source_finding_ids, default=str, sort_keys=True),
+                    json.dumps(recommendation.source_comparison_ids, default=str, sort_keys=True),
+                    json.dumps(recommendation.source_snapshot_ids, default=str, sort_keys=True),
+                    json.dumps(recommendation.evidence_fingerprints, default=str, sort_keys=True),
+                    recommendation.evidence_freshness,
+                    json.dumps([item.model_dump(mode="json") for item in recommendation.evidence_references], default=str, sort_keys=True),
+                    recommendation.semantic_fingerprint,
+                    recommendation.content_fingerprint,
+                    recommendation.provenance_reference,
+                    recommendation.audit_event_id,
+                    recommendation.supersedes_recommendation_id,
+                    recommendation.superseded_by_recommendation_id,
+                    recommendation.model_dump_json(),
+                ),
+            )
+            self.connection.execute(
+                "DELETE FROM project_recommendation_evidence_links WHERE recommendation_id = ?",
+                (recommendation.recommendation_id,),
+            )
+            self.connection.execute(
+                "DELETE FROM project_recommendation_dependencies WHERE recommendation_id = ?",
+                (recommendation.recommendation_id,),
+            )
+            for evidence in recommendation.evidence_references:
+                self.connection.execute(
+                    """
+                    INSERT INTO project_recommendation_evidence_links(
+                        recommendation_id, evidence_kind, evidence_identity, evidence_id, description, freshness, details_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        recommendation.recommendation_id,
+                        evidence.evidence_kind,
+                        evidence.evidence_id or "",
+                        evidence.evidence_id,
+                        evidence.description,
+                        evidence.freshness,
+                        json.dumps(evidence.details, default=str, sort_keys=True),
+                    ),
+                )
+            for dependency_id in recommendation.dependencies:
+                self.connection.execute(
+                    """
+                    INSERT INTO project_recommendation_dependencies(
+                        recommendation_id, depends_on_recommendation_id, dependency_type, reason
+                    ) VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        recommendation.recommendation_id,
+                        dependency_id,
+                        "higher_order_condition",
+                        "Recommendation ordering requires the dependency to be handled first.",
+                    ),
+                )
+
+    def update_project_recommendation_audit_event(self, recommendation_id: str, audit_event_id: str) -> None:
+        recommendation = self.get_project_recommendation(recommendation_id)
+        if recommendation is None:
+            return
+        recommendation.audit_event_id = audit_event_id
+        self.insert_project_recommendation(recommendation)
+
+    def update_project_recommendation_state(
+        self,
+        recommendation_id: str,
+        *,
+        lifecycle_state: str | None = None,
+        superseded_by_recommendation_id: str | None = None,
+        updated_timestamp: datetime | None = None,
+    ) -> None:
+        if lifecycle_state is None and superseded_by_recommendation_id is None and updated_timestamp is None:
+            return
+        recommendation = self.get_project_recommendation(recommendation_id)
+        if recommendation is None:
+            return
+        updated = recommendation.model_copy(
+            update={
+                **({"lifecycle_state": lifecycle_state} if lifecycle_state is not None else {}),
+                **({"superseded_by_recommendation_id": superseded_by_recommendation_id} if superseded_by_recommendation_id is not None else {}),
+                **({"updated_timestamp": updated_timestamp} if updated_timestamp is not None else {}),
+            }
+        )
+        self.insert_project_recommendation(updated)
+
+    def get_project_recommendation(self, recommendation_id: str) -> ProjectRecommendation | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_recommendations WHERE recommendation_id = ?",
+            (recommendation_id,),
+        ).fetchone()
+        return ProjectRecommendation.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_project_recommendation_by_semantic(
+        self,
+        project_id: str,
+        semantic_fingerprint: str,
+    ) -> ProjectRecommendation | None:
+        row = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM project_recommendations
+            WHERE project_id = ? AND semantic_fingerprint = ?
+            ORDER BY created_timestamp DESC, recommendation_id DESC
+            LIMIT 1
+            """,
+            (project_id, semantic_fingerprint),
+        ).fetchone()
+        return ProjectRecommendation.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_project_recommendations(self, project_id: str) -> list[ProjectRecommendation]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM project_recommendations
+            WHERE project_id = ?
+            ORDER BY updated_timestamp DESC, priority_tier, deterministic_score DESC, recommendation_id DESC
+            """,
+            (project_id,),
+        ).fetchall()
+        return [ProjectRecommendation.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_project_recommendations_by_state(
+        self,
+        project_id: str,
+        lifecycle_states: list[str],
+    ) -> list[ProjectRecommendation]:
+        if not lifecycle_states:
+            return []
+        placeholders = ",".join("?" for _ in lifecycle_states)
+        rows = self.connection.execute(
+            f"""
+            SELECT normalized_payload_json
+            FROM project_recommendations
+            WHERE project_id = ? AND lifecycle_state IN ({placeholders})
+            ORDER BY updated_timestamp DESC, priority_tier, deterministic_score DESC, recommendation_id DESC
+            """,
+            [project_id, *lifecycle_states],
+        ).fetchall()
+        return [ProjectRecommendation.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_recommendations_for_projects(self, project_ids: list[str]) -> list[ProjectRecommendation]:
+        if not project_ids:
+            return []
+        placeholders = ",".join("?" for _ in project_ids)
+        rows = self.connection.execute(
+            f"""
+            SELECT normalized_payload_json
+            FROM project_recommendations
+            WHERE project_id IN ({placeholders})
+            ORDER BY updated_timestamp DESC, priority_tier, deterministic_score DESC, recommendation_id DESC
+            """,
+            project_ids,
+        ).fetchall()
+        return [ProjectRecommendation.model_validate_json(row["normalized_payload_json"]) for row in rows]
 
     def insert_audit_event(self, event: AuditEvent) -> None:
         with self.connection:

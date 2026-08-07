@@ -381,3 +381,130 @@ class ProjectChangePortfolio(BaseModel):
     projects: list[ProjectChangePortfolioEntry] = Field(default_factory=list)
     counts_by_severity: dict[str, int] = Field(default_factory=dict)
     counts_by_change_class: dict[str, int] = Field(default_factory=dict)
+
+
+RecommendationType = Literal[
+    "review_blocking_project_health_condition",
+    "review_uncommitted_project_changes",
+    "verify_removal_of_configured_important_project_path",
+    "refresh_project_evidence_before_relying_on_state",
+    "review_upstream_branch_divergence",
+    "review_repository_head_change",
+    "review_project_configuration_change",
+    "insufficient_evidence",
+]
+RecommendationPriorityTier = Literal["P0", "P1", "P2", "P3", "P4"]
+RecommendationLifecycleState = Literal["active", "blocked", "deferred", "resolved", "superseded", "stale"]
+RecommendationUrgency = Literal["immediate", "soon", "normal", "low", "unknown"]
+RecommendationEffort = Literal["tiny", "small", "medium", "large", "unknown"]
+RecommendationReversibility = Literal["easy", "moderate", "difficult", "unknown"]
+RecommendationConfidence = Literal["high", "medium", "low", "unknown"]
+RecommendationBlockerType = Literal[
+    "evidence_too_stale",
+    "dependency_unresolved",
+    "project_root_unavailable",
+    "required_human_decision_missing",
+    "higher_order_condition_unresolved",
+    "insufficient_evidence",
+]
+
+
+class RecommendationScoreBreakdown(BaseModel):
+    urgency_category: RecommendationUrgency = "unknown"
+    effort_category: RecommendationEffort = "unknown"
+    reversibility_category: RecommendationReversibility = "unknown"
+    severity_contribution: int = 0
+    urgency_contribution: int = 0
+    user_impact_contribution: int = 0
+    release_impact_contribution: int = 0
+    safety_impact_contribution: int = 0
+    dependency_impact_contribution: int = 0
+    confidence_contribution: int = 0
+    effort_contribution: int = 0
+    reversibility_contribution: int = 0
+    freshness_contribution: int = 0
+    total_score: int = 0
+
+
+class RecommendationBlocker(BaseModel):
+    blocker_type: RecommendationBlockerType
+    blocker_description: str
+    required_condition: str
+    evidence_ids: list[str] = Field(default_factory=list)
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectRecommendationEvidenceLink(BaseModel):
+    recommendation_id: str
+    evidence_kind: str
+    evidence_id: str | None = None
+    description: str
+    freshness: str | None = None
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectRecommendationDependency(BaseModel):
+    recommendation_id: str
+    depends_on_recommendation_id: str
+    dependency_type: str = "higher_order_condition"
+    reason: str
+
+
+class ProjectRecommendation(BaseModel):
+    recommendation_id: str = Field(default_factory=lambda: str(uuid4()))
+    schema_version: int = 1
+    project_id: str
+    recommendation_type: RecommendationType
+    recommendation_policy_version: str
+    created_timestamp: datetime = Field(default_factory=utc_now)
+    updated_timestamp: datetime = Field(default_factory=utc_now)
+    lifecycle_state: RecommendationLifecycleState = "active"
+    priority_tier: RecommendationPriorityTier = "P4"
+    deterministic_score: int = 0
+    score_breakdown: RecommendationScoreBreakdown = Field(default_factory=RecommendationScoreBreakdown)
+    title: str = ""
+    concise_summary: str = ""
+    rationale: str = ""
+    why_it_matters: str = ""
+    why_it_received_this_score: str = ""
+    reasons_to_proceed: list[str] = Field(default_factory=list)
+    reasons_not_to_proceed: list[str] = Field(default_factory=list)
+    blockers: list[RecommendationBlocker] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    uncertainty: str = "unknown"
+    source_finding_ids: list[str] = Field(default_factory=list)
+    source_comparison_ids: list[str] = Field(default_factory=list)
+    source_snapshot_ids: list[str] = Field(default_factory=list)
+    evidence_fingerprints: list[str] = Field(default_factory=list)
+    evidence_freshness: str = "unknown"
+    evidence_references: list[ProjectHealthEvidenceReference] = Field(default_factory=list)
+    semantic_fingerprint: str = ""
+    content_fingerprint: str = ""
+    provenance_reference: str | None = None
+    audit_event_id: str | None = None
+    supersedes_recommendation_id: str | None = None
+    superseded_by_recommendation_id: str | None = None
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProjectRecommendationPortfolioEntry(BaseModel):
+    project_id: str
+    project_name: str
+    latest_recommendation_id: str | None = None
+    latest_created_timestamp: datetime | None = None
+    latest_priority_tier: RecommendationPriorityTier = "P4"
+    latest_lifecycle_state: RecommendationLifecycleState = "stale"
+    recommendation_count: int = 0
+    active_recommendation_count: int = 0
+    blocked_recommendation_count: int = 0
+    counts_by_priority: dict[str, int] = Field(default_factory=dict)
+    counts_by_state: dict[str, int] = Field(default_factory=dict)
+    latest_recommendations: list[ProjectRecommendation] = Field(default_factory=list)
+
+
+class ProjectRecommendationPortfolio(BaseModel):
+    generated_at: datetime = Field(default_factory=utc_now)
+    projects: list[ProjectRecommendationPortfolioEntry] = Field(default_factory=list)
+    recommendation_queue: list[ProjectRecommendation] = Field(default_factory=list)
+    counts_by_priority: dict[str, int] = Field(default_factory=dict)
+    counts_by_state: dict[str, int] = Field(default_factory=dict)

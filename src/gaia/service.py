@@ -14,10 +14,13 @@ from gaia.models import (
     ProjectConfig,
     ProjectHealthPortfolio,
     ProjectHealthSnapshot,
+    ProjectRecommendation,
+    ProjectRecommendationPortfolio,
     RepositorySnapshot,
     SearchResult,
 )
 from gaia.project_health import ProjectHealthService
+from gaia.recommendations import RecommendationService
 from gaia.reports import foundation_report_json, foundation_report_markdown
 from gaia.scanner import DocumentScanner
 
@@ -30,6 +33,7 @@ class ProjectService:
         self.git = GitInspector(settings.git_timeout_seconds, settings.max_git_output_bytes)
         self.project_health_service = ProjectHealthService(settings, self.database, self.audit, self.git)
         self.change_intelligence_service = ChangeIntelligenceService(settings, self.database, self.audit)
+        self.recommendation_service = RecommendationService(settings, self.database, self.audit)
         self.scanner = DocumentScanner(settings.max_file_bytes)
 
     def get_project(self, project_id: str) -> ProjectConfig:
@@ -177,3 +181,21 @@ class ProjectService:
 
     def project_change_portfolio(self) -> ProjectChangePortfolio:
         return self.change_intelligence_service.portfolio_change_view()
+
+    def generate_project_recommendations(self, project_id: str) -> list[ProjectRecommendation]:
+        return self.recommendation_service.generate_project_recommendations(project_id)
+
+    def project_recommendations(self, project_id: str) -> list[ProjectRecommendation]:
+        return self.recommendation_service.generate_project_recommendations(project_id)
+
+    def list_project_recommendations(self, project_id: str) -> list[ProjectRecommendation]:
+        return self.recommendation_service.list_project_recommendations(project_id)
+
+    def get_project_recommendation(self, recommendation_id: str) -> ProjectRecommendation | None:
+        return self.recommendation_service.get_recommendation(recommendation_id)
+
+    def recommendation_queue(self, project_id: str | None = None) -> list[ProjectRecommendation]:
+        return self.recommendation_service.recommendation_queue(project_id)
+
+    def project_recommendation_portfolio(self) -> ProjectRecommendationPortfolio:
+        return self.recommendation_service.project_recommendation_portfolio()

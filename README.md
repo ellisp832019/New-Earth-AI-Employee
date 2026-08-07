@@ -26,6 +26,8 @@ GAIA v0.9 B1 adds the canonical multi-project registry and deterministic project
 
 GAIA v0.9 B2 adds snapshot comparison, change-intelligence findings, and deterministic drift detection on top of the B1 registry.
 
+GAIA v0.9 B3 adds deterministic recommendation ranking, explainable scoring, and dependency-aware prioritisation on top of B2 evidence.
+
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
 Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).
 Release notes for v0.4 live under [docs/releases](docs/releases/GAIA_V0_4_0_RELEASE_NOTES.md).
@@ -37,6 +39,7 @@ Release notes and closeout evidence for v0.8.0 live under [docs/releases](docs/r
 The v0.9 planning package starts at [docs/planning/README.md](docs/planning/README.md).
 The v0.9 B1 implementation package starts at [docs/implementation/v0_9_b1/START_HERE.md](docs/implementation/v0_9_b1/START_HERE.md).
 The v0.9 B2 implementation package starts at [docs/implementation/v0_9_b2/START_HERE.md](docs/implementation/v0_9_b2/START_HERE.md).
+The v0.9 B3 implementation package starts at [docs/implementation/v0_9_b3/START_HERE.md](docs/implementation/v0_9_b3/START_HERE.md).
 
 ## Repository relationship
 
