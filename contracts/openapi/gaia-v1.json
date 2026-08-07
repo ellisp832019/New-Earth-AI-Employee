@@ -3741,6 +3741,66 @@
         "summary": "Validate Permission Manifest"
       }
     },
+    "/portfolio/changes": {
+      "get": {
+        "operationId": "change_portfolio_portfolio_changes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Change Portfolio Portfolio Changes Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Change Portfolio"
+      }
+    },
+    "/portfolio/health": {
+      "get": {
+        "operationId": "health_portfolio_portfolio_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Health Portfolio Portfolio Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health Portfolio"
+      }
+    },
+    "/portfolio/recommendations": {
+      "get": {
+        "operationId": "recommendation_portfolio_portfolio_recommendations_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Recommendation Portfolio Portfolio Recommendations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Recommendation Portfolio"
+      }
+    },
     "/projects": {
       "get": {
         "operationId": "projects_projects_get",
@@ -3805,6 +3865,50 @@
         "summary": "Project"
       }
     },
+    "/projects/{project_id}/changes/findings": {
+      "get": {
+        "operationId": "project_change_findings_projects__project_id__changes_findings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Change Findings Projects  Project Id  Changes Findings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Change Findings"
+      }
+    },
     "/projects/{project_id}/documents": {
       "get": {
         "operationId": "documents_projects__project_id__documents_get",
@@ -3847,6 +3951,218 @@
           }
         },
         "summary": "Documents"
+      }
+    },
+    "/projects/{project_id}/health": {
+      "get": {
+        "operationId": "latest_project_health_projects__project_id__health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Latest Project Health Projects  Project Id  Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Latest Project Health"
+      },
+      "post": {
+        "operationId": "capture_project_health_projects__project_id__health_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Capture Project Health Projects  Project Id  Health Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Capture Project Health"
+      }
+    },
+    "/projects/{project_id}/health/snapshots": {
+      "get": {
+        "operationId": "project_health_snapshots_projects__project_id__health_snapshots_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Health Snapshots Projects  Project Id  Health Snapshots Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Health Snapshots"
+      }
+    },
+    "/projects/{project_id}/recommendations": {
+      "get": {
+        "operationId": "project_recommendations_projects__project_id__recommendations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Project Recommendations Projects  Project Id  Recommendations Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Project Recommendations"
+      }
+    },
+    "/projects/{project_id}/recommendations/generate": {
+      "post": {
+        "operationId": "generate_project_recommendations_projects__project_id__recommendations_generate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "title": "Project Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Generate Project Recommendations Projects  Project Id  Recommendations Generate Post",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Project Recommendations"
       }
     },
     "/projects/{project_id}/reports/foundation": {
@@ -4550,6 +4866,139 @@
           }
         },
         "summary": "Receipt Verify"
+      }
+    },
+    "/recommendations/queue": {
+      "get": {
+        "operationId": "recommendation_queue_recommendations_queue_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Recommendation Queue Recommendations Queue Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recommendation Queue"
+      }
+    },
+    "/recommendations/{recommendation_id}": {
+      "get": {
+        "operationId": "recommendation_recommendations__recommendation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recommendation_id",
+            "required": true,
+            "schema": {
+              "title": "Recommendation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Recommendation Recommendations  Recommendation Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Recommendation"
+      }
+    },
+    "/recommendations/{recommendation_id}/work-packages": {
+      "post": {
+        "operationId": "generate_work_package_recommendations__recommendation_id__work_packages_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "recommendation_id",
+            "required": true,
+            "schema": {
+              "title": "Recommendation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Generate Work Package Recommendations  Recommendation Id  Work Packages Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Work Package"
       }
     },
     "/retention/apply": {
@@ -5482,6 +5931,932 @@
           }
         },
         "summary": "Trust Alert Acknowledge"
+      }
+    },
+    "/work-packages": {
+      "get": {
+        "operationId": "work_packages_work_packages_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "project_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Project Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approval_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Approval State"
+            }
+          },
+          {
+            "in": "query",
+            "name": "staleness_state",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Staleness State"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Work Packages Work Packages Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Packages"
+      }
+    },
+    "/work-packages/{work_package_id}": {
+      "get": {
+        "operationId": "get_work_package_work_packages__work_package_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Work Package Work Packages  Work Package Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Work Package"
+      }
+    },
+    "/work-packages/{work_package_id}/approval-decisions": {
+      "get": {
+        "operationId": "work_package_approval_decisions_work_packages__work_package_id__approval_decisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Work Package Approval Decisions Work Packages  Work Package Id  Approval Decisions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Package Approval Decisions"
+      }
+    },
+    "/work-packages/{work_package_id}/approve": {
+      "post": {
+        "operationId": "approve_work_package_work_packages__work_package_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Revision Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "default": "manual",
+              "title": "Actor",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "human_note",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Human Note"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Approve Work Package Work Packages  Work Package Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Work Package"
+      }
+    },
+    "/work-packages/{work_package_id}/expire": {
+      "post": {
+        "operationId": "expire_work_package_work_packages__work_package_id__expire_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "default": "manual expiry",
+                "title": "Reason",
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Expire Work Package Work Packages  Work Package Id  Expire Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Expire Work Package"
+      }
+    },
+    "/work-packages/{work_package_id}/handoff": {
+      "post": {
+        "operationId": "handoff_work_package_work_packages__work_package_id__handoff_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Revision Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "approved_by",
+            "required": false,
+            "schema": {
+              "default": "manual",
+              "title": "Approved By",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "next_manual_action",
+            "required": false,
+            "schema": {
+              "default": "Copy the approved Codex prompt into Codex.",
+              "title": "Next Manual Action",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "rollback_reference",
+            "required": false,
+            "schema": {
+              "default": "Return to the recorded baseline commit or last approved revision.",
+              "title": "Rollback Reference",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Handoff Work Package Work Packages  Work Package Id  Handoff Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Handoff Work Package"
+      }
+    },
+    "/work-packages/{work_package_id}/handoffs": {
+      "get": {
+        "operationId": "work_package_handoffs_work_packages__work_package_id__handoffs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Work Package Handoffs Work Packages  Work Package Id  Handoffs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Package Handoffs"
+      }
+    },
+    "/work-packages/{work_package_id}/outcome": {
+      "post": {
+        "operationId": "record_work_package_outcome_work_packages__work_package_id__outcome_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Revision Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "outcome",
+            "required": true,
+            "schema": {
+              "title": "Outcome",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "default": "manual",
+              "title": "Actor",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "note",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Note"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Record Work Package Outcome Work Packages  Work Package Id  Outcome Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Record Work Package Outcome"
+      }
+    },
+    "/work-packages/{work_package_id}/outcomes": {
+      "get": {
+        "operationId": "work_package_outcomes_work_packages__work_package_id__outcomes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Work Package Outcomes Work Packages  Work Package Id  Outcomes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Package Outcomes"
+      }
+    },
+    "/work-packages/{work_package_id}/prompt": {
+      "get": {
+        "operationId": "work_package_prompt_work_packages__work_package_id__prompt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_number",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Revision Number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Work Package Prompt Work Packages  Work Package Id  Prompt Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Package Prompt"
+      }
+    },
+    "/work-packages/{work_package_id}/reject": {
+      "post": {
+        "operationId": "reject_work_package_work_packages__work_package_id__reject_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Revision Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "default": "manual",
+              "title": "Actor",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "human_note",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Human Note"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reject Work Package Work Packages  Work Package Id  Reject Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reject Work Package"
+      }
+    },
+    "/work-packages/{work_package_id}/revise": {
+      "patch": {
+        "operationId": "revise_work_package_work_packages__work_package_id__revise_patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "default": {},
+                "title": "Request",
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Revise Work Package Work Packages  Work Package Id  Revise Patch",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revise Work Package"
+      }
+    },
+    "/work-packages/{work_package_id}/revisions": {
+      "get": {
+        "operationId": "work_package_revisions_work_packages__work_package_id__revisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Work Package Revisions Work Packages  Work Package Id  Revisions Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Package Revisions"
+      }
+    },
+    "/work-packages/{work_package_id}/staleness/detect": {
+      "post": {
+        "operationId": "detect_work_package_staleness_work_packages__work_package_id__staleness_detect_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Detect Work Package Staleness Work Packages  Work Package Id  Staleness Detect Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detect Work Package Staleness"
+      }
+    },
+    "/work-packages/{work_package_id}/submit-for-review": {
+      "post": {
+        "operationId": "submit_work_package_for_review_work_packages__work_package_id__submit_for_review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "revision_number",
+            "required": true,
+            "schema": {
+              "minimum": 1,
+              "title": "Revision Number",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "actor",
+            "required": false,
+            "schema": {
+              "default": "manual",
+              "title": "Actor",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Submit Work Package For Review Work Packages  Work Package Id  Submit For Review Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Submit Work Package For Review"
+      }
+    },
+    "/work-packages/{work_package_id}/summary": {
+      "get": {
+        "operationId": "work_package_summary_work_packages__work_package_id__summary_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_package_id",
+            "required": true,
+            "schema": {
+              "title": "Work Package Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Work Package Summary Work Packages  Work Package Id  Summary Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Work Package Summary"
       }
     }
   }

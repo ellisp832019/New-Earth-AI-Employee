@@ -23,6 +23,7 @@ class _GaiaShellState extends State<GaiaShell> {
   static const _destinations = <_Destination>[
     _Destination('Home', Icons.home_outlined, Icons.home),
     _Destination('Projects', Icons.folder_outlined, Icons.folder),
+    _Destination('Project Officer', Icons.cases_outlined, Icons.cases),
     _Destination('Ask GAIA', Icons.chat_bubble_outline, Icons.chat_bubble),
     _Destination('Evidence', Icons.fact_check_outlined, Icons.fact_check),
     _Destination('Snapshots', Icons.camera_alt_outlined, Icons.camera_alt),
@@ -34,8 +35,16 @@ class _GaiaShellState extends State<GaiaShell> {
     _Destination('Permissions', Icons.shield_outlined, Icons.shield),
     _Destination('Action Centre', Icons.play_circle_outline, Icons.play_circle),
     _Destination('Receipts', Icons.receipt_long_outlined, Icons.receipt_long),
-    _Destination('Trust Centre', Icons.verified_user_outlined, Icons.verified_user),
-    _Destination('Embedded Workspace', Icons.view_column_outlined, Icons.view_column),
+    _Destination(
+      'Trust Centre',
+      Icons.verified_user_outlined,
+      Icons.verified_user,
+    ),
+    _Destination(
+      'Embedded Workspace',
+      Icons.view_column_outlined,
+      Icons.view_column,
+    ),
     _Destination('Integration', Icons.cable_outlined, Icons.cable),
     _Destination('Daily Brief', Icons.event_note_outlined, Icons.event_note),
     _Destination('VS Code Ops', Icons.code_outlined, Icons.code),
@@ -60,6 +69,7 @@ class _GaiaShellState extends State<GaiaShell> {
       children: [
         HomeScreen(controller: controller),
         ProjectsScreen(controller: controller),
+        ProjectOfficerWorkspaceScreen(controller: controller),
         AskScreen(controller: controller),
         EvidenceScreen(controller: controller),
         SnapshotsScreen(controller: controller),
@@ -97,13 +107,17 @@ class _GaiaShellState extends State<GaiaShell> {
               children: [
                 NavigationRail(
                   selectedIndex: selectedIndex,
-                  onDestinationSelected: (index) => setState(() => selectedIndex = index),
+                  onDestinationSelected: (index) =>
+                      setState(() => selectedIndex = index),
                   labelType: NavigationRailLabelType.all,
                   leading: Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Column(
                       children: [
-                        Text('GAIA', style: Theme.of(context).textTheme.headlineSmall),
+                        Text(
+                          'GAIA',
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
                         const SizedBox(height: 8),
                         Text(
                           controller.backendStatusLabel,
@@ -147,7 +161,9 @@ class _GlobalStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectedProject = controller.selectedProject;
-    final hasOllama = controller.models.any((model) => model.provider == 'ollama' && model.available);
+    final hasOllama = controller.models.any(
+      (model) => model.provider == 'ollama' && model.available,
+    );
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -155,19 +171,19 @@ class _GlobalStatus extends StatelessWidget {
       children: [
         StatusChip(
           label: controller.backendStatusLabel,
-          color: controller.backendState == BackendConnectionState.connected ? Colors.green : Colors.orange,
-          icon: controller.backendState == BackendConnectionState.connected ? Icons.check_circle : Icons.cloud_off,
+          color: controller.backendState == BackendConnectionState.connected
+              ? Colors.green
+              : Colors.orange,
+          icon: controller.backendState == BackendConnectionState.connected
+              ? Icons.check_circle
+              : Icons.cloud_off,
         ),
         StatusChip(
           label: controller.backendCompatibilityLabel,
           color: controller.backendCompatibilityColor,
           icon: Icons.verified_outlined,
         ),
-        StatusChip(
-          label: 'Read-only',
-          color: Colors.blue,
-          icon: Icons.lock,
-        ),
+        StatusChip(label: 'Read-only', color: Colors.blue, icon: Icons.lock),
         const StatusChip(
           label: 'GAIA-owned output only',
           color: Colors.deepOrange,
@@ -207,8 +223,12 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final project = controller.selectedProject;
-    final snapshot = controller.snapshots.isNotEmpty ? controller.snapshots.first : null;
-    final latestRun = controller.agentRuns.isNotEmpty ? controller.agentRuns.first : null;
+    final snapshot = controller.snapshots.isNotEmpty
+        ? controller.snapshots.first
+        : null;
+    final latestRun = controller.agentRuns.isNotEmpty
+        ? controller.agentRuns.first
+        : null;
     final latestReport = controller.reports[project?.projectId ?? ''];
     return _ScreenScaffold(
       title: 'Home',
@@ -223,11 +243,24 @@ class HomeScreen extends StatelessWidget {
                 'GAIA Status',
                 controller.health?.status ?? controller.backendStatusLabel,
                 controller.backendState == BackendConnectionState.connected &&
-                    controller.backendCompatibilityState == BackendCompatibilityState.compatible,
+                    controller.backendCompatibilityState ==
+                        BackendCompatibilityState.compatible,
               ),
-              _statusCard('Projects', '${controller.projects.length}', controller.projects.isNotEmpty),
-              _statusCard('Selected Project', project?.name ?? 'None selected', project != null),
-              _statusCard('Working Tree', snapshot?.git.isClean == true ? 'Clean' : 'Changed', snapshot?.git.isClean == true),
+              _statusCard(
+                'Projects',
+                '${controller.projects.length}',
+                controller.projects.isNotEmpty,
+              ),
+              _statusCard(
+                'Selected Project',
+                project?.name ?? 'None selected',
+                project != null,
+              ),
+              _statusCard(
+                'Working Tree',
+                snapshot?.git.isClean == true ? 'Clean' : 'Changed',
+                snapshot?.git.isClean == true,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -236,12 +269,23 @@ class HomeScreen extends StatelessWidget {
               Expanded(
                 child: SectionCard(
                   title: 'Backend Health',
-                  subtitle: controller.health?.version ?? controller.lastError ?? 'Not connected',
+                  subtitle:
+                      controller.health?.version ??
+                      controller.lastError ??
+                      'Not connected',
                   trailing: _quickActionButtons(context, controller),
                   child: _keyValueGrid([
                     ('Database', controller.health?.databasePath ?? 'Unknown'),
-                    ('FTS5', controller.health?.fts5Available == true ? 'Available' : 'Unavailable'),
-                    ('Port', Uri.parse(controller.settings.backendUrl).port.toString()),
+                    (
+                      'FTS5',
+                      controller.health?.fts5Available == true
+                          ? 'Available'
+                          : 'Unavailable',
+                    ),
+                    (
+                      'Port',
+                      Uri.parse(controller.settings.backendUrl).port.toString(),
+                    ),
                     ('Logs', '${controller.backendLogs.length} lines'),
                   ]),
                 ),
@@ -255,7 +299,10 @@ class HomeScreen extends StatelessWidget {
                     ('Branch', snapshot?.git.branch ?? 'Unknown'),
                     ('Commit', snapshot?.git.commitSha ?? 'Unknown'),
                     ('Documents', snapshot?.documentCount.toString() ?? '0'),
-                    ('Warnings', snapshot?.scanWarnings.length.toString() ?? '0'),
+                    (
+                      'Warnings',
+                      snapshot?.scanWarnings.length.toString() ?? '0',
+                    ),
                   ]),
                 ),
               ),
@@ -294,7 +341,10 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _quickActionButtons(BuildContext context, GaiaAppController controller) {
+  Widget _quickActionButtons(
+    BuildContext context,
+    GaiaAppController controller,
+  ) {
     final project = controller.selectedProject;
     if (project == null) {
       return const SizedBox.shrink();
@@ -303,25 +353,30 @@ class HomeScreen extends StatelessWidget {
       spacing: 8,
       children: [
         FilledButton(
-          onPressed: controller.busy ? null : () => controller.runScan(project.projectId),
+          onPressed: controller.busy
+              ? null
+              : () => controller.runScan(project.projectId),
           child: const Text('Scan'),
         ),
         FilledButton.tonal(
-          onPressed: controller.busy ? null : () => controller.createSnapshot(project.projectId),
+          onPressed: controller.busy
+              ? null
+              : () => controller.createSnapshot(project.projectId),
           child: const Text('Snapshot'),
         ),
         OutlinedButton(
           onPressed: controller.busy
               ? null
               : () => controller.askGaia(
-                    projectId: project.projectId,
-                    question: 'What was completed most recently?',
-                    provider: controller.settings.preferredProvider,
-                    modelName: controller.settings.preferredModelName,
-                    evidenceLimit: controller.settings.defaultEvidenceLimit,
-                    deterministicOnly: controller.settings.deterministicOnlyDefault,
-                    refreshSnapshot: false,
-                  ),
+                  projectId: project.projectId,
+                  question: 'What was completed most recently?',
+                  provider: controller.settings.preferredProvider,
+                  modelName: controller.settings.preferredModelName,
+                  evidenceLimit: controller.settings.defaultEvidenceLimit,
+                  deterministicOnly:
+                      controller.settings.deterministicOnlyDefault,
+                  refreshSnapshot: false,
+                ),
           child: const Text('Ask'),
         ),
       ],
@@ -332,7 +387,8 @@ class HomeScreen extends StatelessWidget {
     final warnings = <String>[
       ...controller.backendLogs.takeLast(3),
       if (controller.lastError != null) controller.lastError!,
-      if (controller.backendCompatibilityState == BackendCompatibilityState.incompatible)
+      if (controller.backendCompatibilityState ==
+          BackendCompatibilityState.incompatible)
         'Backend version ${controller.health?.version ?? 'unknown'} is incompatible with the v0.5 desktop client.',
     ].where((item) => item.trim().isNotEmpty).toList();
     if (warnings.isEmpty) {
@@ -340,7 +396,11 @@ class HomeScreen extends StatelessWidget {
     }
     return Column(
       children: [
-        for (final warning in warnings) ListTile(leading: const Icon(Icons.warning_amber), title: Text(warning)),
+        for (final warning in warnings)
+          ListTile(
+            leading: const Icon(Icons.warning_amber),
+            title: Text(warning),
+          ),
       ],
     );
   }
@@ -390,12 +450,18 @@ class ProjectsScreen extends StatelessWidget {
                   for (final project in controller.projects)
                     Card(
                       child: ListTile(
-                        selected: project.projectId == controller.selectedProjectId,
-                        onTap: () => controller.selectProject(project.projectId),
+                        selected:
+                            project.projectId == controller.selectedProjectId,
+                        onTap: () =>
+                            controller.selectProject(project.projectId),
                         title: Text(project.name),
-                        subtitle: Text('${project.projectId} • ${project.access} • ${controller.maskPath(project.root)}'),
+                        subtitle: Text(
+                          '${project.projectId} • ${project.access} • ${controller.maskPath(project.root)}',
+                        ),
                         trailing: project.projectId == 'microgrow-v1'
-                            ? const Chip(label: Text('READ-ONLY EXTERNAL PROJECT'))
+                            ? const Chip(
+                                label: Text('READ-ONLY EXTERNAL PROJECT'),
+                              )
                             : null,
                       ),
                     ),
@@ -418,6 +484,932 @@ class ProjectsScreen extends StatelessWidget {
   }
 }
 
+class ProjectOfficerWorkspaceScreen extends StatefulWidget {
+  const ProjectOfficerWorkspaceScreen({super.key, required this.controller});
+
+  final GaiaAppController controller;
+
+  @override
+  State<ProjectOfficerWorkspaceScreen> createState() =>
+      _ProjectOfficerWorkspaceScreenState();
+}
+
+class _ProjectOfficerWorkspaceScreenState
+    extends State<ProjectOfficerWorkspaceScreen> {
+  String changeSeverityFilter = 'all';
+  String changeDirectionFilter = 'all';
+  String changeTypeFilter = 'all';
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = widget.controller;
+    final selectedProject = controller.selectedProject;
+    final selectedRecommendation = controller.selectedRecommendation;
+    final selectedWorkPackage = controller.selectedWorkPackage;
+    final selectedProjectId =
+        selectedProject?.projectId ?? controller.selectedProjectId;
+    return _ScreenScaffold(
+      title: 'Project Officer Workspace',
+      subtitle:
+          'B1-B4 planning control centre for review, traceability and handoff preparation',
+      child: ListView(
+        children: [
+          SectionCard(
+            title: 'Planning Portfolio',
+            subtitle:
+                'Health, change intelligence, recommendations and work packages',
+            trailing: Wrap(
+              spacing: 8,
+              children: [
+                FilledButton(
+                  onPressed: controller.busy || selectedProjectId == null
+                      ? null
+                      : () => controller.refreshPlanningWorkspaceForProject(
+                          selectedProjectId,
+                        ),
+                  child: const Text('Refresh planning data'),
+                ),
+                OutlinedButton(
+                  onPressed: controller.busy || selectedProjectId == null
+                      ? null
+                      : () =>
+                            controller.captureProjectHealth(selectedProjectId),
+                  child: const Text('Capture health'),
+                ),
+                OutlinedButton(
+                  onPressed: controller.busy || selectedProjectId == null
+                      ? null
+                      : () => controller.generateRecommendations(
+                          selectedProjectId,
+                        ),
+                  child: const Text('Generate recommendations'),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _keyValueGrid([
+                  (
+                    'Health projects',
+                    _portfolioCount(controller.healthPortfolio, 'projects'),
+                  ),
+                  (
+                    'Change projects',
+                    _portfolioCount(controller.changePortfolio, 'projects'),
+                  ),
+                  (
+                    'Recommendation queue',
+                    _portfolioCount(
+                      controller.recommendationPortfolio,
+                      'recommendation_queue',
+                    ),
+                  ),
+                  ('Work packages', controller.workPackages.length.toString()),
+                ]),
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final project in controller.projects)
+                      ActionChip(
+                        label: Text(
+                          '${project.name} | ${_portfolioProjectState(controller.healthPortfolio, project.projectId)} | ${_portfolioProjectPriority(controller.recommendationPortfolio, project.projectId)}',
+                        ),
+                        onPressed: () {
+                          controller.selectProject(project.projectId);
+                          unawaited(
+                            controller.refreshPlanningWorkspaceForProject(
+                              project.projectId,
+                            ),
+                          );
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Selected Project',
+            subtitle: selectedProject?.name ?? 'No project selected',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (selectedProject == null)
+                  const Text('Select a project to review its planning state.')
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _keyValueGrid([
+                        ('Project ID', selectedProject.projectId),
+                        ('Access', selectedProject.access),
+                        (
+                          'Health snapshots',
+                          controller.projectHealthSnapshots.length.toString(),
+                        ),
+                        (
+                          'Change findings',
+                          controller.projectChangeFindings.length.toString(),
+                        ),
+                        (
+                          'Recommendations',
+                          controller.projectRecommendations.length.toString(),
+                        ),
+                        (
+                          'Work packages',
+                          controller.workPackages.length.toString(),
+                        ),
+                      ]),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.tonal(
+                            onPressed: controller.busy
+                                ? null
+                                : () => controller
+                                      .refreshPlanningWorkspaceForProject(
+                                        selectedProject.projectId,
+                                      ),
+                            child: const Text('Refresh project view'),
+                          ),
+                          OutlinedButton(
+                            onPressed: controller.busy
+                                ? null
+                                : () => controller.captureProjectHealth(
+                                    selectedProject.projectId,
+                                  ),
+                            child: const Text('Capture new health snapshot'),
+                          ),
+                          OutlinedButton(
+                            onPressed: controller.busy
+                                ? null
+                                : () => controller.generateRecommendations(
+                                    selectedProject.projectId,
+                                  ),
+                            child: const Text('Regenerate recommendations'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Project Health',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: selectedProject == null
+                ? const Text('No project selected.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _keyValueGrid([
+                        (
+                          'Latest status',
+                          _mapString(
+                            controller.healthPortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'normalized_status',
+                          ),
+                        ),
+                        (
+                          'Latest snapshot',
+                          _mapString(
+                            controller.healthPortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'latest_snapshot_id',
+                          ),
+                        ),
+                        (
+                          'Freshness',
+                          _mapString(
+                            controller.healthPortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'evidence_freshness',
+                          ),
+                        ),
+                        (
+                          'Reason codes',
+                          _mapList(
+                            controller.healthPortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'reason_codes',
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Latest health snapshots',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      for (final snapshot
+                          in controller.projectHealthSnapshots.take(3))
+                        Card(
+                          child: ListTile(
+                            title: Text(
+                              snapshot['snapshot_id']?.toString() ?? 'Snapshot',
+                            ),
+                            subtitle: Text(
+                              '${snapshot['normalized_status'] ?? 'unknown'} | ${snapshot['capture_timestamp'] ?? ''}',
+                            ),
+                            trailing: Text(
+                              _shortFingerprint(
+                                snapshot['content_fingerprint'],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Change Intelligence',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: selectedProject == null
+                ? const Text('No project selected.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: [
+                          _filterBox(
+                            label: 'Severity',
+                            value: changeSeverityFilter,
+                            values: const [
+                              'all',
+                              'info',
+                              'low',
+                              'medium',
+                              'high',
+                              'critical',
+                            ],
+                            onChanged: (value) => setState(
+                              () => changeSeverityFilter = value ?? 'all',
+                            ),
+                          ),
+                          _filterBox(
+                            label: 'Direction',
+                            value: changeDirectionFilter,
+                            values: const [
+                              'all',
+                              'improved',
+                              'degraded',
+                              'changed',
+                              'unchanged',
+                              'unknown',
+                            ],
+                            onChanged: (value) => setState(
+                              () => changeDirectionFilter = value ?? 'all',
+                            ),
+                          ),
+                          _filterBox(
+                            label: 'Type',
+                            value: changeTypeFilter,
+                            values: <String>[
+                              'all',
+                              ...{
+                                for (final finding
+                                    in controller.projectChangeFindings)
+                                  finding['change_class']?.toString() ??
+                                      'unknown',
+                              },
+                            ],
+                            onChanged: (value) => setState(
+                              () => changeTypeFilter = value ?? 'all',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _keyValueGrid([
+                        (
+                          'Latest comparison',
+                          _mapString(
+                            controller.changePortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'latest_comparison_id',
+                          ),
+                        ),
+                        (
+                          'Latest change',
+                          _mapString(
+                            controller.changePortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'latest_meaningful_change_timestamp',
+                          ),
+                        ),
+                        (
+                          'Stale evidence',
+                          _mapBool(
+                            controller.changePortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'stale_evidence',
+                          ),
+                        ),
+                        (
+                          'Severity counts',
+                          _mapNested(
+                            controller.changePortfolio,
+                            'projects',
+                            selectedProject.projectId,
+                            'counts_by_severity',
+                          ),
+                        ),
+                      ]),
+                      const SizedBox(height: 12),
+                      Text(
+                        'Recent findings',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      for (final finding in _filteredChangeFindings(
+                        controller.projectChangeFindings,
+                      ).take(5))
+                        Card(
+                          child: ListTile(
+                            title: Text(
+                              finding['change_class']?.toString() ?? 'Change',
+                            ),
+                            subtitle: Text(_changeFindingSubtitle(finding)),
+                            trailing: Text(
+                              '${finding['severity'] ?? 'info'} | ${finding['direction'] ?? 'unknown'}',
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Recommendations',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (controller.projectRecommendations.isEmpty)
+                  const Text('No recommendations available yet.')
+                else
+                  for (final recommendation
+                      in controller.projectRecommendations)
+                    Card(
+                      child: ListTile(
+                        selected:
+                            recommendation['recommendation_id'] ==
+                            controller.selectedRecommendationId,
+                        onTap: () => controller.selectRecommendation(
+                          recommendation['recommendation_id']?.toString(),
+                        ),
+                        title: Text(
+                          recommendation['title']?.toString() ??
+                              'Recommendation',
+                        ),
+                        subtitle: Text(
+                          '${recommendation['recommendation_type'] ?? ''} | ${recommendation['priority_tier'] ?? ''} | ${recommendation['lifecycle_state'] ?? ''}',
+                        ),
+                        trailing: FilledButton.tonal(
+                          onPressed: controller.busy
+                              ? null
+                              : () async {
+                                  final recommendationId =
+                                      recommendation['recommendation_id']
+                                          ?.toString();
+                                  if (recommendationId == null ||
+                                      recommendationId.isEmpty) {
+                                    return;
+                                  }
+                                  await controller.generateWorkPackage(
+                                    recommendationId,
+                                  );
+                                  controller.selectRecommendation(
+                                    recommendationId,
+                                  );
+                                  await controller
+                                      .refreshPlanningWorkspaceForProject(
+                                        selectedProjectId ??
+                                            recommendation['project_id']
+                                                ?.toString() ??
+                                            '',
+                                      );
+                                },
+                          child: const Text('Build package'),
+                        ),
+                      ),
+                    ),
+                const SizedBox(height: 12),
+                if (selectedRecommendation != null) ...[
+                  Text(
+                    'Selected recommendation',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  _keyValueGrid([
+                    (
+                      'Recommendation ID',
+                      selectedRecommendation['recommendation_id']?.toString() ??
+                          '',
+                    ),
+                    (
+                      'Type',
+                      selectedRecommendation['recommendation_type']
+                              ?.toString() ??
+                          '',
+                    ),
+                    (
+                      'Priority',
+                      selectedRecommendation['priority_tier']?.toString() ?? '',
+                    ),
+                    (
+                      'State',
+                      selectedRecommendation['lifecycle_state']?.toString() ??
+                          '',
+                    ),
+                    (
+                      'Score',
+                      selectedRecommendation['deterministic_score']
+                              ?.toString() ??
+                          '',
+                    ),
+                    (
+                      'Evidence freshness',
+                      selectedRecommendation['evidence_freshness']
+                              ?.toString() ??
+                          '',
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(selectedRecommendation['rationale']?.toString() ?? ''),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Work Packages',
+            subtitle: selectedProject?.projectId ?? 'No project selected',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (controller.workPackages.isEmpty)
+                  const Text(
+                    'Generate a work package from a recommendation to begin review.',
+                  )
+                else
+                  for (final workPackage in controller.workPackages)
+                    Card(
+                      child: ListTile(
+                        selected:
+                            workPackage['work_package_id'] ==
+                            controller.selectedWorkPackageId,
+                        onTap: () => controller.selectWorkPackage(
+                          workPackage['work_package_id']?.toString(),
+                        ),
+                        title: Text(
+                          workPackage['title']?.toString() ?? 'Work package',
+                        ),
+                        subtitle: Text(
+                          '${workPackage['approval_state'] ?? ''} | ${workPackage['staleness_state'] ?? ''} | rev ${workPackage['current_revision_number'] ?? ''}',
+                        ),
+                        trailing: Text(
+                          workPackage['gate_state']?.toString() ?? '',
+                        ),
+                      ),
+                    ),
+                const SizedBox(height: 12),
+                if (selectedWorkPackage != null)
+                  _WorkPackageDetail(
+                    controller: controller,
+                    workPackage: selectedWorkPackage,
+                    summary: controller.selectedWorkPackageSummary,
+                    revisions: controller.selectedWorkPackageRevisions,
+                    decisions: controller.selectedWorkPackageApprovalDecisions,
+                    handoffs: controller.selectedWorkPackageHandoffs,
+                    outcomes: controller.selectedWorkPackageOutcomes,
+                  )
+                else
+                  const Text(
+                    'Select a work package to inspect revision history, prompt text, and handoff evidence.',
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          SectionCard(
+            title: 'Evidence and Provenance',
+            subtitle:
+                selectedWorkPackage?['work_package_id']?.toString() ??
+                'No work package selected',
+            child: selectedWorkPackage == null
+                ? const Text('Select a work package to inspect provenance.')
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _keyValueGrid([
+                        (
+                          'Provenance',
+                          selectedWorkPackage['provenance_reference']
+                                  ?.toString() ??
+                              'None',
+                        ),
+                        (
+                          'Audit reference',
+                          selectedWorkPackage['audit_reference']?.toString() ??
+                              'None',
+                        ),
+                        (
+                          'Prompt fingerprint',
+                          selectedWorkPackage['prompt_content_fingerprint']
+                                  ?.toString() ??
+                              '',
+                        ),
+                        (
+                          'Approval target',
+                          selectedWorkPackage['approval_target_fingerprint']
+                                  ?.toString() ??
+                              '',
+                        ),
+                        (
+                          'Source snapshots',
+                          _joinList(
+                            selectedWorkPackage['source_health_snapshot_ids'],
+                          ),
+                        ),
+                        (
+                          'Source evidence',
+                          _joinList(selectedWorkPackage['source_finding_ids']),
+                        ),
+                      ]),
+                      const SizedBox(height: 12),
+                      SelectableText(
+                        encodeJsonPretty({
+                          'evidence_references':
+                              selectedWorkPackage['evidence_references'],
+                          'security_boundaries':
+                              selectedWorkPackage['security_boundaries'],
+                          'prohibited_operations':
+                              selectedWorkPackage['prohibited_operations'],
+                          'required_approvals':
+                              selectedWorkPackage['required_approvals'],
+                        }),
+                      ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<Map<String, dynamic>> _filteredChangeFindings(
+    List<Map<String, dynamic>> findings,
+  ) {
+    return findings.where((finding) {
+      final severity = finding['severity']?.toString() ?? 'info';
+      final direction = finding['direction']?.toString() ?? 'unknown';
+      final type = finding['change_class']?.toString() ?? 'unknown';
+      final severityMatches =
+          changeSeverityFilter == 'all' || changeSeverityFilter == severity;
+      final directionMatches =
+          changeDirectionFilter == 'all' || changeDirectionFilter == direction;
+      final typeMatches = changeTypeFilter == 'all' || changeTypeFilter == type;
+      return severityMatches && directionMatches && typeMatches;
+    }).toList();
+  }
+
+  String _changeFindingSubtitle(Map<String, dynamic> finding) {
+    final parts = <String>[
+      finding['explanation']?.toString() ?? '',
+      _joinList(finding['reason_codes']),
+      'Freshness: ${finding['freshness']?.toString() ?? 'unknown'}',
+    ].where((item) => item.trim().isNotEmpty).toList();
+    return parts.join('\n');
+  }
+}
+
+class _WorkPackageDetail extends StatelessWidget {
+  const _WorkPackageDetail({
+    required this.controller,
+    required this.workPackage,
+    required this.summary,
+    required this.revisions,
+    required this.decisions,
+    required this.handoffs,
+    required this.outcomes,
+  });
+
+  final GaiaAppController controller;
+  final Map<String, dynamic> workPackage;
+  final Map<String, dynamic>? summary;
+  final List<Map<String, dynamic>> revisions;
+  final List<Map<String, dynamic>> decisions;
+  final List<Map<String, dynamic>> handoffs;
+  final List<Map<String, dynamic>> outcomes;
+
+  @override
+  Widget build(BuildContext context) {
+    final revisionNumber =
+        (workPackage['current_revision_number'] as num?)?.toInt() ?? 1;
+    final approvalState = workPackage['approval_state']?.toString() ?? '';
+    final stalenessState = workPackage['staleness_state']?.toString() ?? '';
+    final projectId = workPackage['project_id']?.toString() ?? '';
+    final risk = workPackage['risk_classification']?.toString() ?? '';
+    final evidenceFreshness =
+        workPackage['evidence_freshness']?.toString() ?? '';
+    final promptFingerprint =
+        workPackage['prompt_content_fingerprint']?.toString() ?? '';
+    final promptTemplateVersion =
+        workPackage['prompt_template_version']?.toString() ?? '';
+    final prompt =
+        workPackage['generated_codex_prompt']?.toString() ??
+        summary?['generated_codex_prompt']?.toString() ??
+        '';
+    final canSubmit = approvalState == 'proposed';
+    final canReview =
+        approvalState == 'proposed' || approvalState == 'under_review';
+    final canApprove =
+        approvalState == 'under_review' && stalenessState == 'fresh';
+    final canReject =
+        approvalState == 'under_review' && stalenessState == 'fresh';
+    final canHandoff = approvalState == 'approved' && stalenessState == 'fresh';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _keyValueGrid([
+          ('Work package ID', workPackage['work_package_id']?.toString() ?? ''),
+          ('Revision', revisionNumber.toString()),
+          ('Approval state', approvalState),
+          ('Gate state', workPackage['gate_state']?.toString() ?? ''),
+          ('Staleness', stalenessState),
+          ('Expiry', workPackage['expiry_timestamp']?.toString() ?? 'None'),
+          ('Risk', risk),
+          ('Evidence freshness', evidenceFreshness),
+          ('Prompt template version', promptTemplateVersion),
+          ('Prompt fingerprint', promptFingerprint),
+          (
+            'Current revision ID',
+            workPackage['current_revision_id']?.toString() ?? '',
+          ),
+        ]),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            FilledButton(
+              onPressed: controller.busy || !canSubmit
+                  ? null
+                  : () => controller.submitWorkPackageForReview(
+                      workPackage['work_package_id']?.toString() ?? '',
+                      revisionNumber,
+                      actor: 'manual',
+                    ),
+              child: const Text('Submit for review'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy || !canApprove
+                  ? null
+                  : () => _confirmLifecycleAction(
+                      context,
+                      title: 'Approve work package',
+                      actionLabel: 'Approve',
+                      workPackage: workPackage,
+                      revisionNumber: revisionNumber,
+                      projectId: projectId,
+                      risk: risk,
+                      evidenceFreshness: evidenceFreshness,
+                      promptFingerprint: promptFingerprint,
+                      stalenessState: stalenessState,
+                      onConfirm: () => controller.approveWorkPackage(
+                        workPackage['work_package_id']?.toString() ?? '',
+                        revisionNumber,
+                        actor: 'manual',
+                        humanNote: 'Approved in Project Officer Workspace',
+                      ),
+                    ),
+              child: const Text('Approve'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy || !canReject
+                  ? null
+                  : () => _confirmLifecycleAction(
+                      context,
+                      title: 'Reject work package',
+                      actionLabel: 'Reject',
+                      workPackage: workPackage,
+                      revisionNumber: revisionNumber,
+                      projectId: projectId,
+                      risk: risk,
+                      evidenceFreshness: evidenceFreshness,
+                      promptFingerprint: promptFingerprint,
+                      stalenessState: stalenessState,
+                      onConfirm: () => controller.rejectWorkPackage(
+                        workPackage['work_package_id']?.toString() ?? '',
+                        revisionNumber,
+                        actor: 'manual',
+                        humanNote: 'Rejected in Project Officer Workspace',
+                      ),
+                    ),
+              child: const Text('Reject'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy || !canHandoff
+                  ? null
+                  : () => _confirmLifecycleAction(
+                      context,
+                      title: 'Record handoff',
+                      actionLabel: 'Record handoff',
+                      workPackage: workPackage,
+                      revisionNumber: revisionNumber,
+                      projectId: projectId,
+                      risk: risk,
+                      evidenceFreshness: evidenceFreshness,
+                      promptFingerprint: promptFingerprint,
+                      stalenessState: stalenessState,
+                      onConfirm: () => controller.handoffWorkPackage(
+                        workPackage['work_package_id']?.toString() ?? '',
+                        revisionNumber,
+                        approvedBy: 'manual',
+                      ),
+                    ),
+              child: const Text('Handoff'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.detectWorkPackageStaleness(
+                      workPackage['work_package_id']?.toString() ?? '',
+                    ),
+              child: const Text('Detect staleness'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy
+                  ? null
+                  : () => controller.expireWorkPackage(
+                      workPackage['work_package_id']?.toString() ?? '',
+                      reason: 'manual expiry',
+                    ),
+              child: const Text('Expire'),
+            ),
+            OutlinedButton(
+              onPressed: controller.busy || !canReview
+                  ? null
+                  : () => controller.reviseWorkPackage(
+                      workPackage['work_package_id']?.toString() ?? '',
+                      changeReason: 'Workspace revision',
+                      fieldUpdates: const <String, dynamic>{},
+                      actor: 'manual',
+                    ),
+              child: const Text('Revise'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Generated prompt',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 8),
+        const Text('DO NOT EXECUTE AUTOMATICALLY. HUMAN REVIEW REQUIRED.'),
+        const SizedBox(height: 8),
+        SelectableText(prompt.isEmpty ? 'No prompt available.' : prompt),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [CopyButton(text: prompt, label: 'Copy Prompt')],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Revision history',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        for (final revision in revisions)
+          Card(
+            child: ListTile(
+              title: Text(
+                'Revision ${revision['revision_number']?.toString() ?? ''}',
+              ),
+              subtitle: Text(revision['change_reason']?.toString() ?? ''),
+              trailing: Text(
+                revision['approval_state_at_creation']?.toString() ?? '',
+              ),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Text(
+          'Approval decisions',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        for (final decision in decisions)
+          Card(
+            child: ListTile(
+              title: Text(decision['decision']?.toString() ?? ''),
+              subtitle: Text(decision['human_note']?.toString() ?? ''),
+              trailing: Text(decision['actor']?.toString() ?? ''),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Text('Handoffs', style: Theme.of(context).textTheme.titleMedium),
+        for (final handoff in handoffs)
+          Card(
+            child: ListTile(
+              title: Text(handoff['approved_by']?.toString() ?? ''),
+              subtitle: Text(handoff['next_manual_action']?.toString() ?? ''),
+              trailing: Text(handoff['handoff_id']?.toString() ?? ''),
+            ),
+          ),
+        const SizedBox(height: 12),
+        Text('Outcomes', style: Theme.of(context).textTheme.titleMedium),
+        for (final outcome in outcomes)
+          Card(
+            child: ListTile(
+              title: Text(outcome['outcome']?.toString() ?? ''),
+              subtitle: Text(outcome['note']?.toString() ?? ''),
+              trailing: Text(outcome['actor']?.toString() ?? ''),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _confirmLifecycleAction(
+    BuildContext context, {
+    required String title,
+    required String actionLabel,
+    required Map<String, dynamic> workPackage,
+    required int revisionNumber,
+    required String projectId,
+    required String risk,
+    required String evidenceFreshness,
+    required String promptFingerprint,
+    required String stalenessState,
+    required Future<void> Function() onConfirm,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: 560,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _keyValueGrid([
+                  (
+                    'Work package ID',
+                    workPackage['work_package_id']?.toString() ?? '',
+                  ),
+                  ('Revision', revisionNumber.toString()),
+                  ('Project', projectId),
+                  ('Risk', risk),
+                  ('Evidence freshness', evidenceFreshness),
+                  ('Prompt fingerprint', promptFingerprint),
+                  ('Staleness', stalenessState),
+                ]),
+                const SizedBox(height: 12),
+                const Text(
+                  'This confirms the exact revision only. It does not execute the work package.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(actionLabel),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed == true) {
+      await onConfirm();
+    }
+  }
+}
+
 class _ProjectDetailView extends StatelessWidget {
   const _ProjectDetailView({required this.controller});
 
@@ -426,8 +1418,13 @@ class _ProjectDetailView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final project = controller.selectedProject;
-    final snapshot = controller.snapshots.where((item) => item.projectId == project?.projectId).isNotEmpty
-        ? controller.snapshots.firstWhere((item) => item.projectId == project?.projectId)
+    final snapshot =
+        controller.snapshots
+            .where((item) => item.projectId == project?.projectId)
+            .isNotEmpty
+        ? controller.snapshots.firstWhere(
+            (item) => item.projectId == project?.projectId,
+          )
         : null;
     if (project == null) {
       return const Text('Select a project to see detail.');
@@ -479,7 +1476,9 @@ class AskScreen extends StatefulWidget {
 }
 
 class _AskScreenState extends State<AskScreen> {
-  final TextEditingController questionController = TextEditingController(text: 'Where exactly is MicroGrow currently?');
+  final TextEditingController questionController = TextEditingController(
+    text: 'Where exactly is MicroGrow currently?',
+  );
   String provider = 'mock';
   String modelName = '';
   bool deterministicOnly = true;
@@ -544,9 +1543,14 @@ class _AskScreenState extends State<AskScreen> {
                   key: ValueKey(selectedProject?.projectId),
                   initialValue: selectedProject?.projectId,
                   items: [
-                    for (final project in controller.projects) DropdownMenuItem(value: project.projectId, child: Text(project.name)),
+                    for (final project in controller.projects)
+                      DropdownMenuItem(
+                        value: project.projectId,
+                        child: Text(project.name),
+                      ),
                   ],
-                  onChanged: (value) => setState(() => controller.selectProject(value)),
+                  onChanged: (value) =>
+                      setState(() => controller.selectProject(value)),
                   decoration: const InputDecoration(labelText: 'Project'),
                 ),
                 const SizedBox(height: 12),
@@ -570,11 +1574,20 @@ class _AskScreenState extends State<AskScreen> {
                         key: ValueKey(provider),
                         initialValue: provider,
                         items: const [
-                          DropdownMenuItem(value: 'mock', child: Text('Mock (deterministic)')),
-                          DropdownMenuItem(value: 'ollama', child: Text('Ollama (local)')),
+                          DropdownMenuItem(
+                            value: 'mock',
+                            child: Text('Mock (deterministic)'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'ollama',
+                            child: Text('Ollama (local)'),
+                          ),
                         ],
-                        onChanged: (value) => setState(() => provider = value ?? 'mock'),
-                        decoration: const InputDecoration(labelText: 'Provider'),
+                        onChanged: (value) =>
+                            setState(() => provider = value ?? 'mock'),
+                        decoration: const InputDecoration(
+                          labelText: 'Provider',
+                        ),
                       ),
                     ),
                     SizedBox(
@@ -582,15 +1595,20 @@ class _AskScreenState extends State<AskScreen> {
                       child: TextField(
                         onChanged: (value) => modelName = value,
                         controller: TextEditingController(text: modelName),
-                        decoration: const InputDecoration(labelText: 'Model name'),
+                        decoration: const InputDecoration(
+                          labelText: 'Model name',
+                        ),
                       ),
                     ),
                     SizedBox(
                       width: 180,
                       child: TextField(
                         keyboardType: TextInputType.number,
-                        onChanged: (value) => evidenceLimit = int.tryParse(value) ?? evidenceLimit,
-                        decoration: const InputDecoration(labelText: 'Evidence limit'),
+                        onChanged: (value) => evidenceLimit =
+                            int.tryParse(value) ?? evidenceLimit,
+                        decoration: const InputDecoration(
+                          labelText: 'Evidence limit',
+                        ),
                       ),
                     ),
                   ],
@@ -602,12 +1620,14 @@ class _AskScreenState extends State<AskScreen> {
                     FilterChip(
                       label: const Text('Deterministic only'),
                       selected: deterministicOnly,
-                      onSelected: (value) => setState(() => deterministicOnly = value),
+                      onSelected: (value) =>
+                          setState(() => deterministicOnly = value),
                     ),
                     FilterChip(
                       label: const Text('Refresh snapshot'),
                       selected: refreshSnapshot,
-                      onSelected: (value) => setState(() => refreshSnapshot = value),
+                      onSelected: (value) =>
+                          setState(() => refreshSnapshot = value),
                     ),
                   ],
                 ),
@@ -619,7 +1639,9 @@ class _AskScreenState extends State<AskScreen> {
                     for (final suggestion in _suggestedQuestions)
                       ActionChip(
                         label: Text(suggestion),
-                        onPressed: () => setState(() => questionController.text = suggestion),
+                        onPressed: () => setState(
+                          () => questionController.text = suggestion,
+                        ),
                       ),
                   ],
                 ),
@@ -628,12 +1650,14 @@ class _AskScreenState extends State<AskScreen> {
           ),
           const SizedBox(height: 16),
           if (controller.busy) const LinearProgressIndicator(),
-          if (controller.statusMessage != null) Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(controller.statusMessage!),
-          ),
+          if (controller.statusMessage != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text(controller.statusMessage!),
+            ),
           const SizedBox(height: 16),
-          if (response != null) _AnswerPanel(response: response, controller: controller),
+          if (response != null)
+            _AnswerPanel(response: response, controller: controller),
         ],
       ),
     );
@@ -653,34 +1677,63 @@ class _AnswerPanel extends StatelessWidget {
       children: [
         SectionCard(
           title: 'Answer',
-          subtitle: 'Run ${response.runId} • Snapshot ${response.snapshotId ?? 'none'} • Confidence ${response.confidence}',
+          subtitle:
+              'Run ${response.runId} • Snapshot ${response.snapshotId ?? 'none'} • Confidence ${response.confidence}',
           trailing: Wrap(
             spacing: 8,
             children: [
               CopyButton(text: response.answer, label: 'Copy answer'),
-              if (isPromptDraft) CopyButton(text: response.answer, label: 'Copy prompt'),
+              if (isPromptDraft)
+                CopyButton(text: response.answer, label: 'Copy prompt'),
             ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _section('Verified current state', Text(_answerSectionText(response.answer, 'Facts:'))),
-              _section('Findings', Text(_answerSectionText(response.answer, 'Findings:'))),
+              _section(
+                'Verified current state',
+                Text(_answerSectionText(response.answer, 'Facts:')),
+              ),
+              _section(
+                'Findings',
+                Text(_answerSectionText(response.answer, 'Findings:')),
+              ),
               _section(
                 'Evidence',
                 Column(
                   children: [
                     for (final item in response.evidence)
-                      EvidenceCard(item: item, onCopy: (text) async => Clipboard.setData(ClipboardData(text: text))),
+                      EvidenceCard(
+                        item: item,
+                        onCopy: (text) async =>
+                            Clipboard.setData(ClipboardData(text: text)),
+                      ),
                   ],
                 ),
               ),
-              _section('Inference', Text(_answerSectionText(response.answer, 'Inference:'))),
-              _section('Recommendations', Text(_answerSectionText(response.answer, 'Recommendation:'))),
-              _section('Unknowns', Text(_answerSectionText(response.answer, 'Unknowns:'))),
-              _section('Warnings', response.warnings.isEmpty ? const Text('None') : _warningChips(response.warnings)),
+              _section(
+                'Inference',
+                Text(_answerSectionText(response.answer, 'Inference:')),
+              ),
+              _section(
+                'Recommendations',
+                Text(_answerSectionText(response.answer, 'Recommendation:')),
+              ),
+              _section(
+                'Unknowns',
+                Text(_answerSectionText(response.answer, 'Unknowns:')),
+              ),
+              _section(
+                'Warnings',
+                response.warnings.isEmpty
+                    ? const Text('None')
+                    : _warningChips(response.warnings),
+              ),
               if (response.promptInjectionWarnings.isNotEmpty)
-                _section('Prompt-injection warnings', _warningChips(response.promptInjectionWarnings)),
+                _section(
+                  'Prompt-injection warnings',
+                  _warningChips(response.promptInjectionWarnings),
+                ),
             ],
           ),
         ),
@@ -734,9 +1787,18 @@ class EvidenceScreen extends StatelessWidget {
           SectionCard(
             title: 'Current Evidence',
             child: controller.lastAskResponse == null
-                ? const Text('Ask GAIA to populate evidence, or inspect the selected project documents below.')
+                ? const Text(
+                    'Ask GAIA to populate evidence, or inspect the selected project documents below.',
+                  )
                 : Column(
-                    children: [for (final item in controller.lastAskResponse!.evidence) EvidenceCard(item: item, onCopy: (text) => Clipboard.setData(ClipboardData(text: text)))],
+                    children: [
+                      for (final item in controller.lastAskResponse!.evidence)
+                        EvidenceCard(
+                          item: item,
+                          onCopy: (text) =>
+                              Clipboard.setData(ClipboardData(text: text)),
+                        ),
+                    ],
                   ),
           ),
           const SizedBox(height: 16),
@@ -748,7 +1810,9 @@ class EvidenceScreen extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.description),
                     title: Text(doc.relativePath),
-                    subtitle: Text('${doc.extension} • ${doc.indexingStatus} • ${doc.sha256.substring(0, 12)}'),
+                    subtitle: Text(
+                      '${doc.extension} • ${doc.indexingStatus} • ${doc.sha256.substring(0, 12)}',
+                    ),
                   ),
               ],
             ),
@@ -813,7 +1877,9 @@ class ReportsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final project = controller.selectedProject;
-    final report = project == null ? null : controller.reports[project.projectId];
+    final report = project == null
+        ? null
+        : controller.reports[project.projectId];
     return _ScreenScaffold(
       title: 'Reports',
       subtitle: 'Foundation reports and safe local exports',
@@ -826,7 +1892,8 @@ class ReportsScreen extends StatelessWidget {
               children: [
                 if (project != null)
                   FilledButton(
-                    onPressed: () => controller.refreshReport(project.projectId),
+                    onPressed: () =>
+                        controller.refreshReport(project.projectId),
                     child: const Text('Refresh foundation report'),
                   ),
                 if (project != null)
@@ -851,7 +1918,12 @@ class ReportsScreen extends StatelessWidget {
                     children: [
                       CopyButton(text: report),
                       const SizedBox(width: 8),
-                      Expanded(child: Text('Saved through GAIA backend report endpoints only.', style: Theme.of(context).textTheme.bodySmall)),
+                      Expanded(
+                        child: Text(
+                          'Saved through GAIA backend report endpoints only.',
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -887,7 +1959,9 @@ class AgentRunsScreen extends StatelessWidget {
                   for (final run in controller.agentRuns)
                     ListTile(
                       title: Text(run.question),
-                      subtitle: Text('${run.projectId} • ${run.provider} • ${run.confidence}'),
+                      subtitle: Text(
+                        '${run.projectId} • ${run.provider} • ${run.confidence}',
+                      ),
                     ),
                 ],
               ),
@@ -953,10 +2027,12 @@ class _TasksScreenState extends State<TasksScreen> {
     final controller = widget.controller;
     final tasks = controller.tasks.where((task) {
       final statusOk = statusFilter == 'all' || task.status == statusFilter;
-      final priorityOk = priorityFilter == 'all' || task.priority == priorityFilter;
+      final priorityOk =
+          priorityFilter == 'all' || task.priority == priorityFilter;
       return statusOk && priorityOk;
     }).toList();
-    final selectedTask = controller.selectedTask ?? (tasks.isNotEmpty ? tasks.first : null);
+    final selectedTask =
+        controller.selectedTask ?? (tasks.isNotEmpty ? tasks.first : null);
     if (selectedTask != null) {
       controller.selectTask(selectedTask.taskId);
     }
@@ -972,14 +2048,26 @@ class _TasksScreenState extends State<TasksScreen> {
               _filterBox(
                 label: 'Status',
                 value: statusFilter,
-                values: const ['all', 'proposed', 'backlog', 'ready', 'in_progress', 'blocked', 'awaiting_approval', 'completed', 'cancelled'],
-                onChanged: (value) => setState(() => statusFilter = value ?? 'all'),
+                values: const [
+                  'all',
+                  'proposed',
+                  'backlog',
+                  'ready',
+                  'in_progress',
+                  'blocked',
+                  'awaiting_approval',
+                  'completed',
+                  'cancelled',
+                ],
+                onChanged: (value) =>
+                    setState(() => statusFilter = value ?? 'all'),
               ),
               _filterBox(
                 label: 'Priority',
                 value: priorityFilter,
                 values: const ['all', 'low', 'normal', 'high', 'critical'],
-                onChanged: (value) => setState(() => priorityFilter = value ?? 'all'),
+                onChanged: (value) =>
+                    setState(() => priorityFilter = value ?? 'all'),
               ),
               FilledButton(
                 onPressed: () => _createTask(context),
@@ -989,7 +2077,10 @@ class _TasksScreenState extends State<TasksScreen> {
                 onPressed: controller.selectedTask == null
                     ? null
                     : () async {
-                        await controller.createTaskFromRun(controller.selectedTask!.sourceAgentRunId ?? controller.agentRuns.first.runId);
+                        await controller.createTaskFromRun(
+                          controller.selectedTask!.sourceAgentRunId ??
+                              controller.agentRuns.first.runId,
+                        );
                         if (mounted) {
                           setState(() {});
                         }
@@ -1011,10 +2102,13 @@ class _TasksScreenState extends State<TasksScreen> {
                         for (final task in tasks)
                           Card(
                             child: ListTile(
-                              selected: task.taskId == controller.selectedTaskId,
+                              selected:
+                                  task.taskId == controller.selectedTaskId,
                               onTap: () => controller.selectTask(task.taskId),
                               title: Text(task.title),
-                              subtitle: Text('${task.projectId} • ${task.status} • ${task.priority}'),
+                              subtitle: Text(
+                                '${task.projectId} • ${task.status} • ${task.priority}',
+                              ),
                             ),
                           ),
                       ],
@@ -1027,7 +2121,12 @@ class _TasksScreenState extends State<TasksScreen> {
                   child: SectionCard(
                     title: 'Task Detail',
                     subtitle: selectedTask?.taskId ?? 'No task selected',
-                    child: selectedTask == null ? const Text('Select a task to inspect it.') : _TaskDetail(controller: controller, task: selectedTask),
+                    child: selectedTask == null
+                        ? const Text('Select a task to inspect it.')
+                        : _TaskDetail(
+                            controller: controller,
+                            task: selectedTask,
+                          ),
                   ),
                 ),
               ],
@@ -1042,7 +2141,9 @@ class _TasksScreenState extends State<TasksScreen> {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     final criteriaController = TextEditingController();
-    String projectId = widget.controller.selectedProjectId ?? widget.controller.projects.first.projectId;
+    String projectId =
+        widget.controller.selectedProjectId ??
+        widget.controller.projects.first.projectId;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -1059,21 +2160,41 @@ class _TasksScreenState extends State<TasksScreen> {
                       initialValue: projectId,
                       items: [
                         for (final project in widget.controller.projects)
-                          DropdownMenuItem(value: project.projectId, child: Text(project.name)),
+                          DropdownMenuItem(
+                            value: project.projectId,
+                            child: Text(project.name),
+                          ),
                       ],
-                      onChanged: (value) => setState(() => projectId = value ?? projectId),
+                      onChanged: (value) =>
+                          setState(() => projectId = value ?? projectId),
                       decoration: const InputDecoration(labelText: 'Project'),
                     ),
-                    TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
-                    TextField(controller: descriptionController, decoration: const InputDecoration(labelText: 'Description')),
-                    TextField(controller: criteriaController, decoration: const InputDecoration(labelText: 'Completion criteria')),
+                    TextField(
+                      controller: titleController,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                    ),
+                    TextField(
+                      controller: descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'Description',
+                      ),
+                    ),
+                    TextField(
+                      controller: criteriaController,
+                      decoration: const InputDecoration(
+                        labelText: 'Completion criteria',
+                      ),
+                    ),
                   ],
                 ),
               );
             },
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () async {
                 await widget.controller.createTask(
@@ -1125,13 +2246,48 @@ class _TaskDetail extends StatelessWidget {
           spacing: 8,
           runSpacing: 8,
           children: [
-            FilledButton(onPressed: () => controller.acceptTask(task.taskId), child: const Text('Accept')),
-            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'ready'), child: const Text('Ready')),
-            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'in_progress'), child: const Text('In Progress')),
-            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'blocked', reason: 'blocked'), child: const Text('Blocked')),
-            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'awaiting_approval', reason: 'ready for review'), child: const Text('Awaiting approval')),
-            OutlinedButton(onPressed: () => controller.transitionTask(task.taskId, 'completed', completionEvidence: const ['manual verification'], manualOverrideReason: 'manual completion'), child: const Text('Complete')),
-            OutlinedButton(onPressed: () => controller.acceptTask(task.taskId), child: const Text('Backlog')),
+            FilledButton(
+              onPressed: () => controller.acceptTask(task.taskId),
+              child: const Text('Accept'),
+            ),
+            OutlinedButton(
+              onPressed: () => controller.transitionTask(task.taskId, 'ready'),
+              child: const Text('Ready'),
+            ),
+            OutlinedButton(
+              onPressed: () =>
+                  controller.transitionTask(task.taskId, 'in_progress'),
+              child: const Text('In Progress'),
+            ),
+            OutlinedButton(
+              onPressed: () => controller.transitionTask(
+                task.taskId,
+                'blocked',
+                reason: 'blocked',
+              ),
+              child: const Text('Blocked'),
+            ),
+            OutlinedButton(
+              onPressed: () => controller.transitionTask(
+                task.taskId,
+                'awaiting_approval',
+                reason: 'ready for review',
+              ),
+              child: const Text('Awaiting approval'),
+            ),
+            OutlinedButton(
+              onPressed: () => controller.transitionTask(
+                task.taskId,
+                'completed',
+                completionEvidence: const ['manual verification'],
+                manualOverrideReason: 'manual completion',
+              ),
+              child: const Text('Complete'),
+            ),
+            OutlinedButton(
+              onPressed: () => controller.acceptTask(task.taskId),
+              child: const Text('Backlog'),
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1156,7 +2312,9 @@ class _DraftsScreenState extends State<DraftsScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final selectedDraft = controller.selectedDraft ?? (controller.drafts.isNotEmpty ? controller.drafts.first : null);
+    final selectedDraft =
+        controller.selectedDraft ??
+        (controller.drafts.isNotEmpty ? controller.drafts.first : null);
     if (selectedDraft != null) {
       controller.selectDraft(selectedDraft.draftId);
     }
@@ -1181,7 +2339,9 @@ class _DraftsScreenState extends State<DraftsScreen> {
                         selected: draft.draftId == controller.selectedDraftId,
                         onTap: () => controller.selectDraft(draft.draftId),
                         title: Text(draft.title),
-                        subtitle: Text('${draft.projectId} • ${draft.draftType} • ${draft.status}'),
+                        subtitle: Text(
+                          '${draft.projectId} • ${draft.draftType} • ${draft.status}',
+                        ),
                       ),
                     ),
                 ],
@@ -1194,7 +2354,9 @@ class _DraftsScreenState extends State<DraftsScreen> {
             child: SectionCard(
               title: 'Draft Detail',
               subtitle: selectedDraft?.draftId ?? 'No draft selected',
-              child: selectedDraft == null ? const Text('Select a draft to review it.') : _DraftDetail(controller: controller, draft: selectedDraft),
+              child: selectedDraft == null
+                  ? const Text('Select a draft to review it.')
+                  : _DraftDetail(controller: controller, draft: selectedDraft),
             ),
           ),
         ],
@@ -1206,7 +2368,9 @@ class _DraftsScreenState extends State<DraftsScreen> {
     final titleController = TextEditingController();
     final contentController = TextEditingController();
     final taskController = TextEditingController();
-    String projectId = widget.controller.selectedProjectId ?? widget.controller.projects.first.projectId;
+    String projectId =
+        widget.controller.selectedProjectId ??
+        widget.controller.projects.first.projectId;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -1221,26 +2385,46 @@ class _DraftsScreenState extends State<DraftsScreen> {
                   initialValue: projectId,
                   items: [
                     for (final project in widget.controller.projects)
-                      DropdownMenuItem(value: project.projectId, child: Text(project.name)),
+                      DropdownMenuItem(
+                        value: project.projectId,
+                        child: Text(project.name),
+                      ),
                   ],
                   onChanged: (value) => projectId = value ?? projectId,
                   decoration: const InputDecoration(labelText: 'Project'),
                 ),
-                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
-                TextField(controller: taskController, decoration: const InputDecoration(labelText: 'Source task ID')),
-                TextField(controller: contentController, maxLines: 4, decoration: const InputDecoration(labelText: 'Content')),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                ),
+                TextField(
+                  controller: taskController,
+                  decoration: const InputDecoration(
+                    labelText: 'Source task ID',
+                  ),
+                ),
+                TextField(
+                  controller: contentController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Content'),
+                ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () async {
                 await widget.controller.createDraft(
                   title: titleController.text.trim(),
                   projectId: projectId,
                   content: contentController.text,
-                  sourceTaskId: taskController.text.trim().isEmpty ? null : taskController.text.trim(),
+                  sourceTaskId: taskController.text.trim().isEmpty
+                      ? null
+                      : taskController.text.trim(),
                   draftType: 'codex_prompt',
                 );
                 if (dialogContext.mounted) {
@@ -1267,7 +2451,9 @@ class _DraftDetail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final revisions = controller.drafts.where((entry) => entry.draftId == draft.draftId).toList();
+    final revisions = controller.drafts
+        .where((entry) => entry.draftId == draft.draftId)
+        .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1284,13 +2470,25 @@ class _DraftDetail extends StatelessWidget {
           children: [
             CopyButton(text: draft.currentContentHash, label: 'Copy hash'),
             const SizedBox(width: 8),
-            FilledButton(onPressed: () => controller.submitDraft(draft.draftId), child: const Text('Submit for review')),
+            FilledButton(
+              onPressed: () => controller.submitDraft(draft.draftId),
+              child: const Text('Submit for review'),
+            ),
             const SizedBox(width: 8),
-            OutlinedButton(onPressed: () => controller.reviseDraft(draft.draftId, 'Revision based on local review.'), child: const Text('Revise')),
+            OutlinedButton(
+              onPressed: () => controller.reviseDraft(
+                draft.draftId,
+                'Revision based on local review.',
+              ),
+              child: const Text('Revise'),
+            ),
           ],
         ),
         const SizedBox(height: 12),
-        MarkdownView(data: '### Current Draft\n\n```markdown\n${draft.currentContentHash}\n```'),
+        MarkdownView(
+          data:
+              '### Current Draft\n\n```markdown\n${draft.currentContentHash}\n```',
+        ),
         const SizedBox(height: 12),
         Text('Evidence: ${draft.evidenceReferences.join(', ')}'),
         Text('Warnings: ${draft.warnings.join(', ')}'),
@@ -1313,7 +2511,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final selectedApproval = controller.selectedApproval ?? (controller.approvals.isNotEmpty ? controller.approvals.first : null);
+    final selectedApproval =
+        controller.selectedApproval ??
+        (controller.approvals.isNotEmpty ? controller.approvals.first : null);
     if (selectedApproval != null) {
       controller.selectApproval(selectedApproval.approvalId);
     }
@@ -1326,16 +2526,24 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
             flex: 2,
             child: SectionCard(
               title: 'Approvals',
-              trailing: FilledButton(onPressed: () => _createApproval(context), child: const Text('Create approval')),
+              trailing: FilledButton(
+                onPressed: () => _createApproval(context),
+                child: const Text('Create approval'),
+              ),
               child: ListView(
                 children: [
                   for (final approval in controller.approvals)
                     Card(
                       child: ListTile(
-                        selected: approval.approvalId == controller.selectedApprovalId,
-                        onTap: () => controller.selectApproval(approval.approvalId),
+                        selected:
+                            approval.approvalId ==
+                            controller.selectedApprovalId,
+                        onTap: () =>
+                            controller.selectApproval(approval.approvalId),
                         title: Text(approval.title),
-                        subtitle: Text('${approval.projectId} • ${approval.riskLevel} • ${approval.status}'),
+                        subtitle: Text(
+                          '${approval.projectId} • ${approval.riskLevel} • ${approval.status}',
+                        ),
                       ),
                     ),
                 ],
@@ -1348,7 +2556,12 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
             child: SectionCard(
               title: 'Approval Detail',
               subtitle: selectedApproval?.approvalId ?? 'No approval selected',
-              child: selectedApproval == null ? const Text('Select an approval to review it.') : _ApprovalDetail(controller: controller, approval: selectedApproval),
+              child: selectedApproval == null
+                  ? const Text('Select an approval to review it.')
+                  : _ApprovalDetail(
+                      controller: controller,
+                      approval: selectedApproval,
+                    ),
             ),
           ),
         ],
@@ -1361,7 +2574,9 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
     final summaryController = TextEditingController();
     final draftController = TextEditingController();
     final taskController = TextEditingController();
-    String projectId = widget.controller.selectedProjectId ?? widget.controller.projects.first.projectId;
+    String projectId =
+        widget.controller.selectedProjectId ??
+        widget.controller.projects.first.projectId;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -1374,26 +2589,57 @@ class _ApprovalsScreenState extends State<ApprovalsScreen> {
               children: [
                 DropdownButtonFormField<String>(
                   initialValue: projectId,
-                  items: [for (final project in widget.controller.projects) DropdownMenuItem(value: project.projectId, child: Text(project.name))],
+                  items: [
+                    for (final project in widget.controller.projects)
+                      DropdownMenuItem(
+                        value: project.projectId,
+                        child: Text(project.name),
+                      ),
+                  ],
                   onChanged: (value) => projectId = value ?? projectId,
                   decoration: const InputDecoration(labelText: 'Project'),
                 ),
-                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
-                TextField(controller: draftController, decoration: const InputDecoration(labelText: 'Source draft ID')),
-                TextField(controller: taskController, decoration: const InputDecoration(labelText: 'Source task ID')),
-                TextField(controller: summaryController, decoration: const InputDecoration(labelText: 'Preview summary')),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                ),
+                TextField(
+                  controller: draftController,
+                  decoration: const InputDecoration(
+                    labelText: 'Source draft ID',
+                  ),
+                ),
+                TextField(
+                  controller: taskController,
+                  decoration: const InputDecoration(
+                    labelText: 'Source task ID',
+                  ),
+                ),
+                TextField(
+                  controller: summaryController,
+                  decoration: const InputDecoration(
+                    labelText: 'Preview summary',
+                  ),
+                ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () async {
                 await widget.controller.createApproval(
                   title: titleController.text.trim(),
                   projectId: projectId,
-                  sourceDraftId: draftController.text.trim().isEmpty ? null : draftController.text.trim(),
-                  sourceTaskId: taskController.text.trim().isEmpty ? null : taskController.text.trim(),
+                  sourceDraftId: draftController.text.trim().isEmpty
+                      ? null
+                      : draftController.text.trim(),
+                  sourceTaskId: taskController.text.trim().isEmpty
+                      ? null
+                      : taskController.text.trim(),
                   previewSummary: summaryController.text.trim(),
                   proposedAction: 'Manual use review',
                   exactTargetDescription: 'GAIA draft and task review',
@@ -1441,15 +2687,26 @@ class _ApprovalDetail extends StatelessWidget {
           spacing: 8,
           children: [
             FilledButton(
-              onPressed: () => controller.approveRequest(approval.approvalId, version: approval.version, reviewer: 'manual', decisionReason: 'Approved for manual use'),
+              onPressed: () => controller.approveRequest(
+                approval.approvalId,
+                version: approval.version,
+                reviewer: 'manual',
+                decisionReason: 'Approved for manual use',
+              ),
               child: const Text('Approve'),
             ),
             OutlinedButton(
-              onPressed: () => controller.rejectRequest(approval.approvalId, version: approval.version, reviewer: 'manual', decisionReason: 'Rejected'),
+              onPressed: () => controller.rejectRequest(
+                approval.approvalId,
+                version: approval.version,
+                reviewer: 'manual',
+                decisionReason: 'Rejected',
+              ),
               child: const Text('Reject'),
             ),
             OutlinedButton(
-              onPressed: () => controller.refreshApprovalValidation(approval.approvalId),
+              onPressed: () =>
+                  controller.refreshApprovalValidation(approval.approvalId),
               child: const Text('Refresh validation'),
             ),
           ],
@@ -1470,7 +2727,9 @@ class DailyBriefScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brief = controller.selectedBrief ?? (controller.briefs.isNotEmpty ? controller.briefs.first : null);
+    final brief =
+        controller.selectedBrief ??
+        (controller.briefs.isNotEmpty ? controller.briefs.first : null);
     if (brief != null) {
       controller.selectBrief(brief.briefId);
     }
@@ -1482,7 +2741,11 @@ class DailyBriefScreen extends StatelessWidget {
           Align(
             alignment: Alignment.centerLeft,
             child: FilledButton(
-              onPressed: controller.selectedProjectId == null ? null : () => controller.createDailyBrief(controller.selectedProjectId!),
+              onPressed: controller.selectedProjectId == null
+                  ? null
+                  : () => controller.createDailyBrief(
+                      controller.selectedProjectId!,
+                    ),
               child: const Text('Generate brief'),
             ),
           ),
@@ -1498,7 +2761,8 @@ class DailyBriefScreen extends StatelessWidget {
                       children: [
                         for (final item in controller.briefs)
                           ListTile(
-                            selected: item.briefId == controller.selectedBriefId,
+                            selected:
+                                item.briefId == controller.selectedBriefId,
                             onTap: () => controller.selectBrief(item.briefId),
                             title: Text(item.title),
                             subtitle: Text(item.projectId),
@@ -1513,7 +2777,9 @@ class DailyBriefScreen extends StatelessWidget {
                   child: SectionCard(
                     title: 'Brief detail',
                     subtitle: brief?.briefId ?? 'No brief selected',
-                    child: brief == null ? const Text('Generate a brief to review it here.') : MarkdownView(data: brief.markdown),
+                    child: brief == null
+                        ? const Text('Generate a brief to review it here.')
+                        : MarkdownView(data: brief.markdown),
                   ),
                 ),
               ],
@@ -1558,7 +2824,10 @@ class VscodeOpsScreen extends StatelessWidget {
                   'GAIA: Complete v0.4 Validation',
                   'GAIA: Release Readiness',
                 ])
-                  ListTile(leading: const Icon(Icons.checklist), title: Text(line)),
+                  ListTile(
+                    leading: const Icon(Icons.checklist),
+                    title: Text(line),
+                  ),
               ],
             ),
           ),
@@ -1624,8 +2893,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     rootController = TextEditingController(text: settings.repositoryRootPath);
     modelController = TextEditingController(text: settings.preferredModelName);
     projectController = TextEditingController(text: settings.defaultProjectId);
-    evidenceController = TextEditingController(text: settings.defaultEvidenceLimit.toString());
-    retentionController = TextEditingController(text: settings.logRetentionDays.toString());
+    evidenceController = TextEditingController(
+      text: settings.defaultEvidenceLimit.toString(),
+    );
+    retentionController = TextEditingController(
+      text: settings.logRetentionDays.toString(),
+    );
     launchPreference = settings.backendLaunchPreference;
     themePreference = settings.themePreference;
     reportPreference = settings.reportFormatPreference;
@@ -1654,48 +2927,110 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Application Settings',
             child: Column(
               children: [
-                TextField(controller: rootController, decoration: const InputDecoration(labelText: 'Repository root')),
-                TextField(controller: backendUrlController, decoration: const InputDecoration(labelText: 'Backend URL')),
+                TextField(
+                  controller: rootController,
+                  decoration: const InputDecoration(
+                    labelText: 'Repository root',
+                  ),
+                ),
+                TextField(
+                  controller: backendUrlController,
+                  decoration: const InputDecoration(labelText: 'Backend URL'),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<BackendLaunchPreference>(
                   key: ValueKey(launchPreference),
                   initialValue: launchPreference,
                   items: const [
-                    DropdownMenuItem(value: BackendLaunchPreference.connectExisting, child: Text('Connect to existing backend')),
-                    DropdownMenuItem(value: BackendLaunchPreference.startLocal, child: Text('Start local backend')),
+                    DropdownMenuItem(
+                      value: BackendLaunchPreference.connectExisting,
+                      child: Text('Connect to existing backend'),
+                    ),
+                    DropdownMenuItem(
+                      value: BackendLaunchPreference.startLocal,
+                      child: Text('Start local backend'),
+                    ),
                   ],
-                  onChanged: (value) => setState(() => launchPreference = value ?? BackendLaunchPreference.startLocal),
-                  decoration: const InputDecoration(labelText: 'Backend launch preference'),
+                  onChanged: (value) => setState(
+                    () => launchPreference =
+                        value ?? BackendLaunchPreference.startLocal,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Backend launch preference',
+                  ),
                 ),
-                TextField(controller: projectController, decoration: const InputDecoration(labelText: 'Default project')),
-                TextField(controller: modelController, decoration: const InputDecoration(labelText: 'Preferred model')),
-                TextField(controller: evidenceController, decoration: const InputDecoration(labelText: 'Default evidence limit')),
-                TextField(controller: retentionController, decoration: const InputDecoration(labelText: 'Log retention days')),
+                TextField(
+                  controller: projectController,
+                  decoration: const InputDecoration(
+                    labelText: 'Default project',
+                  ),
+                ),
+                TextField(
+                  controller: modelController,
+                  decoration: const InputDecoration(
+                    labelText: 'Preferred model',
+                  ),
+                ),
+                TextField(
+                  controller: evidenceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Default evidence limit',
+                  ),
+                ),
+                TextField(
+                  controller: retentionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Log retention days',
+                  ),
+                ),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<ThemePreference>(
                   key: ValueKey(themePreference),
                   initialValue: themePreference,
                   items: const [
-                    DropdownMenuItem(value: ThemePreference.system, child: Text('System')),
-                    DropdownMenuItem(value: ThemePreference.light, child: Text('Light')),
-                    DropdownMenuItem(value: ThemePreference.dark, child: Text('Dark')),
+                    DropdownMenuItem(
+                      value: ThemePreference.system,
+                      child: Text('System'),
+                    ),
+                    DropdownMenuItem(
+                      value: ThemePreference.light,
+                      child: Text('Light'),
+                    ),
+                    DropdownMenuItem(
+                      value: ThemePreference.dark,
+                      child: Text('Dark'),
+                    ),
                   ],
-                  onChanged: (value) => setState(() => themePreference = value ?? ThemePreference.system),
+                  onChanged: (value) => setState(
+                    () => themePreference = value ?? ThemePreference.system,
+                  ),
                   decoration: const InputDecoration(labelText: 'Theme'),
                 ),
                 DropdownButtonFormField<ReportFormatPreference>(
                   key: ValueKey(reportPreference),
                   initialValue: reportPreference,
                   items: const [
-                    DropdownMenuItem(value: ReportFormatPreference.markdown, child: Text('Markdown')),
-                    DropdownMenuItem(value: ReportFormatPreference.json, child: Text('JSON')),
+                    DropdownMenuItem(
+                      value: ReportFormatPreference.markdown,
+                      child: Text('Markdown'),
+                    ),
+                    DropdownMenuItem(
+                      value: ReportFormatPreference.json,
+                      child: Text('JSON'),
+                    ),
                   ],
-                  onChanged: (value) => setState(() => reportPreference = value ?? ReportFormatPreference.markdown),
-                  decoration: const InputDecoration(labelText: 'Report viewing preference'),
+                  onChanged: (value) => setState(
+                    () => reportPreference =
+                        value ?? ReportFormatPreference.markdown,
+                  ),
+                  decoration: const InputDecoration(
+                    labelText: 'Report viewing preference',
+                  ),
                 ),
                 SwitchListTile(
                   value: deterministicOnly,
-                  onChanged: (value) => setState(() => deterministicOnly = value),
+                  onChanged: (value) =>
+                      setState(() => deterministicOnly = value),
                   title: const Text('Deterministic-only default'),
                 ),
                 const SizedBox(height: 8),
@@ -1710,11 +3045,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           backendLaunchPreference: launchPreference,
                           defaultProjectId: projectController.text.trim(),
                           preferredModelName: modelController.text.trim(),
-                          defaultEvidenceLimit: int.tryParse(evidenceController.text) ?? widget.controller.settings.defaultEvidenceLimit,
+                          defaultEvidenceLimit:
+                              int.tryParse(evidenceController.text) ??
+                              widget.controller.settings.defaultEvidenceLimit,
                           deterministicOnlyDefault: deterministicOnly,
                           reportFormatPreference: reportPreference,
                           themePreference: themePreference,
-                          logRetentionDays: int.tryParse(retentionController.text) ?? widget.controller.settings.logRetentionDays,
+                          logRetentionDays:
+                              int.tryParse(retentionController.text) ??
+                              widget.controller.settings.logRetentionDays,
                         );
                         await widget.controller.updateSettings(next);
                       },
@@ -1723,7 +3062,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     OutlinedButton(
                       onPressed: () async {
                         await widget.controller.updateSettings(
-                          GaiaAppSettings.defaults().copyWith(firstRunComplete: widget.controller.settings.firstRunComplete),
+                          GaiaAppSettings.defaults().copyWith(
+                            firstRunComplete:
+                                widget.controller.settings.firstRunComplete,
+                          ),
                         );
                         setState(() {
                           final settings = widget.controller.settings;
@@ -1731,8 +3073,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           rootController.text = settings.repositoryRootPath;
                           projectController.text = settings.defaultProjectId;
                           modelController.text = settings.preferredModelName;
-                          evidenceController.text = settings.defaultEvidenceLimit.toString();
-                          retentionController.text = settings.logRetentionDays.toString();
+                          evidenceController.text = settings
+                              .defaultEvidenceLimit
+                              .toString();
+                          retentionController.text = settings.logRetentionDays
+                              .toString();
                           launchPreference = settings.backendLaunchPreference;
                           themePreference = settings.themePreference;
                           reportPreference = settings.reportFormatPreference;
@@ -1767,16 +3112,23 @@ class AboutScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('GAIA Windows is the desktop control centre for the permissioned GAIA backend.'),
+            const Text(
+              'GAIA Windows is the desktop control centre for the permissioned GAIA backend.',
+            ),
             const SizedBox(height: 12),
             _keyValueGrid([
               ('Backend', controller.settings.backendUrl),
               ('Version', controller.health?.version ?? 'Unknown'),
               ('Read-only', 'Yes'),
-              ('Current project', controller.selectedProject?.projectId ?? 'None'),
+              (
+                'Current project',
+                controller.selectedProject?.projectId ?? 'None',
+              ),
             ]),
             const SizedBox(height: 12),
-            const Text('Approval, task, draft and output-execution workflows are tracked locally and require explicit confirmation.'),
+            const Text(
+              'Approval, task, draft and output-execution workflows are tracked locally and require explicit confirmation.',
+            ),
           ],
         ),
       ),
@@ -1824,9 +3176,15 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
                   for (final manifest in controller.permissionManifests)
                     Card(
                       child: ListTile(
-                        selected: manifest['manifest_id'] == controller.selectedManifestId,
-                        onTap: () => controller.selectManifest(manifest['manifest_id'] as String?),
-                        title: Text(manifest['name']?.toString() ?? 'Unnamed manifest'),
+                        selected:
+                            manifest['manifest_id'] ==
+                            controller.selectedManifestId,
+                        onTap: () => controller.selectManifest(
+                          manifest['manifest_id'] as String?,
+                        ),
+                        title: Text(
+                          manifest['name']?.toString() ?? 'Unnamed manifest',
+                        ),
                         subtitle: Text(
                           '${manifest['manifest_id']} • ${manifest['enabled'] == true ? 'enabled' : 'disabled'} • ${manifest['overwrite_policy'] ?? 'deny'}',
                         ),
@@ -1841,46 +3199,88 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             flex: 3,
             child: SectionCard(
               title: 'Manifest Detail',
-              subtitle: selected?['manifest_id']?.toString() ?? 'No manifest selected',
+              subtitle:
+                  selected?['manifest_id']?.toString() ??
+                  'No manifest selected',
               child: selected == null
                   ? const Text('Create or select a manifest to inspect it.')
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _keyValueGrid([
-                          ('Manifest ID', selected['manifest_id']?.toString() ?? ''),
-                          ('Version', selected['manifest_version']?.toString() ?? ''),
-                          ('Enabled', selected['enabled'] == true ? 'Yes' : 'No'),
-                          ('Risk ceiling', selected['risk_ceiling']?.toString() ?? ''),
-                          ('Overwrite policy', selected['overwrite_policy']?.toString() ?? ''),
+                          (
+                            'Manifest ID',
+                            selected['manifest_id']?.toString() ?? '',
+                          ),
+                          (
+                            'Version',
+                            selected['manifest_version']?.toString() ?? '',
+                          ),
+                          (
+                            'Enabled',
+                            selected['enabled'] == true ? 'Yes' : 'No',
+                          ),
+                          (
+                            'Risk ceiling',
+                            selected['risk_ceiling']?.toString() ?? '',
+                          ),
+                          (
+                            'Overwrite policy',
+                            selected['overwrite_policy']?.toString() ?? '',
+                          ),
                         ]),
                         const SizedBox(height: 12),
-                        Text('Allowed roots: ${(selected['allowed_target_roots'] as List?)?.join(', ') ?? ''}'),
-                        Text('Allowed actions: ${(selected['allowed_action_types'] as List?)?.join(', ') ?? ''}'),
-                        Text('Allowed extensions: ${(selected['allowed_file_extensions'] as List?)?.join(', ') ?? ''}'),
+                        Text(
+                          'Allowed roots: ${(selected['allowed_target_roots'] as List?)?.join(', ') ?? ''}',
+                        ),
+                        Text(
+                          'Allowed actions: ${(selected['allowed_action_types'] as List?)?.join(', ') ?? ''}',
+                        ),
+                        Text(
+                          'Allowed extensions: ${(selected['allowed_file_extensions'] as List?)?.join(', ') ?? ''}',
+                        ),
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           children: [
                             FilledButton(
                               onPressed: () async {
-                                final result = await controller.validatePermissionManifest(selected['manifest_id'] as String);
+                                final result = await controller
+                                    .validatePermissionManifest(
+                                      selected['manifest_id'] as String,
+                                    );
                                 if (context.mounted) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(result['valid'] == true ? 'Manifest valid' : 'Manifest has issues')),
+                                    SnackBar(
+                                      content: Text(
+                                        result['valid'] == true
+                                            ? 'Manifest valid'
+                                            : 'Manifest has issues',
+                                      ),
+                                    ),
                                   );
                                 }
                               },
                               child: const Text('Validate'),
                             ),
                             OutlinedButton(
-                              onPressed: () => controller.reviewPermissionManifest(
-                                selected['manifest_id'] as String,
-                                version: selected['manifest_version'] as int? ?? 1,
-                                enabled: !(selected['enabled'] as bool? ?? false),
-                                reviewNotes: 'Manual review from Control Centre',
+                              onPressed: () =>
+                                  controller.reviewPermissionManifest(
+                                    selected['manifest_id'] as String,
+                                    version:
+                                        selected['manifest_version'] as int? ??
+                                        1,
+                                    enabled:
+                                        !(selected['enabled'] as bool? ??
+                                            false),
+                                    reviewNotes:
+                                        'Manual review from Control Centre',
+                                  ),
+                              child: Text(
+                                selected['enabled'] == true
+                                    ? 'Disable'
+                                    : 'Enable',
                               ),
-                              child: Text(selected['enabled'] == true ? 'Disable' : 'Enable'),
                             ),
                           ],
                         ),
@@ -1895,7 +3295,9 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
 
   Future<void> _createManifest(BuildContext context) async {
     final nameController = TextEditingController(text: 'Approved outputs');
-    final rootController = TextEditingController(text: 'workspace/approved_outputs');
+    final rootController = TextEditingController(
+      text: 'workspace/approved_outputs',
+    );
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -1906,18 +3308,31 @@ class _PermissionsScreenState extends State<PermissionsScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextField(controller: nameController, decoration: const InputDecoration(labelText: 'Name')),
-                TextField(controller: rootController, decoration: const InputDecoration(labelText: 'Allowed root')),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
+                TextField(
+                  controller: rootController,
+                  decoration: const InputDecoration(labelText: 'Allowed root'),
+                ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () async {
                 await widget.controller.createPermissionManifest(
                   name: nameController.text.trim(),
-                  allowedActionTypes: const <String>['create_output_file', 'update_output_file', 'rollback_output_file'],
+                  allowedActionTypes: const <String>[
+                    'create_output_file',
+                    'update_output_file',
+                    'rollback_output_file',
+                  ],
                   allowedTargetRoots: <String>[rootController.text.trim()],
                   allowedFileExtensions: const <String>['.md', '.txt'],
                   enabled: false,
@@ -1960,7 +3375,8 @@ class _ActionsScreenState extends State<ActionsScreen> {
     final selectedDetail = controller.selectedActionDetail ?? selected;
     return _ScreenScaffold(
       title: 'Action Centre',
-      subtitle: 'Proposed actions, exact targets, hashes, approvals and receipts',
+      subtitle:
+          'Proposed actions, exact targets, hashes, approvals and receipts',
       child: Row(
         children: [
           Expanded(
@@ -1976,9 +3392,14 @@ class _ActionsScreenState extends State<ActionsScreen> {
                   for (final action in controller.outputActions)
                     Card(
                       child: ListTile(
-                        selected: action['action_id'] == controller.selectedActionId,
-                        onTap: () => controller.selectAction(action['action_id'] as String?),
-                        title: Text(action['title']?.toString() ?? 'Untitled action'),
+                        selected:
+                            action['action_id'] == controller.selectedActionId,
+                        onTap: () => controller.selectAction(
+                          action['action_id'] as String?,
+                        ),
+                        title: Text(
+                          action['title']?.toString() ?? 'Untitled action',
+                        ),
                         subtitle: Text(
                           '${action['action_type'] ?? ''} • ${action['status'] ?? ''} • ${action['risk'] ?? ''}',
                         ),
@@ -1993,60 +3414,119 @@ class _ActionsScreenState extends State<ActionsScreen> {
             flex: 3,
             child: SectionCard(
               title: 'Action Detail',
-              subtitle: selectedDetail?['action_id']?.toString() ?? 'No action selected',
+              subtitle:
+                  selectedDetail?['action_id']?.toString() ??
+                  'No action selected',
               child: selectedDetail == null
                   ? const Text('Create or select an action to review it.')
                   : ListView(
                       children: [
                         _keyValueGrid([
-                          ('Action ID', selectedDetail['action_id']?.toString() ?? ''),
-                          ('Type', selectedDetail['action_type']?.toString() ?? ''),
-                          ('Status', selectedDetail['status']?.toString() ?? ''),
+                          (
+                            'Action ID',
+                            selectedDetail['action_id']?.toString() ?? '',
+                          ),
+                          (
+                            'Type',
+                            selectedDetail['action_type']?.toString() ?? '',
+                          ),
+                          (
+                            'Status',
+                            selectedDetail['status']?.toString() ?? '',
+                          ),
                           ('Risk', selectedDetail['risk']?.toString() ?? ''),
-                          ('Manifest', selectedDetail['manifest_id']?.toString() ?? ''),
-                          ('Target', selectedDetail['canonical_target']?.toString() ?? ''),
-                          ('Proposed hash', selectedDetail['proposed_content_hash']?.toString() ?? ''),
-                          ('Previous hash', selectedDetail['previous_content_hash']?.toString() ?? 'None'),
-                          ('Receipt', selectedDetail['execution_receipt_id']?.toString() ?? 'None'),
+                          (
+                            'Manifest',
+                            selectedDetail['manifest_id']?.toString() ?? '',
+                          ),
+                          (
+                            'Target',
+                            selectedDetail['canonical_target']?.toString() ??
+                                '',
+                          ),
+                          (
+                            'Proposed hash',
+                            selectedDetail['proposed_content_hash']
+                                    ?.toString() ??
+                                '',
+                          ),
+                          (
+                            'Previous hash',
+                            selectedDetail['previous_content_hash']
+                                    ?.toString() ??
+                                'None',
+                          ),
+                          (
+                            'Receipt',
+                            selectedDetail['execution_receipt_id']
+                                    ?.toString() ??
+                                'None',
+                          ),
                         ]),
                         const SizedBox(height: 12),
                         Text('Preview'),
-                        SelectableText(selectedDetail['preview']?.toString() ?? ''),
+                        SelectableText(
+                          selectedDetail['preview']?.toString() ?? '',
+                        ),
                         const SizedBox(height: 12),
                         Text('Diff'),
-                        SelectableText(selectedDetail['diff']?.toString() ?? ''),
+                        SelectableText(
+                          selectedDetail['diff']?.toString() ?? '',
+                        ),
                         const SizedBox(height: 12),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
                             FilledButton(
-                              onPressed: () => controller.requestActionApproval(selectedDetail['action_id'] as String),
+                              onPressed: () => controller.requestActionApproval(
+                                selectedDetail['action_id'] as String,
+                              ),
                               child: const Text('Request approval'),
                             ),
                             OutlinedButton(
-                              onPressed: () => controller.approveAction(selectedDetail['action_id'] as String),
+                              onPressed: () => controller.approveAction(
+                                selectedDetail['action_id'] as String,
+                              ),
                               child: const Text('Approve'),
                             ),
                             OutlinedButton(
-                              onPressed: () => controller.executeAction(selectedDetail['action_id'] as String, confirm: true, operator: 'manual'),
+                              onPressed: () => controller.executeAction(
+                                selectedDetail['action_id'] as String,
+                                confirm: true,
+                                operator: 'manual',
+                              ),
                               child: const Text('Execute'),
                             ),
                             OutlinedButton(
-                              onPressed: () => controller.rollbackAction(selectedDetail['action_id'] as String, confirm: true, operator: 'manual'),
+                              onPressed: () => controller.rollbackAction(
+                                selectedDetail['action_id'] as String,
+                                confirm: true,
+                                operator: 'manual',
+                              ),
                               child: const Text('Rollback'),
                             ),
                             OutlinedButton(
-                              onPressed: () => controller.cancelAction(selectedDetail['action_id'] as String),
+                              onPressed: () => controller.cancelAction(
+                                selectedDetail['action_id'] as String,
+                              ),
                               child: const Text('Cancel'),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        Text('Approval binding: ${selectedDetail['approval_binding_hash'] ?? 'None'}'),
-                        Text('Approval status: ${selectedDetail['approval_status'] ?? 'None'}'),
-                        Text('Backup path: ${selectedDetail['backup_path'] ?? 'None'}'),
-                        Text('Selected previews: ${controller.selectedActionPreviews.length}'),
+                        Text(
+                          'Approval binding: ${selectedDetail['approval_binding_hash'] ?? 'None'}',
+                        ),
+                        Text(
+                          'Approval status: ${selectedDetail['approval_status'] ?? 'None'}',
+                        ),
+                        Text(
+                          'Backup path: ${selectedDetail['backup_path'] ?? 'None'}',
+                        ),
+                        Text(
+                          'Selected previews: ${controller.selectedActionPreviews.length}',
+                        ),
                         for (final preview in controller.selectedActionPreviews)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
@@ -2056,9 +3536,13 @@ class _ActionsScreenState extends State<ActionsScreen> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(preview['target_path']?.toString() ?? ''),
+                                    Text(
+                                      preview['target_path']?.toString() ?? '',
+                                    ),
                                     const SizedBox(height: 8),
-                                    SelectableText(preview['preview']?.toString() ?? ''),
+                                    SelectableText(
+                                      preview['preview']?.toString() ?? '',
+                                    ),
                                   ],
                                 ),
                               ),
@@ -2074,10 +3558,21 @@ class _ActionsScreenState extends State<ActionsScreen> {
   }
 
   Future<void> _createAction(BuildContext context) async {
-    final titleController = TextEditingController(text: 'Export approved output');
-    final contentController = TextEditingController(text: 'Hello from GAIA v0.8.0');
-    final targetController = TextEditingController(text: 'workspace/approved_outputs/demo.md');
-    String manifestId = widget.controller.selectedManifestId ?? (widget.controller.permissionManifests.isNotEmpty ? widget.controller.permissionManifests.first['manifest_id'] as String : '');
+    final titleController = TextEditingController(
+      text: 'Export approved output',
+    );
+    final contentController = TextEditingController(
+      text: 'Hello from GAIA v0.8.0',
+    );
+    final targetController = TextEditingController(
+      text: 'workspace/approved_outputs/demo.md',
+    );
+    String manifestId =
+        widget.controller.selectedManifestId ??
+        (widget.controller.permissionManifests.isNotEmpty
+            ? widget.controller.permissionManifests.first['manifest_id']
+                  as String
+            : '');
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
@@ -2091,20 +3586,37 @@ class _ActionsScreenState extends State<ActionsScreen> {
                 DropdownButtonFormField<String>(
                   initialValue: manifestId.isEmpty ? null : manifestId,
                   items: [
-                    for (final manifest in widget.controller.permissionManifests)
-                      DropdownMenuItem(value: manifest['manifest_id'] as String?, child: Text(manifest['name']?.toString() ?? 'Manifest')),
+                    for (final manifest
+                        in widget.controller.permissionManifests)
+                      DropdownMenuItem(
+                        value: manifest['manifest_id'] as String?,
+                        child: Text(manifest['name']?.toString() ?? 'Manifest'),
+                      ),
                   ],
                   onChanged: (value) => manifestId = value ?? manifestId,
                   decoration: const InputDecoration(labelText: 'Manifest'),
                 ),
-                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Title')),
-                TextField(controller: targetController, decoration: const InputDecoration(labelText: 'Target path')),
-                TextField(controller: contentController, maxLines: 4, decoration: const InputDecoration(labelText: 'Content')),
+                TextField(
+                  controller: titleController,
+                  decoration: const InputDecoration(labelText: 'Title'),
+                ),
+                TextField(
+                  controller: targetController,
+                  decoration: const InputDecoration(labelText: 'Target path'),
+                ),
+                TextField(
+                  controller: contentController,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Content'),
+                ),
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
               onPressed: () async {
                 await widget.controller.createOutputAction(
@@ -2158,10 +3670,18 @@ class ReceiptsScreen extends StatelessWidget {
                   for (final receipt in controller.executionReceipts)
                     Card(
                       child: ListTile(
-                        selected: receipt['receipt_id'] == controller.selectedReceiptId,
-                        onTap: () => controller.selectReceipt(receipt['receipt_id'] as String?),
-                        title: Text(receipt['receipt_id']?.toString() ?? 'Receipt'),
-                        subtitle: Text('${receipt['action_id'] ?? ''} • ${receipt['result'] ?? ''}'),
+                        selected:
+                            receipt['receipt_id'] ==
+                            controller.selectedReceiptId,
+                        onTap: () => controller.selectReceipt(
+                          receipt['receipt_id'] as String?,
+                        ),
+                        title: Text(
+                          receipt['receipt_id']?.toString() ?? 'Receipt',
+                        ),
+                        subtitle: Text(
+                          '${receipt['action_id'] ?? ''} • ${receipt['result'] ?? ''}',
+                        ),
                       ),
                     ),
                 ],
@@ -2173,7 +3693,8 @@ class ReceiptsScreen extends StatelessWidget {
             flex: 3,
             child: SectionCard(
               title: 'Receipt Detail',
-              subtitle: selected?['receipt_id']?.toString() ?? 'No receipt selected',
+              subtitle:
+                  selected?['receipt_id']?.toString() ?? 'No receipt selected',
               child: selected == null
                   ? const Text('Select a receipt to inspect it.')
                   : _keyValueGrid([
@@ -2181,14 +3702,36 @@ class ReceiptsScreen extends StatelessWidget {
                       ('Action ID', selected['action_id']?.toString() ?? ''),
                       ('Manifest', selected['manifest_id']?.toString() ?? ''),
                       ('Target', selected['target_path']?.toString() ?? ''),
-                      ('Previous hash', selected['previous_hash']?.toString() ?? 'None'),
-                      ('Resulting hash', selected['resulting_hash']?.toString() ?? ''),
-                      ('Backup path', selected['backup_path']?.toString() ?? 'None'),
-                      ('Rollback available', selected['rollback_available'] == true ? 'Yes' : 'No'),
+                      (
+                        'Previous hash',
+                        selected['previous_hash']?.toString() ?? 'None',
+                      ),
+                      (
+                        'Resulting hash',
+                        selected['resulting_hash']?.toString() ?? '',
+                      ),
+                      (
+                        'Backup path',
+                        selected['backup_path']?.toString() ?? 'None',
+                      ),
+                      (
+                        'Rollback available',
+                        selected['rollback_available'] == true ? 'Yes' : 'No',
+                      ),
                       ('Chain ID', selected['chain_id']?.toString() ?? 'None'),
-                      ('Chain sequence', selected['chain_sequence']?.toString() ?? 'None'),
-                      ('Receipt hash', selected['receipt_content_hash']?.toString() ?? 'None'),
-                      ('Verification', selected['verification_status']?.toString() ?? 'unknown'),
+                      (
+                        'Chain sequence',
+                        selected['chain_sequence']?.toString() ?? 'None',
+                      ),
+                      (
+                        'Receipt hash',
+                        selected['receipt_content_hash']?.toString() ?? 'None',
+                      ),
+                      (
+                        'Verification',
+                        selected['verification_status']?.toString() ??
+                            'unknown',
+                      ),
                     ]),
             ),
           ),
@@ -2205,8 +3748,11 @@ class TrustCentreScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final latestReceipt = controller.executionReceipts.isNotEmpty ? controller.executionReceipts.first : null;
-    final compatibility = controller.integrationCompatibility ?? <String, dynamic>{};
+    final latestReceipt = controller.executionReceipts.isNotEmpty
+        ? controller.executionReceipts.first
+        : null;
+    final compatibility =
+        controller.integrationCompatibility ?? <String, dynamic>{};
     return _ScreenScaffold(
       title: 'Trust Centre',
       subtitle: 'Compatibility, chains, templates and retention posture',
@@ -2216,25 +3762,68 @@ class TrustCentreScreen extends StatelessWidget {
             title: 'Compatibility',
             subtitle: compatibility['status']?.toString() ?? 'Unavailable',
             child: _keyValueGrid([
-              ('Backend', compatibility['backend_version']?.toString() ?? 'unknown'),
-              ('Contract', compatibility['integration_contract_version']?.toString() ?? compatibility['contract_version']?.toString() ?? 'unknown'),
-              ('Client', compatibility['client_package_version']?.toString() ?? 'unknown'),
-              ('Capabilities', (compatibility['capabilities'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
-              ('Degraded', (compatibility['degraded_features'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
+              (
+                'Backend',
+                compatibility['backend_version']?.toString() ?? 'unknown',
+              ),
+              (
+                'Contract',
+                compatibility['integration_contract_version']?.toString() ??
+                    compatibility['contract_version']?.toString() ??
+                    'unknown',
+              ),
+              (
+                'Client',
+                compatibility['client_package_version']?.toString() ??
+                    'unknown',
+              ),
+              (
+                'Capabilities',
+                (compatibility['capabilities'] as List<dynamic>? ??
+                        const <dynamic>[])
+                    .join(', '),
+              ),
+              (
+                'Degraded',
+                (compatibility['degraded_features'] as List<dynamic>? ??
+                        const <dynamic>[])
+                    .join(', '),
+              ),
             ]),
           ),
           const SizedBox(height: 16),
           SectionCard(
             title: 'Receipt Chain',
-            subtitle: latestReceipt?['chain_id']?.toString() ?? 'No receipts yet',
+            subtitle:
+                latestReceipt?['chain_id']?.toString() ?? 'No receipts yet',
             child: latestReceipt == null
-                ? const Text('Create and execute an action to populate the receipt chain.')
+                ? const Text(
+                    'Create and execute an action to populate the receipt chain.',
+                  )
                 : _keyValueGrid([
-                    ('Chain ID', latestReceipt['chain_id']?.toString() ?? 'None'),
-                    ('Sequence', latestReceipt['chain_sequence']?.toString() ?? 'None'),
-                    ('Receipt hash', latestReceipt['receipt_content_hash']?.toString() ?? 'None'),
-                    ('Previous hash', latestReceipt['previous_receipt_hash']?.toString() ?? 'None'),
-                    ('Verification', latestReceipt['verification_status']?.toString() ?? 'unknown'),
+                    (
+                      'Chain ID',
+                      latestReceipt['chain_id']?.toString() ?? 'None',
+                    ),
+                    (
+                      'Sequence',
+                      latestReceipt['chain_sequence']?.toString() ?? 'None',
+                    ),
+                    (
+                      'Receipt hash',
+                      latestReceipt['receipt_content_hash']?.toString() ??
+                          'None',
+                    ),
+                    (
+                      'Previous hash',
+                      latestReceipt['previous_receipt_hash']?.toString() ??
+                          'None',
+                    ),
+                    (
+                      'Verification',
+                      latestReceipt['verification_status']?.toString() ??
+                          'unknown',
+                    ),
                   ]),
           ),
           const SizedBox(height: 16),
@@ -2259,7 +3848,8 @@ class EmbeddedWorkspaceScreen extends StatefulWidget {
   final GaiaAppController controller;
 
   @override
-  State<EmbeddedWorkspaceScreen> createState() => _EmbeddedWorkspaceScreenState();
+  State<EmbeddedWorkspaceScreen> createState() =>
+      _EmbeddedWorkspaceScreenState();
 }
 
 class _EmbeddedWorkspaceScreenState extends State<EmbeddedWorkspaceScreen> {
@@ -2269,7 +3859,9 @@ class _EmbeddedWorkspaceScreenState extends State<EmbeddedWorkspaceScreen> {
   void initState() {
     super.initState();
     dashboardController = GaiaDashboardController(
-      client: GaiaIntegrationClient(baseUri: Uri.parse(widget.controller.settings.backendUrl)),
+      client: GaiaIntegrationClient(
+        baseUri: Uri.parse(widget.controller.settings.backendUrl),
+      ),
     );
     unawaited(dashboardController.refresh());
   }
@@ -2297,9 +3889,7 @@ class _EmbeddedWorkspaceScreenState extends State<EmbeddedWorkspaceScreen> {
           ],
         ),
         const Divider(height: 1),
-        Expanded(
-          child: GaiaDashboardView(controller: dashboardController),
-        ),
+        Expanded(child: GaiaDashboardView(controller: dashboardController)),
       ],
     );
   }
@@ -2312,7 +3902,8 @@ class IntegrationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final compatibility = controller.integrationCompatibility ?? <String, dynamic>{};
+    final compatibility =
+        controller.integrationCompatibility ?? <String, dynamic>{};
     return _ScreenScaffold(
       title: 'Integration',
       subtitle: 'Dashboard-safe contract diagnostics',
@@ -2322,20 +3913,54 @@ class IntegrationScreen extends StatelessWidget {
             title: 'Contract State',
             subtitle: compatibility['status']?.toString() ?? 'Unavailable',
             child: _keyValueGrid([
-              ('Backend', compatibility['backend_version']?.toString() ?? 'unknown'),
-              ('Minimum API', compatibility['minimum_supported_api_version']?.toString() ?? 'unknown'),
-              ('Maximum API', compatibility['maximum_tested_api_version']?.toString() ?? 'unknown'),
-              ('Contract', compatibility['integration_contract_version']?.toString() ?? compatibility['contract_version']?.toString() ?? 'unknown'),
-              ('Loopback only', compatibility['loopback_only'] == true ? 'Yes' : 'No'),
+              (
+                'Backend',
+                compatibility['backend_version']?.toString() ?? 'unknown',
+              ),
+              (
+                'Minimum API',
+                compatibility['minimum_supported_api_version']?.toString() ??
+                    'unknown',
+              ),
+              (
+                'Maximum API',
+                compatibility['maximum_tested_api_version']?.toString() ??
+                    'unknown',
+              ),
+              (
+                'Contract',
+                compatibility['integration_contract_version']?.toString() ??
+                    compatibility['contract_version']?.toString() ??
+                    'unknown',
+              ),
+              (
+                'Loopback only',
+                compatibility['loopback_only'] == true ? 'Yes' : 'No',
+              ),
             ]),
           ),
           const SizedBox(height: 16),
           SectionCard(
             title: 'Feature Gating',
             child: _keyValueGrid([
-              ('Capabilities', (compatibility['capabilities'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
-              ('Degraded features', (compatibility['degraded_features'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
-              ('Warnings', (compatibility['deprecation_warnings'] as List<dynamic>? ?? const <dynamic>[]).join(', ')),
+              (
+                'Capabilities',
+                (compatibility['capabilities'] as List<dynamic>? ??
+                        const <dynamic>[])
+                    .join(', '),
+              ),
+              (
+                'Degraded features',
+                (compatibility['degraded_features'] as List<dynamic>? ??
+                        const <dynamic>[])
+                    .join(', '),
+              ),
+              (
+                'Warnings',
+                (compatibility['deprecation_warnings'] as List<dynamic>? ??
+                        const <dynamic>[])
+                    .join(', '),
+              ),
               ('Example host', 'This repo ships a loopback reference host'),
             ]),
           ),
@@ -2362,8 +3987,12 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
   @override
   void initState() {
     super.initState();
-    rootController = TextEditingController(text: widget.controller.settings.repositoryRootPath);
-    backendController = TextEditingController(text: widget.controller.settings.backendUrl);
+    rootController = TextEditingController(
+      text: widget.controller.settings.repositoryRootPath,
+    );
+    backendController = TextEditingController(
+      text: widget.controller.settings.backendUrl,
+    );
   }
 
   @override
@@ -2384,9 +4013,14 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
             padding: const EdgeInsets.all(24),
             children: [
               const SizedBox(height: 24),
-              Text('Welcome to GAIA', style: Theme.of(context).textTheme.displaySmall),
+              Text(
+                'Welcome to GAIA',
+                style: Theme.of(context).textTheme.displaySmall,
+              ),
               const SizedBox(height: 8),
-              const Text('Complete a short local setup before entering the desktop control centre.'),
+              const Text(
+                'Complete a short local setup before entering the desktop control centre.',
+              ),
               const SizedBox(height: 24),
               SectionCard(
                 title: 'Setup Stages',
@@ -2394,7 +4028,12 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
                   children: [
                     for (final check in controller.firstRunChecks)
                       ListTile(
-                        leading: Icon(check.passed ? Icons.check_circle : Icons.radio_button_unchecked, color: check.passed ? Colors.green : Colors.orange),
+                        leading: Icon(
+                          check.passed
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          color: check.passed ? Colors.green : Colors.orange,
+                        ),
                         title: Text(check.label),
                         subtitle: Text(check.details),
                       ),
@@ -2406,8 +4045,18 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
                 title: 'Locate Installation',
                 child: Column(
                   children: [
-                    TextField(controller: rootController, decoration: const InputDecoration(labelText: 'GAIA repository root')),
-                    TextField(controller: backendController, decoration: const InputDecoration(labelText: 'Backend URL')),
+                    TextField(
+                      controller: rootController,
+                      decoration: const InputDecoration(
+                        labelText: 'GAIA repository root',
+                      ),
+                    ),
+                    TextField(
+                      controller: backendController,
+                      decoration: const InputDecoration(
+                        labelText: 'Backend URL',
+                      ),
+                    ),
                     const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
@@ -2421,8 +4070,10 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
                                   try {
                                     await controller.updateSettings(
                                       controller.settings.copyWith(
-                                        repositoryRootPath: rootController.text.trim(),
-                                        backendUrl: backendController.text.trim(),
+                                        repositoryRootPath: rootController.text
+                                            .trim(),
+                                        backendUrl: backendController.text
+                                            .trim(),
                                       ),
                                     );
                                     await controller.connectToBackend();
@@ -2436,11 +4087,15 @@ class _FirstRunScreenState extends State<FirstRunScreen> {
                           child: const Text('Finish setup'),
                         ),
                         OutlinedButton(
-                          onPressed: starting ? null : controller.startLocalBackend,
+                          onPressed: starting
+                              ? null
+                              : controller.startLocalBackend,
                           child: const Text('Start local backend'),
                         ),
                         OutlinedButton(
-                          onPressed: starting ? null : controller.connectToBackend,
+                          onPressed: starting
+                              ? null
+                              : controller.connectToBackend,
                           child: const Text('Check backend'),
                         ),
                       ],
@@ -2509,7 +4164,10 @@ Widget _statusCard(String label, String value, bool ok) {
           children: [
             Text(label),
             const SizedBox(height: 8),
-            Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            Text(
+              value,
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 8),
             Text(ok ? 'Operational' : 'Needs attention'),
           ],
@@ -2530,7 +4188,10 @@ Widget _keyValueGrid(List<(String, String)> values) {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(entry.$1, style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                entry.$1,
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
               const SizedBox(height: 4),
               Text(entry.$2),
             ],
@@ -2538,6 +4199,150 @@ Widget _keyValueGrid(List<(String, String)> values) {
         ),
     ],
   );
+}
+
+String _portfolioCount(Map<String, dynamic>? portfolio, String key) {
+  final value = portfolio?[key];
+  if (value is List) {
+    return value.length.toString();
+  }
+  if (value is Map) {
+    return value.length.toString();
+  }
+  return '0';
+}
+
+String _portfolioProjectState(
+  Map<String, dynamic>? portfolio,
+  String projectId,
+) {
+  return _portfolioProjectField(portfolio, projectId, 'normalized_status') ??
+      'unknown';
+}
+
+String _portfolioProjectPriority(
+  Map<String, dynamic>? portfolio,
+  String projectId,
+) {
+  return _portfolioProjectField(portfolio, projectId, 'latest_priority_tier') ??
+      'unknown';
+}
+
+String? _portfolioProjectField(
+  Map<String, dynamic>? portfolio,
+  String projectId,
+  String field,
+) {
+  final projects = portfolio?['projects'];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        return entry[field]?.toString();
+      }
+    }
+  }
+  return null;
+}
+
+String _mapString(
+  Map<String, dynamic>? portfolio,
+  String listKey,
+  String projectId,
+  String field,
+) {
+  final projects = portfolio?[listKey];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        return entry[field]?.toString() ?? 'Unknown';
+      }
+    }
+  }
+  return 'Unknown';
+}
+
+String _mapList(
+  Map<String, dynamic>? portfolio,
+  String listKey,
+  String projectId,
+  String field,
+) {
+  final projects = portfolio?[listKey];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        final value = entry[field];
+        if (value is List) {
+          return value.map((item) => item.toString()).join(', ');
+        }
+      }
+    }
+  }
+  return 'None';
+}
+
+String _mapBool(
+  Map<String, dynamic>? portfolio,
+  String listKey,
+  String projectId,
+  String field,
+) {
+  final value = _mapValue(portfolio, listKey, projectId, field);
+  if (value == null) {
+    return 'Unknown';
+  }
+  return value is bool ? (value ? 'Yes' : 'No') : value.toString();
+}
+
+String _mapNested(
+  Map<String, dynamic>? portfolio,
+  String listKey,
+  String projectId,
+  String field,
+) {
+  final value = _mapValue(portfolio, listKey, projectId, field);
+  if (value is Map) {
+    return value.entries
+        .map((entry) => '${entry.key}: ${entry.value}')
+        .join(', ');
+  }
+  return value?.toString() ?? 'Unknown';
+}
+
+dynamic _mapValue(
+  Map<String, dynamic>? portfolio,
+  String listKey,
+  String projectId,
+  String field,
+) {
+  final projects = portfolio?[listKey];
+  if (projects is List) {
+    for (final project in projects.whereType<Map>()) {
+      final entry = project.cast<String, dynamic>();
+      if (entry['project_id']?.toString() == projectId) {
+        return entry[field];
+      }
+    }
+  }
+  return null;
+}
+
+String _joinList(dynamic value) {
+  if (value is List) {
+    return value.map((item) => item.toString()).join(', ');
+  }
+  return value?.toString() ?? 'None';
+}
+
+String _shortFingerprint(dynamic value) {
+  final text = value?.toString() ?? '';
+  if (text.length <= 8) {
+    return text;
+  }
+  return text.substring(0, 8);
 }
 
 Widget _filterBox({
@@ -2551,7 +4356,8 @@ Widget _filterBox({
     child: DropdownButtonFormField<String>(
       initialValue: value,
       items: [
-        for (final entry in values) DropdownMenuItem(value: entry, child: Text(entry)),
+        for (final entry in values)
+          DropdownMenuItem(value: entry, child: Text(entry)),
       ],
       onChanged: onChanged,
       decoration: InputDecoration(labelText: label),

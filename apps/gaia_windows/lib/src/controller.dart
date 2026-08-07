@@ -50,6 +50,21 @@ class GaiaAppController extends ChangeNotifier {
   List<DraftRecord> drafts = <DraftRecord>[];
   List<ApprovalRecord> approvals = <ApprovalRecord>[];
   List<DailyBriefRecord> briefs = <DailyBriefRecord>[];
+  Map<String, dynamic>? healthPortfolio;
+  Map<String, dynamic>? changePortfolio;
+  Map<String, dynamic>? recommendationPortfolio;
+  List<Map<String, dynamic>> projectHealthSnapshots = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> projectChangeFindings = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> projectRecommendations = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> recommendationQueue = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> workPackages = <Map<String, dynamic>>[];
+  Map<String, dynamic>? selectedRecommendationDetail;
+  Map<String, dynamic>? selectedWorkPackageDetail;
+  Map<String, dynamic>? selectedWorkPackageSummary;
+  List<Map<String, dynamic>> selectedWorkPackageRevisions = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> selectedWorkPackageApprovalDecisions = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> selectedWorkPackageHandoffs = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> selectedWorkPackageOutcomes = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> permissionManifests = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> outputActions = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> executionReceipts = <Map<String, dynamic>>[];
@@ -63,6 +78,8 @@ class GaiaAppController extends ChangeNotifier {
   String? selectedDraftId;
   String? selectedApprovalId;
   String? selectedBriefId;
+  String? selectedRecommendationId;
+  String? selectedWorkPackageId;
   String? selectedActionId;
   String? selectedManifestId;
   String? selectedReceiptId;
@@ -247,6 +264,7 @@ class GaiaAppController extends ChangeNotifier {
       searchResults = <SearchResult>[];
     }
     await refreshWorkflowRecords(projectId: projectId);
+    await refreshPlanningWorkspace(projectId: projectId);
     notifyListeners();
   }
 
@@ -307,6 +325,124 @@ class GaiaAppController extends ChangeNotifier {
     selectedActionId ??= outputActions.isEmpty ? null : outputActions.first['action_id'] as String?;
     selectedReceiptId ??= executionReceipts.isEmpty ? null : executionReceipts.first['receipt_id'] as String?;
     await refreshSelectedAction();
+    notifyListeners();
+  }
+
+  Future<void> refreshPlanningWorkspace({String? projectId}) async {
+    final activeProjectId = projectId ?? selectedProjectId;
+    try {
+      healthPortfolio = await _client.projectHealthPortfolio();
+    } catch (_) {
+      healthPortfolio = null;
+    }
+    try {
+      changePortfolio = await _client.projectChangePortfolio();
+    } catch (_) {
+      changePortfolio = null;
+    }
+    try {
+      recommendationPortfolio = await _client.projectRecommendationPortfolio();
+    } catch (_) {
+      recommendationPortfolio = null;
+    }
+    if (activeProjectId != null) {
+      try {
+        projectHealthSnapshots = await _client.projectHealthSnapshots(activeProjectId);
+      } catch (_) {
+        projectHealthSnapshots = <Map<String, dynamic>>[];
+      }
+      try {
+        projectChangeFindings = await _client.projectChangeFindings(activeProjectId);
+      } catch (_) {
+        projectChangeFindings = <Map<String, dynamic>>[];
+      }
+      try {
+        projectRecommendations = await _client.projectRecommendations(activeProjectId);
+        if (projectRecommendations.isEmpty) {
+          projectRecommendations = await _client.generateProjectRecommendations(activeProjectId);
+        }
+      } catch (_) {
+        projectRecommendations = <Map<String, dynamic>>[];
+      }
+      try {
+        recommendationQueue = await _client.recommendationQueue(projectId: activeProjectId);
+      } catch (_) {
+        recommendationQueue = <Map<String, dynamic>>[];
+      }
+      try {
+        workPackages = await _client.listWorkPackages(projectId: activeProjectId);
+      } catch (_) {
+        workPackages = <Map<String, dynamic>>[];
+      }
+    } else {
+      projectHealthSnapshots = <Map<String, dynamic>>[];
+      projectChangeFindings = <Map<String, dynamic>>[];
+      projectRecommendations = <Map<String, dynamic>>[];
+      recommendationQueue = <Map<String, dynamic>>[];
+      workPackages = <Map<String, dynamic>>[];
+      selectedRecommendationId = null;
+      selectedWorkPackageId = null;
+      selectedRecommendationDetail = null;
+      selectedWorkPackageDetail = null;
+      selectedWorkPackageSummary = null;
+      selectedWorkPackageRevisions = <Map<String, dynamic>>[];
+      selectedWorkPackageApprovalDecisions = <Map<String, dynamic>>[];
+      selectedWorkPackageHandoffs = <Map<String, dynamic>>[];
+      selectedWorkPackageOutcomes = <Map<String, dynamic>>[];
+    }
+    final recommendationKnown = selectedRecommendationId != null &&
+        projectRecommendations.any((item) => item['recommendation_id']?.toString() == selectedRecommendationId);
+    final workPackageKnown = selectedWorkPackageId != null &&
+        workPackages.any((item) => item['work_package_id']?.toString() == selectedWorkPackageId);
+    if (!recommendationKnown) {
+      selectedRecommendationId = projectRecommendations.isEmpty ? null : projectRecommendations.first['recommendation_id'] as String?;
+    }
+    if (!workPackageKnown) {
+      selectedWorkPackageId = workPackages.isEmpty ? null : workPackages.first['work_package_id'] as String?;
+    }
+    await refreshSelectedRecommendation();
+    await refreshSelectedWorkPackage();
+    notifyListeners();
+  }
+
+  Future<void> refreshSelectedRecommendation() async {
+    if (selectedRecommendationId == null) {
+      selectedRecommendationDetail = null;
+      return;
+    }
+    try {
+      selectedRecommendationDetail = await _client.getRecommendation(selectedRecommendationId!);
+    } catch (_) {
+      selectedRecommendationDetail = null;
+    }
+    notifyListeners();
+  }
+
+  Future<void> refreshSelectedWorkPackage() async {
+    if (selectedWorkPackageId == null) {
+      selectedWorkPackageDetail = null;
+      selectedWorkPackageSummary = null;
+      selectedWorkPackageRevisions = <Map<String, dynamic>>[];
+      selectedWorkPackageApprovalDecisions = <Map<String, dynamic>>[];
+      selectedWorkPackageHandoffs = <Map<String, dynamic>>[];
+      selectedWorkPackageOutcomes = <Map<String, dynamic>>[];
+      return;
+    }
+    try {
+      selectedWorkPackageDetail = await _client.getWorkPackage(selectedWorkPackageId!);
+      selectedWorkPackageSummary = await _client.workPackageSummary(selectedWorkPackageId!);
+      selectedWorkPackageRevisions = await _client.workPackageRevisions(selectedWorkPackageId!);
+      selectedWorkPackageApprovalDecisions = await _client.workPackageApprovalDecisions(selectedWorkPackageId!);
+      selectedWorkPackageHandoffs = await _client.workPackageHandoffs(selectedWorkPackageId!);
+      selectedWorkPackageOutcomes = await _client.workPackageOutcomes(selectedWorkPackageId!);
+    } catch (_) {
+      selectedWorkPackageDetail = null;
+      selectedWorkPackageSummary = null;
+      selectedWorkPackageRevisions = <Map<String, dynamic>>[];
+      selectedWorkPackageApprovalDecisions = <Map<String, dynamic>>[];
+      selectedWorkPackageHandoffs = <Map<String, dynamic>>[];
+      selectedWorkPackageOutcomes = <Map<String, dynamic>>[];
+    }
     notifyListeners();
   }
 
@@ -548,6 +684,100 @@ class GaiaAppController extends ChangeNotifier {
       previewSummary: previewSummary,
       approvedContentHash: draft.currentContentHash,
     );
+  }
+
+  Future<void> refreshPlanningWorkspaceForProject(String projectId) async {
+    await refreshPlanningWorkspace(projectId: projectId);
+  }
+
+  Future<void> generateRecommendations(String projectId) async {
+    await _client.generateProjectRecommendations(projectId);
+    await refreshPlanningWorkspace(projectId: projectId);
+  }
+
+  Future<void> captureProjectHealth(String projectId) async {
+    await _client.captureProjectHealth(projectId);
+    await refreshPlanningWorkspace(projectId: projectId);
+  }
+
+  Future<void> generateWorkPackage(String recommendationId) async {
+    final package = await _client.generateWorkPackage(recommendationId);
+    selectedWorkPackageId = package['work_package_id'] as String?;
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> submitWorkPackageForReview(String workPackageId, int revisionNumber, {String actor = 'manual'}) async {
+    await _client.submitWorkPackageForReview(workPackageId, revisionNumber: revisionNumber, actor: actor);
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> approveWorkPackage(String workPackageId, int revisionNumber, {String actor = 'manual', String? humanNote}) async {
+    await _client.approveWorkPackage(workPackageId, revisionNumber: revisionNumber, actor: actor, humanNote: humanNote);
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> rejectWorkPackage(String workPackageId, int revisionNumber, {String actor = 'manual', String? humanNote}) async {
+    await _client.rejectWorkPackage(workPackageId, revisionNumber: revisionNumber, actor: actor, humanNote: humanNote);
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> handoffWorkPackage(
+    String workPackageId,
+    int revisionNumber, {
+    String approvedBy = 'manual',
+    String nextManualAction = 'Copy the approved Codex prompt into Codex.',
+    String rollbackReference = 'Return to the recorded baseline commit or last approved revision.',
+  }) async {
+    await _client.handoffWorkPackage(
+      workPackageId,
+      revisionNumber: revisionNumber,
+      approvedBy: approvedBy,
+      nextManualAction: nextManualAction,
+      rollbackReference: rollbackReference,
+    );
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> recordWorkPackageOutcome(
+    String workPackageId,
+    int revisionNumber, {
+    required String outcome,
+    String actor = 'manual',
+    String? note,
+  }) async {
+    await _client.recordWorkPackageOutcome(
+      workPackageId,
+      revisionNumber: revisionNumber,
+      outcome: outcome,
+      actor: actor,
+      note: note,
+    );
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> reviseWorkPackage(
+    String workPackageId, {
+    required String changeReason,
+    Map<String, dynamic>? fieldUpdates,
+    String actor = 'manual',
+  }) async {
+    await _client.reviseWorkPackage(
+      workPackageId,
+      changeReason: changeReason,
+      fieldUpdates: fieldUpdates,
+      actor: actor,
+    );
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> detectWorkPackageStaleness(String workPackageId) async {
+    await _client.detectWorkPackageStaleness(workPackageId);
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
+  }
+
+  Future<void> expireWorkPackage(String workPackageId, {String reason = 'manual expiry'}) async {
+    await _client.expireWorkPackage(workPackageId, reason: reason);
+    await refreshPlanningWorkspace(projectId: selectedProjectId);
   }
 
   Future<void> createPermissionManifest({
@@ -854,6 +1084,30 @@ class GaiaAppController extends ChangeNotifier {
     return null;
   }
 
+  Map<String, dynamic>? get selectedRecommendation {
+    if (selectedRecommendationId == null) {
+      return null;
+    }
+    for (final recommendation in projectRecommendations) {
+      if (recommendation['recommendation_id'] == selectedRecommendationId) {
+        return recommendation;
+      }
+    }
+    return selectedRecommendationDetail;
+  }
+
+  Map<String, dynamic>? get selectedWorkPackage {
+    if (selectedWorkPackageId == null) {
+      return null;
+    }
+    for (final workPackage in workPackages) {
+      if (workPackage['work_package_id'] == selectedWorkPackageId) {
+        return workPackage;
+      }
+    }
+    return selectedWorkPackageDetail;
+  }
+
   void selectProject(String? projectId) {
     if (selectedProjectId == projectId) {
       return;
@@ -891,6 +1145,24 @@ class GaiaAppController extends ChangeNotifier {
       return;
     }
     selectedBriefId = briefId;
+    notifyListeners();
+  }
+
+  void selectRecommendation(String? recommendationId) {
+    if (selectedRecommendationId == recommendationId) {
+      return;
+    }
+    selectedRecommendationId = recommendationId;
+    unawaited(refreshSelectedRecommendation());
+    notifyListeners();
+  }
+
+  void selectWorkPackage(String? workPackageId) {
+    if (selectedWorkPackageId == workPackageId) {
+      return;
+    }
+    selectedWorkPackageId = workPackageId;
+    unawaited(refreshSelectedWorkPackage());
     notifyListeners();
   }
 
