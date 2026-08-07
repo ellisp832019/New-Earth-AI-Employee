@@ -9,6 +9,8 @@ from gaia.conversation import AgentRunRecord
 from gaia.models import (
     AuditEvent,
     DocumentRecord,
+    ProjectChangeComparison,
+    ProjectChangeFinding,
     ProjectHealthSnapshot,
     RepositorySnapshot,
     SearchResult,
@@ -16,7 +18,7 @@ from gaia.models import (
 
 
 class Database:
-    SCHEMA_VERSION = 8
+    SCHEMA_VERSION = 9
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -67,6 +69,54 @@ class Database:
                 content_fingerprint TEXT NOT NULL,
                 provenance_reference TEXT,
                 audit_event_id TEXT
+            );
+            CREATE TABLE IF NOT EXISTS project_change_comparisons (
+                comparison_id TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                detector_version TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                comparison_kind TEXT NOT NULL,
+                previous_snapshot_id TEXT NOT NULL,
+                current_snapshot_id TEXT NOT NULL,
+                previous_snapshot_fingerprint TEXT NOT NULL,
+                current_snapshot_fingerprint TEXT NOT NULL,
+                capture_timestamp TEXT NOT NULL,
+                comparison_status TEXT NOT NULL,
+                meaningful_change_detected INTEGER NOT NULL,
+                finding_count INTEGER NOT NULL,
+                finding_ids_json TEXT NOT NULL,
+                detector_outcomes_json TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                provenance_reference TEXT,
+                audit_event_id TEXT,
+                content_fingerprint TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS project_change_findings (
+                finding_id TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                comparison_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                finding_type TEXT NOT NULL,
+                change_class TEXT NOT NULL,
+                severity TEXT NOT NULL,
+                direction TEXT NOT NULL,
+                confidence TEXT NOT NULL,
+                status TEXT NOT NULL,
+                capture_timestamp TEXT NOT NULL,
+                previous_snapshot_id TEXT NOT NULL,
+                current_snapshot_id TEXT NOT NULL,
+                previous_snapshot_fingerprint TEXT NOT NULL,
+                current_snapshot_fingerprint TEXT NOT NULL,
+                reason_codes_json TEXT NOT NULL,
+                explanation TEXT NOT NULL,
+                evidence_references_json TEXT NOT NULL,
+                evidence_json TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                detector_version TEXT NOT NULL,
+                provenance_reference TEXT,
+                audit_event_id TEXT,
+                content_fingerprint TEXT NOT NULL,
+                FOREIGN KEY(comparison_id) REFERENCES project_change_comparisons(comparison_id)
             );
             CREATE TABLE IF NOT EXISTS audit_events (
                 event_id TEXT PRIMARY KEY,
@@ -486,6 +536,17 @@ class Database:
                 "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_project_timestamp ON project_health_snapshots(project_id, capture_timestamp DESC)",
                 "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_normalized_status ON project_health_snapshots(normalized_status)",
                 "CREATE INDEX IF NOT EXISTS idx_project_health_snapshots_content_fingerprint ON project_health_snapshots(content_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_comparisons_project_id ON project_change_comparisons(project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_comparisons_capture_timestamp ON project_change_comparisons(capture_timestamp)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_comparisons_project_timestamp ON project_change_comparisons(project_id, capture_timestamp DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_comparisons_content_fingerprint ON project_change_comparisons(content_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_findings_project_id ON project_change_findings(project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_findings_comparison_id ON project_change_findings(comparison_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_findings_change_class ON project_change_findings(change_class)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_findings_severity ON project_change_findings(severity)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_findings_capture_timestamp ON project_change_findings(capture_timestamp)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_findings_current_snapshot_id ON project_change_findings(current_snapshot_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_change_findings_content_fingerprint ON project_change_findings(content_fingerprint)",
             ]
         )
         self.connection.commit()
@@ -705,6 +766,169 @@ class Database:
             if snapshot is not None:
                 snapshots.append(snapshot)
         return snapshots
+
+    def insert_project_change_comparison(self, comparison: ProjectChangeComparison) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR IGNORE INTO project_change_comparisons(
+                    comparison_id, schema_version, detector_version, project_id, comparison_kind,
+                    previous_snapshot_id, current_snapshot_id, previous_snapshot_fingerprint,
+                    current_snapshot_fingerprint, capture_timestamp, comparison_status,
+                    meaningful_change_detected, finding_count, finding_ids_json, detector_outcomes_json,
+                    normalized_payload_json, provenance_reference, audit_event_id, content_fingerprint
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    comparison.comparison_id,
+                    comparison.schema_version,
+                    comparison.detector_version,
+                    comparison.project_id,
+                    comparison.comparison_kind,
+                    comparison.previous_snapshot_id,
+                    comparison.current_snapshot_id,
+                    comparison.previous_snapshot_fingerprint,
+                    comparison.current_snapshot_fingerprint,
+                    comparison.capture_timestamp.isoformat(),
+                    comparison.comparison_status,
+                    int(comparison.meaningful_change_detected),
+                    comparison.finding_count,
+                    json.dumps(comparison.finding_ids, default=str, sort_keys=True),
+                    json.dumps(comparison.detector_outcomes, default=str, sort_keys=True),
+                    comparison.model_dump_json(),
+                    comparison.provenance_reference,
+                    comparison.audit_event_id,
+                    comparison.content_fingerprint,
+                ),
+            )
+
+    def update_project_change_comparison_audit_event(self, comparison_id: str, audit_event_id: str) -> None:
+        with self.connection:
+            self.connection.execute(
+                "UPDATE project_change_comparisons SET audit_event_id = ? WHERE comparison_id = ?",
+                (audit_event_id, comparison_id),
+            )
+
+    def get_project_change_comparison(self, comparison_id: str) -> ProjectChangeComparison | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_change_comparisons WHERE comparison_id = ?",
+            (comparison_id,),
+        ).fetchone()
+        return ProjectChangeComparison.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_project_change_comparisons(self, project_id: str) -> list[ProjectChangeComparison]:
+        rows = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_change_comparisons WHERE project_id = ? ORDER BY capture_timestamp DESC, comparison_id DESC",
+            (project_id,),
+        ).fetchall()
+        return [ProjectChangeComparison.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def latest_project_change_comparison(self, project_id: str) -> ProjectChangeComparison | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_change_comparisons WHERE project_id = ? ORDER BY capture_timestamp DESC, comparison_id DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()
+        return ProjectChangeComparison.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def insert_project_change_finding(self, finding: ProjectChangeFinding) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR IGNORE INTO project_change_findings(
+                    finding_id, schema_version, comparison_id, project_id, finding_type, change_class,
+                    severity, direction, confidence, status, capture_timestamp, previous_snapshot_id,
+                    current_snapshot_id, previous_snapshot_fingerprint, current_snapshot_fingerprint,
+                    reason_codes_json, explanation, evidence_references_json, evidence_json,
+                    normalized_payload_json, detector_version, provenance_reference, audit_event_id,
+                    content_fingerprint
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    finding.finding_id,
+                    finding.schema_version,
+                    finding.comparison_id,
+                    finding.project_id,
+                    finding.finding_type,
+                    finding.change_class,
+                    finding.severity,
+                    finding.direction,
+                    finding.confidence,
+                    finding.status,
+                    finding.capture_timestamp.isoformat(),
+                    finding.previous_snapshot_id,
+                    finding.current_snapshot_id,
+                    finding.previous_snapshot_fingerprint,
+                    finding.current_snapshot_fingerprint,
+                    json.dumps(finding.reason_codes, default=str, sort_keys=True),
+                    finding.explanation,
+                    json.dumps([item.model_dump(mode="json") for item in finding.evidence_references], default=str, sort_keys=True),
+                    json.dumps(finding.evidence, default=str, sort_keys=True),
+                    finding.model_dump_json(),
+                    finding.detector_version,
+                    finding.provenance_reference,
+                    finding.audit_event_id,
+                    finding.content_fingerprint,
+                ),
+            )
+
+    def update_project_change_finding_audit_event(self, finding_id: str, audit_event_id: str) -> None:
+        with self.connection:
+            self.connection.execute(
+                "UPDATE project_change_findings SET audit_event_id = ? WHERE finding_id = ?",
+                (audit_event_id, finding_id),
+            )
+
+    def get_project_change_finding(self, finding_id: str) -> ProjectChangeFinding | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_change_findings WHERE finding_id = ?",
+            (finding_id,),
+        ).fetchone()
+        return ProjectChangeFinding.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_project_change_findings(self, project_id: str) -> list[ProjectChangeFinding]:
+        rows = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_change_findings WHERE project_id = ? ORDER BY capture_timestamp DESC, finding_id DESC",
+            (project_id,),
+        ).fetchall()
+        return [ProjectChangeFinding.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_project_change_findings_by_comparison(self, comparison_id: str) -> list[ProjectChangeFinding]:
+        rows = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_change_findings WHERE comparison_id = ? ORDER BY severity, capture_timestamp DESC, finding_id DESC",
+            (comparison_id,),
+        ).fetchall()
+        return [ProjectChangeFinding.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def latest_project_change_findings(self, project_id: str) -> list[ProjectChangeFinding]:
+        row = self.connection.execute(
+            """
+            SELECT comparison_id
+            FROM project_change_comparisons
+            WHERE project_id = ? AND meaningful_change_detected = 1
+            ORDER BY capture_timestamp DESC, comparison_id DESC
+            LIMIT 1
+            """,
+            (project_id,),
+        ).fetchone()
+        if row is None:
+            return []
+        return self.list_project_change_findings_by_comparison(str(row["comparison_id"]))
+
+    def recent_project_change_findings(self, project_ids: list[str], limit: int = 50) -> list[ProjectChangeFinding]:
+        if not project_ids:
+            return []
+        placeholders = ",".join("?" for _ in project_ids)
+        rows = self.connection.execute(
+            f"""
+            SELECT normalized_payload_json
+            FROM project_change_findings
+            WHERE project_id IN ({placeholders})
+            ORDER BY capture_timestamp DESC, project_id ASC, finding_id DESC
+            LIMIT ?
+            """,
+            [*project_ids, max(1, min(limit, 1000))],
+        ).fetchall()
+        return [ProjectChangeFinding.model_validate_json(row["normalized_payload_json"]) for row in rows]
 
     def insert_audit_event(self, event: AuditEvent) -> None:
         with self.connection:

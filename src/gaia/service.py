@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections import Counter
 
 from gaia.audit import AuditRecorder
+from gaia.change_intelligence import ChangeIntelligenceService
 from gaia.config import Settings
 from gaia.db import Database
 from gaia.git_inspector import GitInspector
 from gaia.models import (
+    ProjectChangeComparison,
+    ProjectChangeFinding,
+    ProjectChangePortfolio,
     ProjectConfig,
     ProjectHealthPortfolio,
     ProjectHealthSnapshot,
@@ -25,6 +29,7 @@ class ProjectService:
         self.audit = AuditRecorder(self.database)
         self.git = GitInspector(settings.git_timeout_seconds, settings.max_git_output_bytes)
         self.project_health_service = ProjectHealthService(settings, self.database, self.audit, self.git)
+        self.change_intelligence_service = ChangeIntelligenceService(settings, self.database, self.audit)
         self.scanner = DocumentScanner(settings.max_file_bytes)
 
     def get_project(self, project_id: str) -> ProjectConfig:
@@ -149,3 +154,26 @@ class ProjectService:
 
     def project_health_portfolio(self) -> ProjectHealthPortfolio:
         return self.project_health_service.portfolio_view()
+
+    def compare_project_health_snapshots(
+        self, previous_snapshot_id: str, current_snapshot_id: str
+    ) -> ProjectChangeComparison:
+        return self.change_intelligence_service.compare_snapshots(previous_snapshot_id, current_snapshot_id)
+
+    def compare_latest_project_health(self, project_id: str) -> ProjectChangeComparison | None:
+        return self.change_intelligence_service.compare_latest_project_health(project_id)
+
+    def get_project_change_comparison(self, comparison_id: str) -> ProjectChangeComparison | None:
+        return self.change_intelligence_service.get_change_comparison(comparison_id)
+
+    def list_project_change_findings(self, project_id: str) -> list[ProjectChangeFinding]:
+        return self.change_intelligence_service.list_project_change_findings(project_id)
+
+    def latest_project_change_findings(self, project_id: str) -> list[ProjectChangeFinding]:
+        return self.change_intelligence_service.latest_project_change_findings(project_id)
+
+    def recent_project_change_findings(self, limit: int = 50) -> list[ProjectChangeFinding]:
+        return self.change_intelligence_service.recent_project_change_findings(limit)
+
+    def project_change_portfolio(self) -> ProjectChangePortfolio:
+        return self.change_intelligence_service.portfolio_change_view()

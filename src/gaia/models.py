@@ -287,3 +287,97 @@ class ProjectHealthPortfolio(BaseModel):
     projects_without_snapshots: list[str] = Field(default_factory=list)
     counts_by_status: dict[str, int] = Field(default_factory=dict)
     latest_snapshot_ids: dict[str, str] = Field(default_factory=dict)
+
+
+ChangeClass = Literal[
+    "snapshot_delta",
+    "health_transition",
+    "branch_change",
+    "head_change",
+    "working_tree_change",
+    "upstream_divergence",
+    "important_path_change",
+    "evidence_freshness_change",
+    "configuration_change",
+    "release_drift",
+    "contract_drift",
+    "documentation_drift",
+    "dependency_drift",
+    "test_regression",
+    "untracked_work",
+    "not_evaluated",
+]
+
+ChangeDirection = Literal["improved", "degraded", "changed", "unchanged", "unknown"]
+ChangeSeverity = Literal["info", "low", "medium", "high", "critical", "not_evaluated"]
+ChangeConfidence = Literal["high", "medium", "low", "unknown"]
+ChangeFindingStatus = Literal["active", "suppressed", "not_evaluated"]
+ChangeComparisonStatus = Literal["compared", "no_meaningful_change", "insufficient_evidence", "not_evaluated"]
+
+
+class ProjectChangeComparison(BaseModel):
+    comparison_id: str = Field(default_factory=lambda: str(uuid4()))
+    schema_version: int = 1
+    detector_version: str
+    project_id: str
+    comparison_kind: str = "explicit"
+    previous_snapshot_id: str
+    current_snapshot_id: str
+    previous_snapshot_fingerprint: str
+    current_snapshot_fingerprint: str
+    capture_timestamp: datetime = Field(default_factory=utc_now)
+    comparison_status: ChangeComparisonStatus = "compared"
+    meaningful_change_detected: bool = False
+    finding_count: int = 0
+    finding_ids: list[str] = Field(default_factory=list)
+    detector_outcomes: list[dict[str, Any]] = Field(default_factory=list)
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+    provenance_reference: str | None = None
+    audit_event_id: str | None = None
+    content_fingerprint: str = ""
+
+
+class ProjectChangeFinding(BaseModel):
+    finding_id: str = Field(default_factory=lambda: str(uuid4()))
+    schema_version: int = 1
+    comparison_id: str
+    project_id: str
+    finding_type: ChangeClass
+    change_class: ChangeClass
+    severity: ChangeSeverity = "info"
+    direction: ChangeDirection = "unknown"
+    confidence: ChangeConfidence = "unknown"
+    status: ChangeFindingStatus = "active"
+    capture_timestamp: datetime = Field(default_factory=utc_now)
+    previous_snapshot_id: str
+    current_snapshot_id: str
+    previous_snapshot_fingerprint: str
+    current_snapshot_fingerprint: str
+    reason_codes: list[str] = Field(default_factory=list)
+    explanation: str = ""
+    evidence_references: list[ProjectHealthEvidenceReference] = Field(default_factory=list)
+    evidence: dict[str, Any] = Field(default_factory=dict)
+    normalized_payload: dict[str, Any] = Field(default_factory=dict)
+    detector_version: str = ""
+    provenance_reference: str | None = None
+    audit_event_id: str | None = None
+    content_fingerprint: str = ""
+
+
+class ProjectChangePortfolioEntry(BaseModel):
+    project_id: str
+    project_name: str
+    latest_health_status: ProjectHealthStatus = "unknown"
+    latest_meaningful_change_timestamp: datetime | None = None
+    latest_comparison_id: str | None = None
+    latest_comparison_freshness: str = "unknown"
+    stale_evidence: bool = False
+    counts_by_severity: dict[str, int] = Field(default_factory=dict)
+    latest_findings: list[ProjectChangeFinding] = Field(default_factory=list)
+
+
+class ProjectChangePortfolio(BaseModel):
+    generated_at: datetime = Field(default_factory=utc_now)
+    projects: list[ProjectChangePortfolioEntry] = Field(default_factory=list)
+    counts_by_severity: dict[str, int] = Field(default_factory=dict)
+    counts_by_change_class: dict[str, int] = Field(default_factory=dict)

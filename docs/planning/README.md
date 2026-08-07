@@ -38,6 +38,18 @@ This package collects planning and architecture materials for upcoming GAIA mile
 - [Validation Evidence](../implementation/v0_9_b1/VALIDATION_EVIDENCE.md)
 - [Handoff to B2](../implementation/v0_9_b1/HANDOFF_TO_B2.md)
 
+## v0.9 B2 Implementation
+
+- [Start Here](../implementation/v0_9_b2/START_HERE.md)
+- [Change Intelligence Architecture](../implementation/v0_9_b2/CHANGE_INTELLIGENCE_ARCHITECTURE.md)
+- [Change Finding Model](../implementation/v0_9_b2/CHANGE_FINDING_MODEL.md)
+- [Detector Rules](../implementation/v0_9_b2/DETECTOR_RULES.md)
+- [Noise Filtering and Fingerprinting](../implementation/v0_9_b2/NOISE_FILTERING_AND_FINGERPRINTING.md)
+- [Database Migration](../implementation/v0_9_b2/DATABASE_MIGRATION.md)
+- [Security and Isolation Proof](../implementation/v0_9_b2/SECURITY_AND_ISOLATION_PROOF.md)
+- [Validation Evidence](../implementation/v0_9_b2/VALIDATION_EVIDENCE.md)
+- [Handoff to B3](../implementation/v0_9_b2/HANDOFF_TO_B3.md)
+
 ## Related
 
 - [Released v0.8 notes](../releases/GAIA_V0_8_0_RELEASE_NOTES.md)
