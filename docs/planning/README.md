@@ -2,6 +2,31 @@
 
 This package collects planning and architecture materials for upcoming GAIA milestones.
 
+## v0.10
+
+- [Start Here](v0_10/START_HERE.md)
+- [Vision](v0_10/GAIA_V0_10_VISION.md)
+- [Architecture](v0_10/GAIA_V0_10_ARCHITECTURE.md)
+- [Implementation Phases](v0_10/GAIA_V0_10_IMPLEMENTATION_PHASES.md)
+- [Acceptance Criteria](v0_10/GAIA_V0_10_ACCEPTANCE_CRITERIA.md)
+- [Security Boundary](v0_10/GAIA_V0_10_SECURITY_BOUNDARY.md)
+- [Non-Goals](v0_10/GAIA_V0_10_NON_GOALS.md)
+- [Test Strategy](v0_10/GAIA_V0_10_TEST_STRATEGY.md)
+- [Project Contract Model](v0_10/PROJECT_CONTRACT_MODEL.md)
+- [Architecture Registry Model](v0_10/ARCHITECTURE_REGISTRY_MODEL.md)
+- [Dependency Graph Model](v0_10/DEPENDENCY_GRAPH_MODEL.md)
+- [Change Impact Model](v0_10/CHANGE_IMPACT_MODEL.md)
+- [Change Proposal Model](v0_10/CHANGE_PROPOSAL_MODEL.md)
+- [Programme Roadmap Model](v0_10/PROGRAMME_ROADMAP_MODEL.md)
+- [Release Train Model](v0_10/RELEASE_TRAIN_MODEL.md)
+- [Programme Package Model](v0_10/PROGRAMME_PACKAGE_MODEL.md)
+- [Decision and Provenance Model](v0_10/DECISION_AND_PROVENANCE_MODEL.md)
+- [Windows Programme Workspace Plan](v0_10/WINDOWS_PROGRAMME_WORKSPACE_PLAN.md)
+- [Dashboard Read-Only Programme Plan](v0_10/DASHBOARD_READ_ONLY_PROGRAMME_PLAN.md)
+- [API, CLI and Client Plan](v0_10/API_CLI_CLIENT_PLAN.md)
+- [Migration and Compatibility Plan](v0_10/MIGRATION_AND_COMPATIBILITY_PLAN.md)
+- [v0.9 to v0.10 Traceability](v0_10/V0_9_TO_V0_10_TRACEABILITY.md)
+
 ## v0.9
 
 - [Start Here](v0_9/START_HERE.md)
