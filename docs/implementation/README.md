@@ -14,3 +14,4 @@ This folder collects milestone implementation evidence for GAIA v0.9 and later.
 - [v0.9 B8 - Cross-Repository Acceptance and Release Closeout](v0_9_b8/START_HERE.md)
 - [v0.10 C1 - Project Contract and Architecture Registry](v0_10_c1/START_HERE.md)
 - [v0.10 C2 - Cross-Project Dependency Graph](v0_10_c2/START_HERE.md)
+- [v0.10 C3 - Change Impact Intelligence](v0_10_c3/START_HERE.md)
