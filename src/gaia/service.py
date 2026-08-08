@@ -6,6 +6,17 @@ from gaia.audit import AuditRecorder
 from gaia.change_intelligence import ChangeIntelligenceService
 from gaia.config import Settings
 from gaia.db import Database
+from gaia.dependency_graph import (
+    DependencyGraphCycleRecord,
+    DependencyGraphDependencyRecord,
+    DependencyGraphFinding,
+    DependencyGraphNode,
+    DependencyGraphOrphanRecord,
+    DependencyGraphProjectDependencyRecord,
+    DependencyGraphService,
+    DependencyGraphSharedDependencyRecord,
+    DependencyGraphSnapshot,
+)
 from gaia.git_inspector import GitInspector
 from gaia.models import (
     ProjectChangeComparison,
@@ -57,6 +68,11 @@ class ProjectService:
         self.architecture_registry_service = ArchitectureRegistryService(settings, self.database, self.audit)
         self.project_contract_service.bootstrap_from_settings()
         self.architecture_registry_service.bootstrap_from_settings()
+        self.dependency_graph_service = DependencyGraphService(
+            settings,
+            self.project_contract_service,
+            self.architecture_registry_service,
+        )
         self.scanner = DocumentScanner(settings.max_file_bytes)
 
     def get_project(self, project_id: str) -> ProjectConfig:
@@ -404,3 +420,53 @@ class ProjectService:
 
     def architecture_relationship_revisions(self, relationship_id: str) -> list[ArchitectureRelationshipRevisionRecord]:
         return self.architecture_registry_service.list_relationship_revisions(relationship_id)
+
+    def dependency_graph(self) -> DependencyGraphSnapshot:
+        return self.dependency_graph_service.build_graph()
+
+    def dependency_graph_node(self, node_id: str) -> DependencyGraphNode | None:
+        return self.dependency_graph_service.get_node(node_id)
+
+    def dependency_graph_dependency(
+        self,
+        entity_id: str,
+        *,
+        transitive: bool = False,
+    ) -> list[DependencyGraphDependencyRecord]:
+        return self.dependency_graph_service.dependencies_of_entity(entity_id, transitive=transitive)
+
+    def dependency_graph_dependent(
+        self,
+        entity_id: str,
+        *,
+        transitive: bool = False,
+    ) -> list[DependencyGraphDependencyRecord]:
+        return self.dependency_graph_service.dependents_of_entity(entity_id, transitive=transitive)
+
+    def project_dependency_graph(
+        self,
+        project_id: str,
+        *,
+        transitive: bool = False,
+    ) -> list[DependencyGraphProjectDependencyRecord]:
+        return self.dependency_graph_service.project_dependencies(project_id, transitive=transitive)
+
+    def project_dependents_graph(
+        self,
+        project_id: str,
+        *,
+        transitive: bool = False,
+    ) -> list[DependencyGraphProjectDependencyRecord]:
+        return self.dependency_graph_service.project_dependents(project_id, transitive=transitive)
+
+    def dependency_graph_cycles(self) -> list[DependencyGraphCycleRecord]:
+        return self.dependency_graph_service.cycles()
+
+    def dependency_graph_shared_dependencies(self) -> list[DependencyGraphSharedDependencyRecord]:
+        return self.dependency_graph_service.shared_dependencies()
+
+    def dependency_graph_orphans(self) -> list[DependencyGraphOrphanRecord]:
+        return self.dependency_graph_service.orphans()
+
+    def dependency_graph_findings(self) -> list[DependencyGraphFinding]:
+        return self.dependency_graph_service.unresolved_dependencies()
