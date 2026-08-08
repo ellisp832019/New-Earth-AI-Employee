@@ -22,10 +22,21 @@ from gaia.models import (
     WorkPackageRecord,
     WorkPackageRevisionRecord,
 )
+from gaia.programme_registry import (
+    ArchitectureEntityKind,
+    ArchitectureEntityRecord,
+    ArchitectureEntityRevisionRecord,
+    ArchitectureRelationshipRecord,
+    ArchitectureRelationshipRevisionRecord,
+    ArchitectureRelationshipType,
+    ProgrammeProvenanceRecord,
+    ProjectContractRecord,
+    ProjectContractRevisionRecord,
+)
 
 
 class Database:
-    SCHEMA_VERSION = 11
+    SCHEMA_VERSION = 12
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -182,6 +193,119 @@ class Database:
                 reason TEXT NOT NULL,
                 PRIMARY KEY(recommendation_id, depends_on_recommendation_id, dependency_type),
                 FOREIGN KEY(recommendation_id) REFERENCES project_recommendations(recommendation_id)
+            );
+            CREATE TABLE IF NOT EXISTS project_contracts (
+                contract_id TEXT PRIMARY KEY,
+                project_id TEXT NOT NULL UNIQUE,
+                current_revision_id TEXT,
+                current_revision_number INTEGER NOT NULL,
+                approved_revision_id TEXT,
+                approved_revision_number INTEGER,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                freshness_state TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(current_revision_id) REFERENCES project_contract_revisions(revision_id)
+            );
+            CREATE TABLE IF NOT EXISTS project_contract_revisions (
+                revision_id TEXT PRIMARY KEY,
+                contract_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                previous_revision_id TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                evidence_references_json TEXT NOT NULL,
+                freshness_state TEXT NOT NULL,
+                supersedes_revision_id TEXT,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(contract_id) REFERENCES project_contracts(contract_id),
+                FOREIGN KEY(previous_revision_id) REFERENCES project_contract_revisions(revision_id),
+                UNIQUE(project_id, semantic_fingerprint),
+                UNIQUE(contract_id, revision_number)
+            );
+            CREATE TABLE IF NOT EXISTS architecture_entities (
+                entity_id TEXT PRIMARY KEY,
+                identity_key TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                owning_project_or_domain TEXT,
+                repository TEXT,
+                source_reference TEXT,
+                current_revision_id TEXT,
+                current_revision_number INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                freshness_state TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                UNIQUE(kind, identity_key),
+                FOREIGN KEY(current_revision_id) REFERENCES architecture_entity_revisions(revision_id)
+            );
+            CREATE TABLE IF NOT EXISTS architecture_entity_revisions (
+                revision_id TEXT PRIMARY KEY,
+                entity_id TEXT NOT NULL,
+                identity_key TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                previous_revision_id TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                evidence_references_json TEXT NOT NULL,
+                freshness_state TEXT NOT NULL,
+                supersedes_revision_id TEXT,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(entity_id) REFERENCES architecture_entities(entity_id),
+                FOREIGN KEY(previous_revision_id) REFERENCES architecture_entity_revisions(revision_id),
+                UNIQUE(entity_id, revision_number),
+                UNIQUE(identity_key, semantic_fingerprint)
+            );
+            CREATE TABLE IF NOT EXISTS architecture_relationships (
+                relationship_id TEXT PRIMARY KEY,
+                identity_key TEXT NOT NULL,
+                relationship_type TEXT NOT NULL,
+                source_entity_id TEXT NOT NULL,
+                target_entity_id TEXT NOT NULL,
+                current_revision_id TEXT,
+                current_revision_number INTEGER NOT NULL,
+                status TEXT NOT NULL,
+                freshness_state TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                UNIQUE(relationship_type, source_entity_id, target_entity_id),
+                FOREIGN KEY(current_revision_id) REFERENCES architecture_relationship_revisions(revision_id)
+            );
+            CREATE TABLE IF NOT EXISTS architecture_relationship_revisions (
+                revision_id TEXT PRIMARY KEY,
+                relationship_id TEXT NOT NULL,
+                identity_key TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                previous_revision_id TEXT,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                created_by TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                evidence_references_json TEXT NOT NULL,
+                freshness_state TEXT NOT NULL,
+                supersedes_revision_id TEXT,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(relationship_id) REFERENCES architecture_relationships(relationship_id),
+                FOREIGN KEY(previous_revision_id) REFERENCES architecture_relationship_revisions(revision_id),
+                UNIQUE(relationship_id, revision_number),
+                UNIQUE(identity_key, semantic_fingerprint)
             );
             CREATE TABLE IF NOT EXISTS work_packages (
                 work_package_id TEXT PRIMARY KEY,
@@ -737,6 +861,25 @@ class Database:
                 "CREATE INDEX IF NOT EXISTS idx_project_recommendation_evidence_links_recommendation_id ON project_recommendation_evidence_links(recommendation_id)",
                 "CREATE INDEX IF NOT EXISTS idx_project_recommendation_dependencies_recommendation_id ON project_recommendation_dependencies(recommendation_id)",
                 "CREATE INDEX IF NOT EXISTS idx_project_recommendation_dependencies_depends_on ON project_recommendation_dependencies(depends_on_recommendation_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_contracts_project_id ON project_contracts(project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_contracts_status ON project_contracts(status)",
+                "CREATE INDEX IF NOT EXISTS idx_project_contracts_current_revision_id ON project_contracts(current_revision_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_contract_revisions_project_id ON project_contract_revisions(project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_contract_revisions_revision_number ON project_contract_revisions(project_id, revision_number DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_project_contract_revisions_semantic_fingerprint ON project_contract_revisions(project_id, semantic_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_entities_kind ON architecture_entities(kind)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_entities_project ON architecture_entities(owning_project_or_domain)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_entities_current_revision_id ON architecture_entities(current_revision_id)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_entity_revisions_entity_id ON architecture_entity_revisions(entity_id)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_entity_revisions_revision_number ON architecture_entity_revisions(entity_id, revision_number DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_entity_revisions_identity_key ON architecture_entity_revisions(identity_key)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_relationships_source_entity_id ON architecture_relationships(source_entity_id)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_relationships_target_entity_id ON architecture_relationships(target_entity_id)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_relationships_type ON architecture_relationships(relationship_type)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_relationships_current_revision_id ON architecture_relationships(current_revision_id)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_relationship_revisions_relationship_id ON architecture_relationship_revisions(relationship_id)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_relationship_revisions_revision_number ON architecture_relationship_revisions(relationship_id, revision_number DESC)",
+                "CREATE INDEX IF NOT EXISTS idx_architecture_relationship_revisions_identity_key ON architecture_relationship_revisions(identity_key)",
                 "CREATE INDEX IF NOT EXISTS idx_work_packages_project_id ON work_packages(project_id)",
                 "CREATE INDEX IF NOT EXISTS idx_work_packages_semantic_fingerprint ON work_packages(semantic_fingerprint)",
                 "CREATE INDEX IF NOT EXISTS idx_work_packages_source_recommendation_id ON work_packages(source_recommendation_id)",
@@ -1327,6 +1470,441 @@ class Database:
             project_ids,
         ).fetchall()
         return [ProjectRecommendation.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def upsert_project_contract(self, contract: ProjectContractRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO project_contracts(
+                    contract_id, project_id, current_revision_id, current_revision_number,
+                    approved_revision_id, approved_revision_number, status, created_at,
+                    updated_at, content_fingerprint, provenance_json, freshness_state,
+                    normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    contract.contract_id,
+                    contract.project_id,
+                    contract.current_revision_id,
+                    contract.current_revision_number,
+                    contract.approved_revision_id,
+                    contract.approved_revision_number,
+                    contract.status,
+                    contract.created_at,
+                    contract.updated_at,
+                    contract.content_fingerprint,
+                    contract.provenance.model_dump_json(),
+                    contract.freshness_state,
+                    contract.model_dump_json(),
+                ),
+            )
+
+    def get_project_contract(self, project_id: str) -> ProjectContractRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_contracts WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()
+        return ProjectContractRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_project_contract_by_id(self, contract_id: str) -> ProjectContractRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_contracts WHERE contract_id = ?",
+            (contract_id,),
+        ).fetchone()
+        return ProjectContractRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def insert_project_contract_revision(self, revision: ProjectContractRevisionRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO project_contract_revisions(
+                    revision_id, contract_id, project_id, revision_number, previous_revision_id,
+                    status, created_at, created_by, semantic_fingerprint, content_fingerprint,
+                    provenance_json, evidence_references_json, freshness_state,
+                    supersedes_revision_id, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    revision.revision_id,
+                    revision.contract_id,
+                    revision.project_id,
+                    revision.revision_number,
+                    revision.previous_revision_id,
+                    revision.status,
+                    revision.created_at,
+                    revision.created_by,
+                    revision.semantic_fingerprint,
+                    revision.content_fingerprint,
+                    revision.provenance.model_dump_json(),
+                    json.dumps([item.model_dump(mode="json") for item in revision.evidence_references], default=str, sort_keys=True),
+                    revision.freshness_state,
+                    revision.supersedes_revision_id,
+                    revision.model_dump_json(),
+                ),
+            )
+
+    def update_project_contract_revision_provenance(
+        self,
+        revision_id: str,
+        provenance: ProgrammeProvenanceRecord,
+    ) -> None:
+        revision = self.get_project_contract_revision(revision_id)
+        if revision is None:
+            return
+        updated = revision.model_copy(update={"provenance": provenance, "normalized_payload": {}})
+        updated.normalized_payload = updated.model_dump(mode="json")
+        self.insert_project_contract_revision(updated)
+
+    def get_project_contract_revision(self, revision_id: str) -> ProjectContractRevisionRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM project_contract_revisions WHERE revision_id = ?",
+            (revision_id,),
+        ).fetchone()
+        return ProjectContractRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_project_contract_revision_by_semantic(
+        self,
+        project_id: str,
+        semantic_fingerprint: str,
+    ) -> ProjectContractRevisionRecord | None:
+        row = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM project_contract_revisions
+            WHERE project_id = ? AND semantic_fingerprint = ?
+            ORDER BY revision_number DESC, revision_id DESC
+            LIMIT 1
+            """,
+            (project_id, semantic_fingerprint),
+        ).fetchone()
+        return ProjectContractRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_project_contract_revisions(self, project_id: str) -> list[ProjectContractRevisionRecord]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM project_contract_revisions
+            WHERE project_id = ?
+            ORDER BY revision_number DESC, created_at DESC, revision_id DESC
+            """,
+            (project_id,),
+        ).fetchall()
+        return [ProjectContractRevisionRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def next_project_contract_revision_number(self, project_id: str) -> int:
+        row = self.connection.execute(
+            "SELECT COALESCE(MAX(revision_number), 0) AS max_revision FROM project_contract_revisions WHERE project_id = ?",
+            (project_id,),
+        ).fetchone()
+        return int(row["max_revision"] or 0) + 1
+
+    def upsert_architecture_entity(self, entity: ArchitectureEntityRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO architecture_entities(
+                    entity_id, identity_key, kind, name, owning_project_or_domain, repository,
+                    source_reference, current_revision_id, current_revision_number, status,
+                    freshness_state, provenance_json, content_fingerprint, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    entity.entity_id,
+                    entity.identity_key,
+                    entity.kind,
+                    entity.name,
+                    entity.owning_project_or_domain,
+                    entity.repository,
+                    entity.source_reference,
+                    entity.current_revision_id,
+                    entity.current_revision_number,
+                    entity.status,
+                    entity.freshness_state,
+                    entity.provenance.model_dump_json(),
+                    entity.content_fingerprint,
+                    entity.model_dump_json(),
+                ),
+            )
+
+    def get_architecture_entity(self, entity_id: str) -> ArchitectureEntityRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM architecture_entities WHERE entity_id = ?",
+            (entity_id,),
+        ).fetchone()
+        return ArchitectureEntityRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_architecture_entity_by_identity_key(self, identity_key: str) -> ArchitectureEntityRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM architecture_entities WHERE identity_key = ?",
+            (identity_key,),
+        ).fetchone()
+        return ArchitectureEntityRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def insert_architecture_entity_revision(self, revision: ArchitectureEntityRevisionRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO architecture_entity_revisions(
+                    revision_id, entity_id, identity_key, revision_number, previous_revision_id,
+                    status, created_at, created_by, semantic_fingerprint, content_fingerprint,
+                    provenance_json, evidence_references_json, freshness_state, supersedes_revision_id,
+                    normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    revision.revision_id,
+                    revision.entity_id,
+                    revision.content.identity_key,
+                    revision.revision_number,
+                    revision.previous_revision_id,
+                    revision.status,
+                    revision.created_at,
+                    revision.created_by,
+                    revision.semantic_fingerprint,
+                    revision.content_fingerprint,
+                    revision.provenance.model_dump_json(),
+                    json.dumps([item.model_dump(mode="json") for item in revision.evidence_references], default=str, sort_keys=True),
+                    revision.freshness_state,
+                    revision.supersedes_revision_id,
+                    revision.model_dump_json(),
+                ),
+            )
+
+    def update_architecture_entity_revision_provenance(
+        self,
+        revision_id: str,
+        provenance: ProgrammeProvenanceRecord,
+    ) -> None:
+        revision = self.get_architecture_entity_revision(revision_id)
+        if revision is None:
+            return
+        updated = revision.model_copy(update={"provenance": provenance, "normalized_payload": {}})
+        updated.normalized_payload = updated.model_dump(mode="json")
+        self.insert_architecture_entity_revision(updated)
+
+    def get_architecture_entity_revision(self, revision_id: str) -> ArchitectureEntityRevisionRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM architecture_entity_revisions WHERE revision_id = ?",
+            (revision_id,),
+        ).fetchone()
+        return ArchitectureEntityRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_architecture_entity_revision_by_semantic(
+        self,
+        identity_key: str,
+        semantic_fingerprint: str,
+    ) -> ArchitectureEntityRevisionRecord | None:
+        row = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM architecture_entity_revisions
+            WHERE identity_key = ? AND semantic_fingerprint = ?
+            ORDER BY revision_number DESC, revision_id DESC
+            LIMIT 1
+            """,
+            (identity_key, semantic_fingerprint),
+        ).fetchone()
+        return ArchitectureEntityRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_architecture_entities(
+        self,
+        *,
+        project_id: str | None = None,
+        kind: ArchitectureEntityKind | None = None,
+    ) -> list[ArchitectureEntityRecord]:
+        clauses = []
+        params: list[object] = []
+        if project_id is not None:
+            clauses.append("owning_project_or_domain = ?")
+            params.append(project_id)
+        if kind is not None:
+            clauses.append("kind = ?")
+            params.append(kind)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = self.connection.execute(
+            f"""
+            SELECT normalized_payload_json
+            FROM architecture_entities
+            {where}
+            ORDER BY kind, identity_key
+            """,
+            params,
+        ).fetchall()
+        return [ArchitectureEntityRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_architecture_entity_revisions(self, entity_id: str) -> list[ArchitectureEntityRevisionRecord]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM architecture_entity_revisions
+            WHERE entity_id = ?
+            ORDER BY revision_number DESC, created_at DESC, revision_id DESC
+            """,
+            (entity_id,),
+        ).fetchall()
+        return [ArchitectureEntityRevisionRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def next_architecture_entity_revision_number(self, entity_id: str) -> int:
+        row = self.connection.execute(
+            "SELECT COALESCE(MAX(revision_number), 0) AS max_revision FROM architecture_entity_revisions WHERE entity_id = ?",
+            (entity_id,),
+        ).fetchone()
+        return int(row["max_revision"] or 0) + 1
+
+    def upsert_architecture_relationship(self, relationship: ArchitectureRelationshipRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO architecture_relationships(
+                    relationship_id, identity_key, relationship_type, source_entity_id,
+                    target_entity_id, current_revision_id, current_revision_number, status,
+                    freshness_state, provenance_json, content_fingerprint, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    relationship.relationship_id,
+                    relationship.identity_key,
+                    relationship.relationship_type,
+                    relationship.source_entity_id,
+                    relationship.target_entity_id,
+                    relationship.current_revision_id,
+                    relationship.current_revision_number,
+                    relationship.status,
+                    relationship.freshness_state,
+                    relationship.provenance.model_dump_json(),
+                    relationship.content_fingerprint,
+                    relationship.model_dump_json(),
+                ),
+            )
+
+    def get_architecture_relationship(self, relationship_id: str) -> ArchitectureRelationshipRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM architecture_relationships WHERE relationship_id = ?",
+            (relationship_id,),
+        ).fetchone()
+        return ArchitectureRelationshipRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_architecture_relationship_by_identity_key(self, identity_key: str) -> ArchitectureRelationshipRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM architecture_relationships WHERE identity_key = ?",
+            (identity_key,),
+        ).fetchone()
+        return ArchitectureRelationshipRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def insert_architecture_relationship_revision(self, revision: ArchitectureRelationshipRevisionRecord) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO architecture_relationship_revisions(
+                    revision_id, relationship_id, identity_key, revision_number, previous_revision_id,
+                    status, created_at, created_by, semantic_fingerprint, content_fingerprint,
+                    provenance_json, evidence_references_json, freshness_state, supersedes_revision_id,
+                    normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    revision.revision_id,
+                    revision.relationship_id,
+                    revision.content.identity_key,
+                    revision.revision_number,
+                    revision.previous_revision_id,
+                    revision.status,
+                    revision.created_at,
+                    revision.created_by,
+                    revision.semantic_fingerprint,
+                    revision.content_fingerprint,
+                    revision.provenance.model_dump_json(),
+                    json.dumps([item.model_dump(mode="json") for item in revision.evidence_references], default=str, sort_keys=True),
+                    revision.freshness_state,
+                    revision.supersedes_revision_id,
+                    revision.model_dump_json(),
+                ),
+            )
+
+    def update_architecture_relationship_revision_provenance(
+        self,
+        revision_id: str,
+        provenance: ProgrammeProvenanceRecord,
+    ) -> None:
+        revision = self.get_architecture_relationship_revision(revision_id)
+        if revision is None:
+            return
+        updated = revision.model_copy(update={"provenance": provenance, "normalized_payload": {}})
+        updated.normalized_payload = updated.model_dump(mode="json")
+        self.insert_architecture_relationship_revision(updated)
+
+    def get_architecture_relationship_revision(self, revision_id: str) -> ArchitectureRelationshipRevisionRecord | None:
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM architecture_relationship_revisions WHERE revision_id = ?",
+            (revision_id,),
+        ).fetchone()
+        return ArchitectureRelationshipRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_architecture_relationship_revision_by_semantic(
+        self,
+        identity_key: str,
+        semantic_fingerprint: str,
+    ) -> ArchitectureRelationshipRevisionRecord | None:
+        row = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM architecture_relationship_revisions
+            WHERE identity_key = ? AND semantic_fingerprint = ?
+            ORDER BY revision_number DESC, revision_id DESC
+            LIMIT 1
+            """,
+            (identity_key, semantic_fingerprint),
+        ).fetchone()
+        return ArchitectureRelationshipRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_architecture_relationships(
+        self,
+        *,
+        source_entity_id: str | None = None,
+        target_entity_id: str | None = None,
+        relationship_type: ArchitectureRelationshipType | None = None,
+    ) -> list[ArchitectureRelationshipRecord]:
+        clauses = []
+        params: list[object] = []
+        if source_entity_id is not None:
+            clauses.append("source_entity_id = ?")
+            params.append(source_entity_id)
+        if target_entity_id is not None:
+            clauses.append("target_entity_id = ?")
+            params.append(target_entity_id)
+        if relationship_type is not None:
+            clauses.append("relationship_type = ?")
+            params.append(relationship_type)
+        where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+        rows = self.connection.execute(
+            f"""
+            SELECT normalized_payload_json
+            FROM architecture_relationships
+            {where}
+            ORDER BY relationship_type, source_entity_id, target_entity_id
+            """,
+            params,
+        ).fetchall()
+        return [ArchitectureRelationshipRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def list_architecture_relationship_revisions(self, relationship_id: str) -> list[ArchitectureRelationshipRevisionRecord]:
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM architecture_relationship_revisions
+            WHERE relationship_id = ?
+            ORDER BY revision_number DESC, created_at DESC, revision_id DESC
+            """,
+            (relationship_id,),
+        ).fetchall()
+        return [ArchitectureRelationshipRevisionRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def next_architecture_relationship_revision_number(self, relationship_id: str) -> int:
+        row = self.connection.execute(
+            "SELECT COALESCE(MAX(revision_number), 0) AS max_revision FROM architecture_relationship_revisions WHERE relationship_id = ?",
+            (relationship_id,),
+        ).fetchone()
+        return int(row["max_revision"] or 0) + 1
 
     def insert_work_package(self, package: WorkPackageRecord) -> None:
         with self.connection:

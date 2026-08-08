@@ -24,6 +24,18 @@ from gaia.models import (
     WorkPackageRecord,
     WorkPackageRevisionRecord,
 )
+from gaia.programme_registry import (
+    ArchitectureEntityKind,
+    ArchitectureEntityRecord,
+    ArchitectureEntityRevisionRecord,
+    ArchitectureRegistryService,
+    ArchitectureRelationshipRecord,
+    ArchitectureRelationshipRevisionRecord,
+    ArchitectureRelationshipType,
+    ProjectContractRecord,
+    ProjectContractRevisionRecord,
+    ProjectContractService,
+)
 from gaia.project_health import ProjectHealthService
 from gaia.recommendations import RecommendationService
 from gaia.reports import foundation_report_json, foundation_report_markdown
@@ -41,6 +53,10 @@ class ProjectService:
         self.change_intelligence_service = ChangeIntelligenceService(settings, self.database, self.audit)
         self.recommendation_service = RecommendationService(settings, self.database, self.audit)
         self.work_package_service = WorkPackageService(settings, self.database, self.audit)
+        self.project_contract_service = ProjectContractService(settings, self.database, self.audit)
+        self.architecture_registry_service = ArchitectureRegistryService(settings, self.database, self.audit)
+        self.project_contract_service.bootstrap_from_settings()
+        self.architecture_registry_service.bootstrap_from_settings()
         self.scanner = DocumentScanner(settings.max_file_bytes)
 
     def get_project(self, project_id: str) -> ProjectConfig:
@@ -331,3 +347,60 @@ class ProjectService:
 
     def work_package_summary(self, work_package_id: str) -> dict[str, object]:
         return self.work_package_service.render_summary(work_package_id)
+
+    def project_contract(self, project_id: str) -> ProjectContractRecord | None:
+        return self.project_contract_service.get_project_contract(project_id)
+
+    def project_contract_revision(self, revision_id: str) -> ProjectContractRevisionRecord | None:
+        return self.project_contract_service.get_contract_revision(revision_id)
+
+    def project_contract_revisions(self, project_id: str) -> list[ProjectContractRevisionRecord]:
+        return self.project_contract_service.list_contract_revisions(project_id)
+
+    def current_project_contract(self, project_id: str) -> ProjectContractRecord | None:
+        return self.project_contract_service.current_approved_contract(project_id)
+
+    def architecture_entities(
+        self,
+        *,
+        project_id: str | None = None,
+        kind: ArchitectureEntityKind | None = None,
+    ) -> list[ArchitectureEntityRecord]:
+        if project_id is not None:
+            return self.architecture_registry_service.list_entities_by_project(project_id)
+        if kind is not None:
+            return self.architecture_registry_service.list_entities_by_kind(kind)
+        return self.architecture_registry_service.list_entities()
+
+    def architecture_entity(self, entity_id: str) -> ArchitectureEntityRecord | None:
+        return self.architecture_registry_service.get_entity(entity_id)
+
+    def architecture_entity_revision(self, revision_id: str) -> ArchitectureEntityRevisionRecord | None:
+        return self.architecture_registry_service.get_entity_revision(revision_id)
+
+    def architecture_entity_revisions(self, entity_id: str) -> list[ArchitectureEntityRevisionRecord]:
+        return self.architecture_registry_service.list_entity_revisions(entity_id)
+
+    def architecture_relationships(
+        self,
+        *,
+        source_entity_id: str | None = None,
+        target_entity_id: str | None = None,
+        relationship_type: ArchitectureRelationshipType | None = None,
+    ) -> list[ArchitectureRelationshipRecord]:
+        if source_entity_id is not None:
+            return self.architecture_registry_service.list_relationships_by_source(source_entity_id)
+        if target_entity_id is not None:
+            return self.architecture_registry_service.list_relationships_by_target(target_entity_id)
+        if relationship_type is not None:
+            return self.architecture_registry_service.list_relationships_by_type(relationship_type)
+        return self.architecture_registry_service.list_relationships()
+
+    def architecture_relationship(self, relationship_id: str) -> ArchitectureRelationshipRecord | None:
+        return self.architecture_registry_service.get_relationship(relationship_id)
+
+    def architecture_relationship_revision(self, revision_id: str) -> ArchitectureRelationshipRevisionRecord | None:
+        return self.architecture_registry_service.get_relationship_revision(revision_id)
+
+    def architecture_relationship_revisions(self, relationship_id: str) -> list[ArchitectureRelationshipRevisionRecord]:
+        return self.architecture_registry_service.list_relationship_revisions(relationship_id)
