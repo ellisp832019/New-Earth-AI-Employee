@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import Counter
 
 from gaia.audit import AuditRecorder
+from gaia.change_impact import ChangeImpactResult, ChangeImpactService, ChangeProposal
 from gaia.change_intelligence import ChangeIntelligenceService
 from gaia.config import Settings
 from gaia.db import Database
@@ -72,6 +73,13 @@ class ProjectService:
             settings,
             self.project_contract_service,
             self.architecture_registry_service,
+        )
+        self.change_impact_service = ChangeImpactService(
+            settings,
+            self.database,
+            self.project_contract_service,
+            self.architecture_registry_service,
+            self.dependency_graph_service,
         )
         self.scanner = DocumentScanner(settings.max_file_bytes)
 
@@ -470,3 +478,18 @@ class ProjectService:
 
     def dependency_graph_findings(self) -> list[DependencyGraphFinding]:
         return self.dependency_graph_service.unresolved_dependencies()
+
+    def analyse_change_proposal(self, proposal: ChangeProposal | dict[str, object]) -> ChangeImpactResult:
+        return self.change_impact_service.analyse_proposal(proposal)
+
+    def analyze_change_proposal(self, proposal: ChangeProposal | dict[str, object]) -> ChangeImpactResult:
+        return self.change_impact_service.analyze_proposal(proposal)
+
+    def analyse_change_impact(self, proposal: ChangeProposal | dict[str, object]) -> ChangeImpactResult:
+        return self.change_impact_service.analyse_change_impact(proposal)
+
+    def analyze_change_impact(self, proposal: ChangeProposal | dict[str, object]) -> ChangeImpactResult:
+        return self.change_impact_service.analyze_change_impact(proposal)
+
+    def change_impact(self, proposal: ChangeProposal | dict[str, object]) -> ChangeImpactResult:
+        return self.change_impact_service.change_impact(proposal)
