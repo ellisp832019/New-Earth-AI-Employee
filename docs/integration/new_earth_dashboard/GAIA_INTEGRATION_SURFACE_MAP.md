@@ -4,10 +4,10 @@
 
 | Artifact | Version | Role |
 | --- | --- | --- |
-| `pyproject.toml` / `src/gaia/__init__.py` | `0.8.0` | GAIA backend release baseline |
-| `packages/gaia_integration_client` | `0.8.0` | Official client library |
-| `packages/gaia_dashboard_module` | `0.8.0` | Read-only embedded operations workspace |
-| `examples/gaia_dashboard_host` | `0.8.0` | Reference host / smoke example |
+| `pyproject.toml` / `src/gaia/__init__.py` | `0.9.0` | GAIA backend release baseline |
+| `packages/gaia_integration_client` | `0.9.0` | Official client library |
+| `packages/gaia_dashboard_module` | `0.9.0` | Read-only embedded operations workspace |
+| `examples/gaia_dashboard_host` | `0.9.0` | Reference host / smoke example |
 | `contracts/openapi/gaia-v1.json` | generated | Published OpenAPI contract |
 
 ## Package Notes
@@ -33,7 +33,7 @@
 - Reference host used to exercise the module and client together.
 - Useful for smoke tests and embedding expectations.
 
-## Backend Capabilities Exposed in v0.7
+## Backend Capabilities Exposed in the Current Release Line
 
 - compatibility state
 - versioned capability catalog

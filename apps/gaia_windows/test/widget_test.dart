@@ -126,6 +126,88 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('gaia shell fits a 1600x900 window without overflow', (
+    WidgetTester tester,
+  ) async {
+    final controller = GaiaAppController();
+    controller.initialized = true;
+    controller.firstRunMode = false;
+    controller.backendState = BackendConnectionState.connected;
+    controller.backendCompatibilityState = BackendCompatibilityState.compatible;
+    controller.health = HealthResponse(
+      status: 'ok',
+      version: '0.9.0',
+      databasePath: 'data/gaia.db',
+      fts5Available: true,
+    );
+    controller.projects = [
+      ProjectConfig(
+        projectId: 'microgrow-v1',
+        name: 'MicroGrow V1',
+        root: r'D:\Dev\Projects\MicroGrow V1',
+        access: 'read_only',
+        approvedExtensions: const [],
+        excludedDirectories: const [],
+        excludedFilenames: const [],
+        importantPaths: const [],
+      ),
+    ];
+    controller.selectedProjectId = 'microgrow-v1';
+
+    await tester.binding.setSurfaceSize(const Size(1600, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(home: GaiaShell(controller: controller)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('GAIA - Windows Control Centre'), findsOneWidget);
+    expect(find.text('Settings'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('gaia shell fits a 1920x1080 window without overflow', (
+    WidgetTester tester,
+  ) async {
+    final controller = GaiaAppController();
+    controller.initialized = true;
+    controller.firstRunMode = false;
+    controller.backendState = BackendConnectionState.connected;
+    controller.backendCompatibilityState = BackendCompatibilityState.compatible;
+    controller.health = HealthResponse(
+      status: 'ok',
+      version: '0.9.0',
+      databasePath: 'data/gaia.db',
+      fts5Available: true,
+    );
+    controller.projects = [
+      ProjectConfig(
+        projectId: 'microgrow-v1',
+        name: 'MicroGrow V1',
+        root: r'D:\Dev\Projects\MicroGrow V1',
+        access: 'read_only',
+        approvedExtensions: const [],
+        excludedDirectories: const [],
+        excludedFilenames: const [],
+        importantPaths: const [],
+      ),
+    ];
+    controller.selectedProjectId = 'microgrow-v1';
+
+    await tester.binding.setSurfaceSize(const Size(1920, 1080));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await tester.pumpWidget(
+      MaterialApp(home: GaiaShell(controller: controller)),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('GAIA - Windows Control Centre'), findsOneWidget);
+    expect(find.text('Project Officer'), findsWidgets);
+    expect(tester.takeException(), isNull);
+  });
+
   test('refreshBackend uses the explicit compatibility contract', () async {
     final controller = GaiaAppController(
       backendApi: GaiaApiClient(
