@@ -10,6 +10,7 @@ enum BackendConnectionState {
 
 enum BackendCompatibilityState {
   compatible,
+  compatibleWithWarnings,
   unknown,
   incompatible,
   unreachable,
@@ -30,11 +31,11 @@ class HealthResponse {
   });
 
   factory HealthResponse.fromJson(Map<String, dynamic> json) => HealthResponse(
-        status: json['status'] as String? ?? 'unknown',
-        version: json['version'] as String? ?? 'unknown',
-        databasePath: json['database_path'] as String? ?? '',
-        fts5Available: json['fts5_available'] as bool? ?? false,
-      );
+    status: json['status'] as String? ?? 'unknown',
+    version: json['version'] as String? ?? 'unknown',
+    databasePath: json['database_path'] as String? ?? '',
+    fts5Available: json['fts5_available'] as bool? ?? false,
+  );
 
   final String status;
   final String version;
@@ -55,15 +56,15 @@ class ProjectConfig {
   });
 
   factory ProjectConfig.fromJson(Map<String, dynamic> json) => ProjectConfig(
-        projectId: json['project_id'] as String? ?? '',
-        name: json['name'] as String? ?? '',
-        root: json['root'] as String? ?? '',
-        access: json['access'] as String? ?? 'read_only',
-        approvedExtensions: _stringList(json['approved_extensions']),
-        excludedDirectories: _stringList(json['excluded_directories']),
-        excludedFilenames: _stringList(json['excluded_filenames']),
-        importantPaths: _stringList(json['important_paths']),
-      );
+    projectId: json['project_id'] as String? ?? '',
+    name: json['name'] as String? ?? '',
+    root: json['root'] as String? ?? '',
+    access: json['access'] as String? ?? 'read_only',
+    approvedExtensions: _stringList(json['approved_extensions']),
+    excludedDirectories: _stringList(json['excluded_directories']),
+    excludedFilenames: _stringList(json['excluded_filenames']),
+    importantPaths: _stringList(json['important_paths']),
+  );
 
   final String projectId;
   final String name;
@@ -95,22 +96,22 @@ class GitState {
   });
 
   factory GitState.fromJson(Map<String, dynamic> json) => GitState(
-        repositoryRoot: json['repository_root'] as String? ?? '',
-        branch: json['branch'] as String?,
-        commitSha: json['commit_sha'] as String?,
-        isClean: json['is_clean'] as bool? ?? false,
-        statusPorcelain: _stringList(json['status_porcelain']),
-        recentCommits: _stringList(json['recent_commits']),
-        branches: _stringList(json['branches']),
-        tags: _stringList(json['tags']),
-        remotes: _stringList(json['remotes']),
-        ahead: json['ahead'] as int?,
-        behind: json['behind'] as int?,
-        trackedFileCount: json['tracked_file_count'] as int? ?? 0,
-        untrackedFiles: _stringList(json['untracked_files']),
-        changedFiles: _stringList(json['changed_files']),
-        warnings: _stringList(json['warnings']),
-      );
+    repositoryRoot: json['repository_root'] as String? ?? '',
+    branch: json['branch'] as String?,
+    commitSha: json['commit_sha'] as String?,
+    isClean: json['is_clean'] as bool? ?? false,
+    statusPorcelain: _stringList(json['status_porcelain']),
+    recentCommits: _stringList(json['recent_commits']),
+    branches: _stringList(json['branches']),
+    tags: _stringList(json['tags']),
+    remotes: _stringList(json['remotes']),
+    ahead: json['ahead'] as int?,
+    behind: json['behind'] as int?,
+    trackedFileCount: json['tracked_file_count'] as int? ?? 0,
+    untrackedFiles: _stringList(json['untracked_files']),
+    changedFiles: _stringList(json['changed_files']),
+    warnings: _stringList(json['warnings']),
+  );
 
   final String repositoryRoot;
   final String? branch;
@@ -146,13 +147,19 @@ class RepositorySnapshot {
     required this.importantPaths,
   });
 
-  factory RepositorySnapshot.fromJson(Map<String, dynamic> json) => RepositorySnapshot(
+  factory RepositorySnapshot.fromJson(Map<String, dynamic> json) =>
+      RepositorySnapshot(
         snapshotId: json['snapshot_id'] as String? ?? '',
         projectId: json['project_id'] as String? ?? '',
         projectName: json['project_name'] as String? ?? '',
         projectRoot: json['project_root'] as String? ?? '',
-        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
-        git: GitState.fromJson((json['git'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{}),
+        createdAt: DateTime.parse(
+          json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+        ),
+        git: GitState.fromJson(
+          (json['git'] as Map?)?.cast<String, dynamic>() ??
+              const <String, dynamic>{},
+        ),
         documentCount: json['document_count'] as int? ?? 0,
         indexedCount: json['indexed_count'] as int? ?? 0,
         skippedCount: json['skipped_count'] as int? ?? 0,
@@ -190,15 +197,17 @@ class DocumentRecord {
   });
 
   factory DocumentRecord.fromJson(Map<String, dynamic> json) => DocumentRecord(
-        projectId: json['project_id'] as String? ?? '',
-        relativePath: json['relative_path'] as String? ?? '',
-        extension: json['extension'] as String? ?? '',
-        sizeBytes: json['size_bytes'] as int? ?? 0,
-        modifiedUtc: DateTime.parse(json['modified_utc'] as String? ?? DateTime.now().toIso8601String()),
-        sha256: json['sha256'] as String? ?? '',
-        indexingStatus: json['indexing_status'] as String? ?? '',
-        warning: json['warning'] as String?,
-      );
+    projectId: json['project_id'] as String? ?? '',
+    relativePath: json['relative_path'] as String? ?? '',
+    extension: json['extension'] as String? ?? '',
+    sizeBytes: json['size_bytes'] as int? ?? 0,
+    modifiedUtc: DateTime.parse(
+      json['modified_utc'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    sha256: json['sha256'] as String? ?? '',
+    indexingStatus: json['indexing_status'] as String? ?? '',
+    warning: json['warning'] as String?,
+  );
 
   final String projectId;
   final String relativePath;
@@ -219,11 +228,11 @@ class SearchResult {
   });
 
   factory SearchResult.fromJson(Map<String, dynamic> json) => SearchResult(
-        relativePath: json['relative_path'] as String? ?? '',
-        extension: json['extension'] as String? ?? '',
-        snippet: json['snippet'] as String? ?? '',
-        score: (json['score'] as num?)?.toDouble(),
-      );
+    relativePath: json['relative_path'] as String? ?? '',
+    extension: json['extension'] as String? ?? '',
+    snippet: json['snippet'] as String? ?? '',
+    score: (json['score'] as num?)?.toDouble(),
+  );
 
   final String relativePath;
   final String extension;
@@ -241,12 +250,12 @@ class ModelStatus {
   });
 
   factory ModelStatus.fromJson(Map<String, dynamic> json) => ModelStatus(
-        provider: json['provider'] as String? ?? '',
-        available: json['available'] as bool? ?? false,
-        modelName: json['model_name'] as String?,
-        endpointIdentity: json['endpoint_identity'] as String?,
-        details: json['details'] as String?,
-      );
+    provider: json['provider'] as String? ?? '',
+    available: json['available'] as bool? ?? false,
+    modelName: json['model_name'] as String?,
+    endpointIdentity: json['endpoint_identity'] as String?,
+    details: json['details'] as String?,
+  );
 
   final String provider;
   final bool available;
@@ -269,16 +278,16 @@ class EvidenceItem {
   });
 
   factory EvidenceItem.fromJson(Map<String, dynamic> json) => EvidenceItem(
-        evidenceId: json['evidence_id'] as String? ?? '',
-        sourceKind: json['source_kind'] as String? ?? '',
-        projectId: json['project_id'] as String? ?? '',
-        sourcePath: json['source_path'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        snippet: json['snippet'] as String? ?? '',
-        score: (json['score'] as num?)?.toDouble() ?? 0,
-        citations: _stringList(json['citations']),
-        warning: json['warning'] as String?,
-      );
+    evidenceId: json['evidence_id'] as String? ?? '',
+    sourceKind: json['source_kind'] as String? ?? '',
+    projectId: json['project_id'] as String? ?? '',
+    sourcePath: json['source_path'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    snippet: json['snippet'] as String? ?? '',
+    score: (json['score'] as num?)?.toDouble() ?? 0,
+    citations: _stringList(json['citations']),
+    warning: json['warning'] as String?,
+  );
 
   final String evidenceId;
   final String sourceKind;
@@ -312,23 +321,27 @@ class AskResponse {
   });
 
   factory AskResponse.fromJson(Map<String, dynamic> json) => AskResponse(
-        runId: json['run_id'] as String? ?? '',
-        projectId: json['project_id'] as String? ?? '',
-        question: json['question'] as String? ?? '',
-        questionCategory: json['question_category'] as String? ?? '',
-        snapshotId: json['snapshot_id'] as String?,
-        provider: json['provider'] as String? ?? '',
-        modelName: json['model_name'] as String?,
-        answer: json['answer'] as String? ?? '',
-        evidence: _listOfMap(json['evidence']).map(EvidenceItem.fromJson).toList(),
-        confidence: json['confidence'] as String? ?? 'low',
-        warnings: _stringList(json['warnings']),
-        promptInjectionWarnings: _stringList(json['prompt_injection_warnings']),
-        deterministicOnly: json['deterministic_only'] as bool? ?? false,
-        structured: json['structured'] as bool? ?? false,
-        startedAt: DateTime.parse(json['started_at'] as String? ?? DateTime.now().toIso8601String()),
-        finishedAt: DateTime.parse(json['finished_at'] as String? ?? DateTime.now().toIso8601String()),
-      );
+    runId: json['run_id'] as String? ?? '',
+    projectId: json['project_id'] as String? ?? '',
+    question: json['question'] as String? ?? '',
+    questionCategory: json['question_category'] as String? ?? '',
+    snapshotId: json['snapshot_id'] as String?,
+    provider: json['provider'] as String? ?? '',
+    modelName: json['model_name'] as String?,
+    answer: json['answer'] as String? ?? '',
+    evidence: _listOfMap(json['evidence']).map(EvidenceItem.fromJson).toList(),
+    confidence: json['confidence'] as String? ?? 'low',
+    warnings: _stringList(json['warnings']),
+    promptInjectionWarnings: _stringList(json['prompt_injection_warnings']),
+    deterministicOnly: json['deterministic_only'] as bool? ?? false,
+    structured: json['structured'] as bool? ?? false,
+    startedAt: DateTime.parse(
+      json['started_at'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    finishedAt: DateTime.parse(
+      json['finished_at'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+  );
 
   final String runId;
   final String projectId;
@@ -367,21 +380,27 @@ class AgentRunRecord {
   });
 
   factory AgentRunRecord.fromJson(Map<String, dynamic> json) => AgentRunRecord(
-        runId: json['run_id'] as String? ?? '',
-        projectId: json['project_id'] as String? ?? '',
-        question: json['question'] as String? ?? '',
-        questionCategory: json['question_category'] as String? ?? '',
-        snapshotId: json['snapshot_id'] as String?,
-        provider: json['provider'] as String? ?? '',
-        modelName: json['model_name'] as String?,
-        status: json['status'] as String? ?? '',
-        confidence: json['confidence'] as String? ?? '',
-        startTimestamp: DateTime.parse(json['start_timestamp'] as String? ?? DateTime.now().toIso8601String()),
-        finishTimestamp: DateTime.parse(json['finish_timestamp'] as String? ?? DateTime.now().toIso8601String()),
-        warnings: _stringList(json['warnings']),
-        promptInjectionWarnings: _stringList(json['prompt_injection_warnings']),
-        structuredAnswer: (json['structured_answer'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{},
-      );
+    runId: json['run_id'] as String? ?? '',
+    projectId: json['project_id'] as String? ?? '',
+    question: json['question'] as String? ?? '',
+    questionCategory: json['question_category'] as String? ?? '',
+    snapshotId: json['snapshot_id'] as String?,
+    provider: json['provider'] as String? ?? '',
+    modelName: json['model_name'] as String?,
+    status: json['status'] as String? ?? '',
+    confidence: json['confidence'] as String? ?? '',
+    startTimestamp: DateTime.parse(
+      json['start_timestamp'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    finishTimestamp: DateTime.parse(
+      json['finish_timestamp'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    warnings: _stringList(json['warnings']),
+    promptInjectionWarnings: _stringList(json['prompt_injection_warnings']),
+    structuredAnswer:
+        (json['structured_answer'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{},
+  );
 
   final String runId;
   final String projectId;
@@ -412,15 +431,19 @@ class AuditEvent {
   });
 
   factory AuditEvent.fromJson(Map<String, dynamic> json) => AuditEvent(
-        eventId: json['event_id'] as String? ?? '',
-        timestamp: DateTime.parse(json['timestamp'] as String? ?? DateTime.now().toIso8601String()),
-        category: json['category'] as String? ?? '',
-        operation: json['operation'] as String? ?? '',
-        projectId: json['project_id'] as String?,
-        outcome: json['outcome'] as String? ?? '',
-        metadata: (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{},
-        errorClassification: json['error_classification'] as String?,
-      );
+    eventId: json['event_id'] as String? ?? '',
+    timestamp: DateTime.parse(
+      json['timestamp'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    category: json['category'] as String? ?? '',
+    operation: json['operation'] as String? ?? '',
+    projectId: json['project_id'] as String?,
+    outcome: json['outcome'] as String? ?? '',
+    metadata:
+        (json['metadata'] as Map?)?.cast<String, dynamic>() ??
+        const <String, dynamic>{},
+    errorClassification: json['error_classification'] as String?,
+  );
 
   final String eventId;
   final DateTime timestamp;
@@ -452,14 +475,14 @@ class AskRequestBody {
   final bool deterministicOnly;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'project_id': projectId,
-        'question': question,
-        'provider': provider,
-        'model': model,
-        'evidence_limit': evidenceLimit,
-        'refresh_snapshot': refreshSnapshot,
-        'deterministic_only': deterministicOnly,
-      }..removeWhere((key, value) => value == null);
+    'project_id': projectId,
+    'question': question,
+    'provider': provider,
+    'model': model,
+    'evidence_limit': evidenceLimit,
+    'refresh_snapshot': refreshSnapshot,
+    'deterministic_only': deterministicOnly,
+  }..removeWhere((key, value) => value == null);
 }
 
 class TaskRecord {
@@ -490,30 +513,36 @@ class TaskRecord {
   });
 
   factory TaskRecord.fromJson(Map<String, dynamic> json) => TaskRecord(
-        taskId: json['task_id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        description: json['description'] as String? ?? '',
-        projectId: json['project_id'] as String? ?? '',
-        status: json['status'] as String? ?? '',
-        priority: json['priority'] as String? ?? '',
-        category: json['category'] as String? ?? '',
-        sourceType: json['source_type'] as String? ?? '',
-        sourceIdentifier: json['source_identifier'] as String?,
-        sourceAgentRunId: json['source_agent_run_id'] as String?,
-        evidenceReferences: _stringList(json['evidence_references']),
-        dependencyTaskIds: _stringList(json['dependency_task_ids']),
-        blockerDescription: json['blocker_description'] as String?,
-        assignedTo: json['assigned_to'] as String?,
-        dueDate: json['due_date'] == null ? null : DateTime.parse(json['due_date'] as String),
-        completionCriteria: json['completion_criteria'] as String? ?? '',
-        completionEvidence: _stringList(json['completion_evidence']),
-        approvalRequirement: json['approval_requirement'] as bool? ?? false,
-        tags: _stringList(json['tags']),
-        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
-        updatedAt: DateTime.parse(json['updated_at'] as String? ?? DateTime.now().toIso8601String()),
-        version: json['version'] as int? ?? 0,
-        manualOverrideReason: json['manual_override_reason'] as String?,
-      );
+    taskId: json['task_id'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    description: json['description'] as String? ?? '',
+    projectId: json['project_id'] as String? ?? '',
+    status: json['status'] as String? ?? '',
+    priority: json['priority'] as String? ?? '',
+    category: json['category'] as String? ?? '',
+    sourceType: json['source_type'] as String? ?? '',
+    sourceIdentifier: json['source_identifier'] as String?,
+    sourceAgentRunId: json['source_agent_run_id'] as String?,
+    evidenceReferences: _stringList(json['evidence_references']),
+    dependencyTaskIds: _stringList(json['dependency_task_ids']),
+    blockerDescription: json['blocker_description'] as String?,
+    assignedTo: json['assigned_to'] as String?,
+    dueDate: json['due_date'] == null
+        ? null
+        : DateTime.parse(json['due_date'] as String),
+    completionCriteria: json['completion_criteria'] as String? ?? '',
+    completionEvidence: _stringList(json['completion_evidence']),
+    approvalRequirement: json['approval_requirement'] as bool? ?? false,
+    tags: _stringList(json['tags']),
+    createdAt: DateTime.parse(
+      json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    updatedAt: DateTime.parse(
+      json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    version: json['version'] as int? ?? 0,
+    manualOverrideReason: json['manual_override_reason'] as String?,
+  );
 
   final String taskId;
   final String title;
@@ -553,7 +582,8 @@ class TaskHistoryRecord {
     required this.metadata,
   });
 
-  factory TaskHistoryRecord.fromJson(Map<String, dynamic> json) => TaskHistoryRecord(
+  factory TaskHistoryRecord.fromJson(Map<String, dynamic> json) =>
+      TaskHistoryRecord(
         historyId: json['history_id'] as String? ?? '',
         taskId: json['task_id'] as String? ?? '',
         fromStatus: json['from_status'] as String?,
@@ -561,8 +591,12 @@ class TaskHistoryRecord {
         action: json['action'] as String? ?? '',
         actor: json['actor'] as String? ?? '',
         reason: json['reason'] as String?,
-        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
-        metadata: (json['metadata'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{},
+        createdAt: DateTime.parse(
+          json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+        ),
+        metadata:
+            (json['metadata'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
       );
 
   final String historyId;
@@ -595,21 +629,25 @@ class DraftRecord {
   });
 
   factory DraftRecord.fromJson(Map<String, dynamic> json) => DraftRecord(
-        draftId: json['draft_id'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        draftType: json['draft_type'] as String? ?? '',
-        projectId: json['project_id'] as String? ?? '',
-        sourceTaskId: json['source_task_id'] as String?,
-        sourceAgentRunId: json['source_agent_run_id'] as String?,
-        currentRevision: json['current_revision'] as int? ?? 0,
-        currentContentHash: json['current_content_hash'] as String? ?? '',
-        status: json['status'] as String? ?? '',
-        evidenceReferences: _stringList(json['evidence_references']),
-        warnings: _stringList(json['warnings']),
-        approvalRequirement: json['approval_requirement'] as bool? ?? false,
-        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
-        updatedAt: DateTime.parse(json['updated_at'] as String? ?? DateTime.now().toIso8601String()),
-      );
+    draftId: json['draft_id'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    draftType: json['draft_type'] as String? ?? '',
+    projectId: json['project_id'] as String? ?? '',
+    sourceTaskId: json['source_task_id'] as String?,
+    sourceAgentRunId: json['source_agent_run_id'] as String?,
+    currentRevision: json['current_revision'] as int? ?? 0,
+    currentContentHash: json['current_content_hash'] as String? ?? '',
+    status: json['status'] as String? ?? '',
+    evidenceReferences: _stringList(json['evidence_references']),
+    warnings: _stringList(json['warnings']),
+    approvalRequirement: json['approval_requirement'] as bool? ?? false,
+    createdAt: DateTime.parse(
+      json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    updatedAt: DateTime.parse(
+      json['updated_at'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+  );
 
   final String draftId;
   final String title;
@@ -639,13 +677,16 @@ class DraftRevisionRecord {
     required this.changeReason,
   });
 
-  factory DraftRevisionRecord.fromJson(Map<String, dynamic> json) => DraftRevisionRecord(
+  factory DraftRevisionRecord.fromJson(Map<String, dynamic> json) =>
+      DraftRevisionRecord(
         revisionId: json['revision_id'] as String? ?? '',
         draftId: json['draft_id'] as String? ?? '',
         revisionNumber: json['revision_number'] as int? ?? 0,
         content: json['content'] as String? ?? '',
         contentHash: json['content_hash'] as String? ?? '',
-        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
+        createdAt: DateTime.parse(
+          json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+        ),
         author: json['author'] as String? ?? '',
         changeReason: json['change_reason'] as String? ?? '',
       );
@@ -688,30 +729,36 @@ class ApprovalRecord {
   });
 
   factory ApprovalRecord.fromJson(Map<String, dynamic> json) => ApprovalRecord(
-        approvalId: json['approval_id'] as String? ?? '',
-        requestType: json['request_type'] as String? ?? '',
-        title: json['title'] as String? ?? '',
-        description: json['description'] as String? ?? '',
-        projectId: json['project_id'] as String? ?? '',
-        sourceTaskId: json['source_task_id'] as String?,
-        sourceDraftId: json['source_draft_id'] as String?,
-        requestingSource: json['requesting_source'] as String? ?? '',
-        proposedAction: json['proposed_action'] as String? ?? '',
-        exactTargetDescription: json['exact_target_description'] as String? ?? '',
-        writeBoundary: json['write_boundary'] as String? ?? '',
-        riskLevel: json['risk_level'] as String? ?? '',
-        previewSummary: json['preview_summary'] as String? ?? '',
-        approvedContentHash: json['approved_content_hash'] as String? ?? '',
-        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
-        expiryTimestamp: json['expiry_timestamp'] == null ? null : DateTime.parse(json['expiry_timestamp'] as String),
-        status: json['status'] as String? ?? '',
-        reviewer: json['reviewer'] as String?,
-        decisionTimestamp: json['decision_timestamp'] == null ? null : DateTime.parse(json['decision_timestamp'] as String),
-        decisionReason: json['decision_reason'] as String?,
-        auditReferences: _stringList(json['audit_references']),
-        invalidationReason: json['invalidation_reason'] as String?,
-        version: json['version'] as int? ?? 0,
-      );
+    approvalId: json['approval_id'] as String? ?? '',
+    requestType: json['request_type'] as String? ?? '',
+    title: json['title'] as String? ?? '',
+    description: json['description'] as String? ?? '',
+    projectId: json['project_id'] as String? ?? '',
+    sourceTaskId: json['source_task_id'] as String?,
+    sourceDraftId: json['source_draft_id'] as String?,
+    requestingSource: json['requesting_source'] as String? ?? '',
+    proposedAction: json['proposed_action'] as String? ?? '',
+    exactTargetDescription: json['exact_target_description'] as String? ?? '',
+    writeBoundary: json['write_boundary'] as String? ?? '',
+    riskLevel: json['risk_level'] as String? ?? '',
+    previewSummary: json['preview_summary'] as String? ?? '',
+    approvedContentHash: json['approved_content_hash'] as String? ?? '',
+    createdAt: DateTime.parse(
+      json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+    ),
+    expiryTimestamp: json['expiry_timestamp'] == null
+        ? null
+        : DateTime.parse(json['expiry_timestamp'] as String),
+    status: json['status'] as String? ?? '',
+    reviewer: json['reviewer'] as String?,
+    decisionTimestamp: json['decision_timestamp'] == null
+        ? null
+        : DateTime.parse(json['decision_timestamp'] as String),
+    decisionReason: json['decision_reason'] as String?,
+    auditReferences: _stringList(json['audit_references']),
+    invalidationReason: json['invalidation_reason'] as String?,
+    version: json['version'] as int? ?? 0,
+  );
 
   final String approvalId;
   final String requestType;
@@ -756,12 +803,18 @@ class DailyBriefRecord {
     required this.sourceRunIds,
   });
 
-  factory DailyBriefRecord.fromJson(Map<String, dynamic> json) => DailyBriefRecord(
+  factory DailyBriefRecord.fromJson(Map<String, dynamic> json) =>
+      DailyBriefRecord(
         briefId: json['brief_id'] as String? ?? '',
         projectId: json['project_id'] as String? ?? '',
         title: json['title'] as String? ?? '',
-        createdAt: DateTime.parse(json['created_at'] as String? ?? DateTime.now().toIso8601String()),
-        repositorySnapshotJson: (json['repository_snapshot_json'] as Map?)?.cast<String, dynamic>() ?? const <String, dynamic>{},
+        createdAt: DateTime.parse(
+          json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+        ),
+        repositorySnapshotJson:
+            (json['repository_snapshot_json'] as Map?)
+                ?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
         verifiedFacts: _stringList(json['verified_facts']),
         inferences: _stringList(json['inferences']),
         recommendations: _stringList(json['recommendations']),
@@ -798,14 +851,21 @@ List<String> _stringList(dynamic value) {
 
 Map<String, int> _mapOfInt(dynamic value) {
   if (value is Map) {
-    return value.map((key, item) => MapEntry(key.toString(), (item as num).toInt()));
+    return value.map(
+      (key, item) => MapEntry(key.toString(), (item as num).toInt()),
+    );
   }
   return <String, int>{};
 }
 
 Map<String, bool> _mapOfBool(dynamic value) {
   if (value is Map) {
-    return value.map((key, item) => MapEntry(key.toString(), item is bool ? item : item.toString() == 'true'));
+    return value.map(
+      (key, item) => MapEntry(
+        key.toString(),
+        item is bool ? item : item.toString() == 'true',
+      ),
+    );
   }
   return <String, bool>{};
 }
@@ -820,4 +880,5 @@ List<Map<String, dynamic>> _listOfMap(dynamic value) {
   return <Map<String, dynamic>>[];
 }
 
-String encodeJsonPretty(Object? value) => const JsonEncoder.withIndent('  ').convert(value);
+String encodeJsonPretty(Object? value) =>
+    const JsonEncoder.withIndent('  ').convert(value);
