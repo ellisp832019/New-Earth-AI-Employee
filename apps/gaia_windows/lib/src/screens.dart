@@ -58,50 +58,20 @@ class _GaiaShellState extends State<GaiaShell> {
   @override
   void initState() {
     super.initState();
-    unawaited(widget.controller.refreshEverything());
   }
 
   @override
   Widget build(BuildContext context) {
     final controller = widget.controller;
-    final body = IndexedStack(
-      index: selectedIndex,
-      children: [
-        HomeScreen(controller: controller),
-        ProjectsScreen(controller: controller),
-        ProjectOfficerWorkspaceScreen(controller: controller),
-        AskScreen(controller: controller),
-        EvidenceScreen(controller: controller),
-        SnapshotsScreen(controller: controller),
-        ReportsScreen(controller: controller),
-        AgentRunsScreen(controller: controller),
-        TasksScreen(controller: controller),
-        DraftsScreen(controller: controller),
-        ApprovalsScreen(controller: controller),
-        PermissionsScreen(controller: controller),
-        ActionsScreen(controller: controller),
-        ReceiptsScreen(controller: controller),
-        TrustCentreScreen(controller: controller),
-        EmbeddedWorkspaceScreen(controller: controller),
-        IntegrationScreen(controller: controller),
-        DailyBriefScreen(controller: controller),
-        VscodeOpsScreen(controller: controller),
-        AuditScreen(controller: controller),
-        SettingsScreen(controller: controller),
-        AboutScreen(controller: controller),
-      ],
-    );
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('GAIA - Windows Control Centre'),
-        actions: [
-          _GlobalStatus(controller: controller),
-          const SizedBox(width: 12),
-        ],
-      ),
+      appBar: AppBar(title: const Text('GAIA - Windows Control Centre')),
       body: Column(
         children: [
           const ReadOnlyBanner(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+            child: _GlobalStatus(controller: controller),
+          ),
           Expanded(
             child: Row(
               children: [
@@ -110,6 +80,7 @@ class _GaiaShellState extends State<GaiaShell> {
                   onDestinationSelected: (index) =>
                       setState(() => selectedIndex = index),
                   labelType: NavigationRailLabelType.all,
+                  scrollable: true,
                   leading: Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: Column(
@@ -140,7 +111,7 @@ class _GaiaShellState extends State<GaiaShell> {
                   child: AnimatedBuilder(
                     animation: controller,
                     builder: (context, _) {
-                      return body;
+                      return _buildSelectedScreen(controller);
                     },
                   ),
                 ),
@@ -150,6 +121,57 @@ class _GaiaShellState extends State<GaiaShell> {
         ],
       ),
     );
+  }
+
+  Widget _buildSelectedScreen(GaiaAppController controller) {
+    switch (selectedIndex) {
+      case 0:
+        return HomeScreen(controller: controller);
+      case 1:
+        return ProjectsScreen(controller: controller);
+      case 2:
+        return ProjectOfficerWorkspaceScreen(controller: controller);
+      case 3:
+        return AskScreen(controller: controller);
+      case 4:
+        return EvidenceScreen(controller: controller);
+      case 5:
+        return SnapshotsScreen(controller: controller);
+      case 6:
+        return ReportsScreen(controller: controller);
+      case 7:
+        return AgentRunsScreen(controller: controller);
+      case 8:
+        return TasksScreen(controller: controller);
+      case 9:
+        return DraftsScreen(controller: controller);
+      case 10:
+        return ApprovalsScreen(controller: controller);
+      case 11:
+        return PermissionsScreen(controller: controller);
+      case 12:
+        return ActionsScreen(controller: controller);
+      case 13:
+        return ReceiptsScreen(controller: controller);
+      case 14:
+        return TrustCentreScreen(controller: controller);
+      case 15:
+        return EmbeddedWorkspaceScreen(controller: controller);
+      case 16:
+        return IntegrationScreen(controller: controller);
+      case 17:
+        return DailyBriefScreen(controller: controller);
+      case 18:
+        return VscodeOpsScreen(controller: controller);
+      case 19:
+        return AuditScreen(controller: controller);
+      case 20:
+        return SettingsScreen(controller: controller);
+      case 21:
+        return AboutScreen(controller: controller);
+      default:
+        return HomeScreen(controller: controller);
+    }
   }
 }
 
@@ -389,7 +411,7 @@ class HomeScreen extends StatelessWidget {
       if (controller.lastError != null) controller.lastError!,
       if (controller.backendCompatibilityState ==
           BackendCompatibilityState.incompatible)
-        'Backend version ${controller.health?.version ?? 'unknown'} is incompatible with the v0.5 desktop client.',
+        'GAIA compatibility check reported an incompatible contract. Review the backend status and contract metadata.',
     ].where((item) => item.trim().isNotEmpty).toList();
     if (warnings.isEmpty) {
       return const Text('No recent warnings.');
@@ -449,20 +471,56 @@ class ProjectsScreen extends StatelessWidget {
                 children: [
                   for (final project in controller.projects)
                     Card(
-                      child: ListTile(
-                        selected:
-                            project.projectId == controller.selectedProjectId,
+                      child: InkWell(
                         onTap: () =>
                             controller.selectProject(project.projectId),
-                        title: Text(project.name),
-                        subtitle: Text(
-                          '${project.projectId} • ${project.access} • ${controller.maskPath(project.root)}',
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      project.name,
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.titleMedium,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${project.projectId} | ${project.access} | ${controller.maskPath(project.root)}',
+                                      style: Theme.of(
+                                        context,
+                                      ).textTheme.bodySmall,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (project.projectId == 'microgrow-v1') ...[
+                                const SizedBox(width: 12),
+                                Flexible(
+                                  child: Align(
+                                    alignment: Alignment.topRight,
+                                    child: Chip(
+                                      label: const Text(
+                                        'READ-ONLY EXTERNAL PROJECT',
+                                      ),
+                                      materialTapTargetSize:
+                                          MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
                         ),
-                        trailing: project.projectId == 'microgrow-v1'
-                            ? const Chip(
-                                label: Text('READ-ONLY EXTERNAL PROJECT'),
-                              )
-                            : null,
                       ),
                     ),
                 ],
@@ -2097,7 +2155,7 @@ class _TasksScreenState extends State<TasksScreen> {
                   flex: 2,
                   child: SectionCard(
                     title: 'Tasks',
-                    child: ListView(
+                    child: Column(
                       children: [
                         for (final task in tasks)
                           Card(
@@ -2107,7 +2165,7 @@ class _TasksScreenState extends State<TasksScreen> {
                               onTap: () => controller.selectTask(task.taskId),
                               title: Text(task.title),
                               subtitle: Text(
-                                '${task.projectId} • ${task.status} • ${task.priority}',
+                                '${task.projectId} | ${task.status} | ${task.priority}',
                               ),
                             ),
                           ),

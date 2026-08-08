@@ -10,7 +10,11 @@ import 'models.dart';
 import 'settings_store.dart';
 
 class FirstRunCheck {
-  FirstRunCheck({required this.label, required this.passed, required this.details});
+  FirstRunCheck({
+    required this.label,
+    required this.passed,
+    required this.details,
+  });
 
   final String label;
   final bool passed;
@@ -22,9 +26,11 @@ class GaiaAppController extends ChangeNotifier {
     GaiaSettingsStore? settingsStore,
     BackendProcessManager? backendProcessManager,
     GaiaBackendApi? backendApi,
-  })  : _settingsStoreFuture = settingsStore == null ? GaiaSettingsStore.open() : Future.value(settingsStore),
-        _backendProcessManager = backendProcessManager,
-        _backendApi = backendApi;
+  }) : _settingsStoreFuture = settingsStore == null
+           ? GaiaSettingsStore.open()
+           : Future.value(settingsStore),
+       _backendProcessManager = backendProcessManager,
+       _backendApi = backendApi;
 
   final Future<GaiaSettingsStore> _settingsStoreFuture;
   final BackendProcessManager? _backendProcessManager;
@@ -61,10 +67,14 @@ class GaiaAppController extends ChangeNotifier {
   Map<String, dynamic>? selectedRecommendationDetail;
   Map<String, dynamic>? selectedWorkPackageDetail;
   Map<String, dynamic>? selectedWorkPackageSummary;
-  List<Map<String, dynamic>> selectedWorkPackageRevisions = <Map<String, dynamic>>[];
-  List<Map<String, dynamic>> selectedWorkPackageApprovalDecisions = <Map<String, dynamic>>[];
-  List<Map<String, dynamic>> selectedWorkPackageHandoffs = <Map<String, dynamic>>[];
-  List<Map<String, dynamic>> selectedWorkPackageOutcomes = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> selectedWorkPackageRevisions =
+      <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> selectedWorkPackageApprovalDecisions =
+      <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> selectedWorkPackageHandoffs =
+      <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> selectedWorkPackageOutcomes =
+      <Map<String, dynamic>>[];
   List<Map<String, dynamic>> permissionManifests = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> outputActions = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> executionReceipts = <Map<String, dynamic>>[];
@@ -87,7 +97,10 @@ class GaiaAppController extends ChangeNotifier {
   final List<String> backendLogs = <String>[];
   http.Client? _activeAskClient;
   bool _loading = false;
-  BackendCompatibilityState backendCompatibilityState = BackendCompatibilityState.unreachable;
+  bool _disposed = false;
+  Future<void>? _refreshEverythingInFlight;
+  BackendCompatibilityState backendCompatibilityState =
+      BackendCompatibilityState.unreachable;
 
   GaiaBackendApi get _client {
     if (_backendApi != null) {
@@ -106,7 +119,9 @@ class GaiaAppController extends ChangeNotifier {
       _settingsStore ??= await _settingsStoreFuture;
       settings = await _settingsStore!.load();
       _backendApi ??= GaiaApiClient(baseUri: settings.backendUri());
-      selectedProjectId = settings.defaultProjectId.isEmpty ? null : settings.defaultProjectId;
+      selectedProjectId = settings.defaultProjectId.isEmpty
+          ? null
+          : settings.defaultProjectId;
       firstRunMode = !settings.firstRunComplete;
       initialized = true;
       notifyListeners();
@@ -121,13 +136,30 @@ class GaiaAppController extends ChangeNotifier {
   }
 
   Future<void> refreshEverything() async {
+    final inFlight = _refreshEverythingInFlight;
+    if (inFlight != null) {
+      await inFlight;
+      return;
+    }
+
+    final future = _refreshEverythingImpl();
+    _refreshEverythingInFlight = future;
+    try {
+      await future;
+    } finally {
+      if (identical(_refreshEverythingInFlight, future)) {
+        _refreshEverythingInFlight = null;
+      }
+    }
+  }
+
+  Future<void> _refreshEverythingImpl() async {
     busy = true;
     lastError = null;
     notifyListeners();
     try {
       await Future.wait(<Future<void>>[
         refreshBackend(),
-        refreshCompatibility(),
         refreshProjects(),
         refreshModels(),
         refreshRuns(),
@@ -157,16 +189,20 @@ class GaiaAppController extends ChangeNotifier {
     try {
       health = await _client.health();
       backendState = BackendConnectionState.connected;
-      backendCompatibilityState = _compatibilityFromVersion(health!.version);
-      if (backendCompatibilityState == BackendCompatibilityState.incompatible) {
-        lastError = 'Backend version ${health!.version} is incompatible with the v0.5 desktop client.';
-      } else {
-        lastError = null;
-      }
     } catch (error) {
       backendState = BackendConnectionState.disconnected;
       backendCompatibilityState = BackendCompatibilityState.unreachable;
       health = null;
+      lastError = error.toString();
+      notifyListeners();
+      return;
+    }
+
+    try {
+      await _refreshCompatibilityState();
+    } catch (error) {
+      backendCompatibilityState = BackendCompatibilityState.unknown;
+      integrationCompatibility = null;
       lastError = error.toString();
     } finally {
       notifyListeners();
@@ -190,14 +226,18 @@ class GaiaAppController extends ChangeNotifier {
     statusMessage = 'Starting local backend...';
     notifyListeners();
     try {
-      await _backendProcessManager.pruneLogs(retentionDays: settings.logRetentionDays);
+      await _backendProcessManager.pruneLogs(
+        retentionDays: settings.logRetentionDays,
+      );
       final session = await _backendProcessManager.start(
         onStdout: _recordBackendLog,
         onStderr: _recordBackendLog,
       );
       _recordBackendLog('Started backend process pid=${session.process.pid}');
       await _pollBackendHealth();
-      settings = settings.copyWith(backendLaunchPreference: BackendLaunchPreference.startLocal);
+      settings = settings.copyWith(
+        backendLaunchPreference: BackendLaunchPreference.startLocal,
+      );
       await _saveSettings();
       await refreshEverything();
     } catch (error) {
@@ -234,8 +274,11 @@ class GaiaAppController extends ChangeNotifier {
 
   Future<void> refreshProjects() async {
     projects = await _client.listProjects();
-    selectedProjectId ??= settings.defaultProjectId.isNotEmpty ? settings.defaultProjectId : (projects.isEmpty ? null : projects.first.projectId);
-    if (selectedProjectId != null && projects.every((project) => project.projectId != selectedProjectId)) {
+    selectedProjectId ??= settings.defaultProjectId.isNotEmpty
+        ? settings.defaultProjectId
+        : (projects.isEmpty ? null : projects.first.projectId);
+    if (selectedProjectId != null &&
+        projects.every((project) => project.projectId != selectedProjectId)) {
       selectedProjectId = projects.isEmpty ? null : projects.first.projectId;
     }
     notifyListeners();
@@ -249,7 +292,10 @@ class GaiaAppController extends ChangeNotifier {
   Future<void> refreshSelectedProject(String projectId) async {
     try {
       final snapshot = await _client.latestSnapshot(projectId);
-      snapshots = <RepositorySnapshot>[snapshot, ...snapshots.where((entry) => entry.projectId != projectId)].take(20).toList();
+      snapshots = <RepositorySnapshot>[
+        snapshot,
+        ...snapshots.where((entry) => entry.projectId != projectId),
+      ].take(20).toList();
     } catch (_) {
       // No snapshot yet, which is fine during first run.
     }
@@ -270,37 +316,53 @@ class GaiaAppController extends ChangeNotifier {
 
   Future<void> refreshWorkflowRecords({String? projectId}) async {
     try {
-      tasks = await _client.listTasks(projectId: projectId ?? selectedProjectId, limit: 100);
+      tasks = await _client.listTasks(
+        projectId: projectId ?? selectedProjectId,
+        limit: 100,
+      );
     } catch (_) {
       tasks = <TaskRecord>[];
     }
     try {
-      drafts = await _client.listDrafts(projectId: projectId ?? selectedProjectId, limit: 100);
+      drafts = await _client.listDrafts(
+        projectId: projectId ?? selectedProjectId,
+        limit: 100,
+      );
     } catch (_) {
       drafts = <DraftRecord>[];
     }
     try {
-      approvals = await _client.listApprovals(projectId: projectId ?? selectedProjectId, limit: 100);
+      approvals = await _client.listApprovals(
+        projectId: projectId ?? selectedProjectId,
+        limit: 100,
+      );
     } catch (_) {
       approvals = <ApprovalRecord>[];
     }
     try {
-      briefs = await _client.listBriefs(projectId: projectId ?? selectedProjectId, limit: 50);
+      briefs = await _client.listBriefs(
+        projectId: projectId ?? selectedProjectId,
+        limit: 50,
+      );
     } catch (_) {
       briefs = <DailyBriefRecord>[];
     }
     selectedTaskId ??= tasks.isEmpty ? null : tasks.first.taskId;
     selectedDraftId ??= drafts.isEmpty ? null : drafts.first.draftId;
-    selectedApprovalId ??= approvals.isEmpty ? null : approvals.first.approvalId;
+    selectedApprovalId ??= approvals.isEmpty
+        ? null
+        : approvals.first.approvalId;
     selectedBriefId ??= briefs.isEmpty ? null : briefs.first.briefId;
     notifyListeners();
   }
 
   Future<void> refreshCompatibility() async {
     try {
-      integrationCompatibility = await _client.integrationCompatibility();
-    } catch (_) {
+      await _refreshCompatibilityState();
+    } catch (error) {
       integrationCompatibility = null;
+      backendCompatibilityState = BackendCompatibilityState.unknown;
+      lastError = error.toString();
     }
     notifyListeners();
   }
@@ -312,7 +374,10 @@ class GaiaAppController extends ChangeNotifier {
       permissionManifests = <Map<String, dynamic>>[];
     }
     try {
-      outputActions = await _client.listActions(projectId: projectId ?? selectedProjectId, limit: 100);
+      outputActions = await _client.listActions(
+        projectId: projectId ?? selectedProjectId,
+        limit: 100,
+      );
     } catch (_) {
       outputActions = <Map<String, dynamic>>[];
     }
@@ -321,9 +386,15 @@ class GaiaAppController extends ChangeNotifier {
     } catch (_) {
       executionReceipts = <Map<String, dynamic>>[];
     }
-    selectedManifestId ??= permissionManifests.isEmpty ? null : permissionManifests.first['manifest_id'] as String?;
-    selectedActionId ??= outputActions.isEmpty ? null : outputActions.first['action_id'] as String?;
-    selectedReceiptId ??= executionReceipts.isEmpty ? null : executionReceipts.first['receipt_id'] as String?;
+    selectedManifestId ??= permissionManifests.isEmpty
+        ? null
+        : permissionManifests.first['manifest_id'] as String?;
+    selectedActionId ??= outputActions.isEmpty
+        ? null
+        : outputActions.first['action_id'] as String?;
+    selectedReceiptId ??= executionReceipts.isEmpty
+        ? null
+        : executionReceipts.first['receipt_id'] as String?;
     await refreshSelectedAction();
     notifyListeners();
   }
@@ -347,30 +418,42 @@ class GaiaAppController extends ChangeNotifier {
     }
     if (activeProjectId != null) {
       try {
-        projectHealthSnapshots = await _client.projectHealthSnapshots(activeProjectId);
+        projectHealthSnapshots = await _client.projectHealthSnapshots(
+          activeProjectId,
+        );
       } catch (_) {
         projectHealthSnapshots = <Map<String, dynamic>>[];
       }
       try {
-        projectChangeFindings = await _client.projectChangeFindings(activeProjectId);
+        projectChangeFindings = await _client.projectChangeFindings(
+          activeProjectId,
+        );
       } catch (_) {
         projectChangeFindings = <Map<String, dynamic>>[];
       }
       try {
-        projectRecommendations = await _client.projectRecommendations(activeProjectId);
+        projectRecommendations = await _client.projectRecommendations(
+          activeProjectId,
+        );
         if (projectRecommendations.isEmpty) {
-          projectRecommendations = await _client.generateProjectRecommendations(activeProjectId);
+          projectRecommendations = await _client.generateProjectRecommendations(
+            activeProjectId,
+          );
         }
       } catch (_) {
         projectRecommendations = <Map<String, dynamic>>[];
       }
       try {
-        recommendationQueue = await _client.recommendationQueue(projectId: activeProjectId);
+        recommendationQueue = await _client.recommendationQueue(
+          projectId: activeProjectId,
+        );
       } catch (_) {
         recommendationQueue = <Map<String, dynamic>>[];
       }
       try {
-        workPackages = await _client.listWorkPackages(projectId: activeProjectId);
+        workPackages = await _client.listWorkPackages(
+          projectId: activeProjectId,
+        );
       } catch (_) {
         workPackages = <Map<String, dynamic>>[];
       }
@@ -390,15 +473,27 @@ class GaiaAppController extends ChangeNotifier {
       selectedWorkPackageHandoffs = <Map<String, dynamic>>[];
       selectedWorkPackageOutcomes = <Map<String, dynamic>>[];
     }
-    final recommendationKnown = selectedRecommendationId != null &&
-        projectRecommendations.any((item) => item['recommendation_id']?.toString() == selectedRecommendationId);
-    final workPackageKnown = selectedWorkPackageId != null &&
-        workPackages.any((item) => item['work_package_id']?.toString() == selectedWorkPackageId);
+    final recommendationKnown =
+        selectedRecommendationId != null &&
+        projectRecommendations.any(
+          (item) =>
+              item['recommendation_id']?.toString() == selectedRecommendationId,
+        );
+    final workPackageKnown =
+        selectedWorkPackageId != null &&
+        workPackages.any(
+          (item) =>
+              item['work_package_id']?.toString() == selectedWorkPackageId,
+        );
     if (!recommendationKnown) {
-      selectedRecommendationId = projectRecommendations.isEmpty ? null : projectRecommendations.first['recommendation_id'] as String?;
+      selectedRecommendationId = projectRecommendations.isEmpty
+          ? null
+          : projectRecommendations.first['recommendation_id'] as String?;
     }
     if (!workPackageKnown) {
-      selectedWorkPackageId = workPackages.isEmpty ? null : workPackages.first['work_package_id'] as String?;
+      selectedWorkPackageId = workPackages.isEmpty
+          ? null
+          : workPackages.first['work_package_id'] as String?;
     }
     await refreshSelectedRecommendation();
     await refreshSelectedWorkPackage();
@@ -411,7 +506,9 @@ class GaiaAppController extends ChangeNotifier {
       return;
     }
     try {
-      selectedRecommendationDetail = await _client.getRecommendation(selectedRecommendationId!);
+      selectedRecommendationDetail = await _client.getRecommendation(
+        selectedRecommendationId!,
+      );
     } catch (_) {
       selectedRecommendationDetail = null;
     }
@@ -429,12 +526,23 @@ class GaiaAppController extends ChangeNotifier {
       return;
     }
     try {
-      selectedWorkPackageDetail = await _client.getWorkPackage(selectedWorkPackageId!);
-      selectedWorkPackageSummary = await _client.workPackageSummary(selectedWorkPackageId!);
-      selectedWorkPackageRevisions = await _client.workPackageRevisions(selectedWorkPackageId!);
-      selectedWorkPackageApprovalDecisions = await _client.workPackageApprovalDecisions(selectedWorkPackageId!);
-      selectedWorkPackageHandoffs = await _client.workPackageHandoffs(selectedWorkPackageId!);
-      selectedWorkPackageOutcomes = await _client.workPackageOutcomes(selectedWorkPackageId!);
+      selectedWorkPackageDetail = await _client.getWorkPackage(
+        selectedWorkPackageId!,
+      );
+      selectedWorkPackageSummary = await _client.workPackageSummary(
+        selectedWorkPackageId!,
+      );
+      selectedWorkPackageRevisions = await _client.workPackageRevisions(
+        selectedWorkPackageId!,
+      );
+      selectedWorkPackageApprovalDecisions = await _client
+          .workPackageApprovalDecisions(selectedWorkPackageId!);
+      selectedWorkPackageHandoffs = await _client.workPackageHandoffs(
+        selectedWorkPackageId!,
+      );
+      selectedWorkPackageOutcomes = await _client.workPackageOutcomes(
+        selectedWorkPackageId!,
+      );
     } catch (_) {
       selectedWorkPackageDetail = null;
       selectedWorkPackageSummary = null;
@@ -455,10 +563,11 @@ class GaiaAppController extends ChangeNotifier {
     try {
       selectedActionDetail = await _client.getAction(selectedActionId!);
       final preview = await _client.previewAction(selectedActionId!);
-      selectedActionPreviews = (preview['previews'] as List<dynamic>? ?? const <dynamic>[])
-          .whereType<Map>()
-          .map((item) => item.cast<String, dynamic>())
-          .toList();
+      selectedActionPreviews =
+          (preview['previews'] as List<dynamic>? ?? const <dynamic>[])
+              .whereType<Map>()
+              .map((item) => item.cast<String, dynamic>())
+              .toList();
     } catch (_) {
       selectedActionDetail = null;
       selectedActionPreviews = <Map<String, dynamic>>[];
@@ -477,15 +586,23 @@ class GaiaAppController extends ChangeNotifier {
 
   Future<void> refreshAuditEvents() async {
     try {
-      auditEvents = (await _client.listAuditEvents(limit: 100)).map(AuditEvent.fromJson).toList();
+      auditEvents = (await _client.listAuditEvents(
+        limit: 100,
+      )).map(AuditEvent.fromJson).toList();
     } catch (_) {
       auditEvents = <AuditEvent>[];
     }
     notifyListeners();
   }
 
-  Future<void> refreshReport(String projectId, {ReportFormatPreference format = ReportFormatPreference.markdown}) async {
-    reports[projectId] = await _client.foundationReport(projectId, format: format.name);
+  Future<void> refreshReport(
+    String projectId, {
+    ReportFormatPreference format = ReportFormatPreference.markdown,
+  }) async {
+    reports[projectId] = await _client.foundationReport(
+      projectId,
+      format: format.name,
+    );
     notifyListeners();
   }
 
@@ -517,7 +634,14 @@ class GaiaAppController extends ChangeNotifier {
     await refreshWorkflowRecords();
   }
 
-  Future<void> transitionTask(String taskId, String status, {String? reason, List<String>? completionEvidence, String? manualOverrideReason, String actor = 'manual'}) async {
+  Future<void> transitionTask(
+    String taskId,
+    String status, {
+    String? reason,
+    List<String>? completionEvidence,
+    String? manualOverrideReason,
+    String actor = 'manual',
+  }) async {
     final task = tasks.firstWhere((entry) => entry.taskId == taskId);
     await _client.transitionTask(
       taskId,
@@ -550,23 +674,25 @@ class GaiaAppController extends ChangeNotifier {
     bool approvalRequirement = false,
     List<String> tags = const <String>[],
   }) async {
-    await _client.createTask(<String, dynamic>{
-      'title': title,
-      'project_id': projectId,
-      'description': description,
-      'priority': priority,
-      'category': category,
-      'source_type': sourceType,
-      'source_identifier': sourceIdentifier,
-      'source_agent_run_id': sourceAgentRunId,
-      'evidence_references': evidenceReferences,
-      'dependency_task_ids': dependencyTaskIds,
-      'blocker_description': blockerDescription,
-      'assigned_to': assignedTo,
-      'completion_criteria': completionCriteria,
-      'approval_requirement': approvalRequirement,
-      'tags': tags,
-    }..removeWhere((key, value) => value == null));
+    await _client.createTask(
+      <String, dynamic>{
+        'title': title,
+        'project_id': projectId,
+        'description': description,
+        'priority': priority,
+        'category': category,
+        'source_type': sourceType,
+        'source_identifier': sourceIdentifier,
+        'source_agent_run_id': sourceAgentRunId,
+        'evidence_references': evidenceReferences,
+        'dependency_task_ids': dependencyTaskIds,
+        'blocker_description': blockerDescription,
+        'assigned_to': assignedTo,
+        'completion_criteria': completionCriteria,
+        'approval_requirement': approvalRequirement,
+        'tags': tags,
+      }..removeWhere((key, value) => value == null),
+    );
     await refreshWorkflowRecords(projectId: projectId);
   }
 
@@ -579,29 +705,33 @@ class GaiaAppController extends ChangeNotifier {
     String? sourceAgentRunId,
     bool approvalRequirement = false,
   }) async {
-    await _client.createDraft(<String, dynamic>{
-      'title': title,
-      'draft_type': draftType,
-      'project_id': projectId,
-      'content': content,
-      'source_task_id': sourceTaskId,
-      'source_agent_run_id': sourceAgentRunId,
-      'approval_requirement': approvalRequirement,
-    }..removeWhere((key, value) => value == null));
+    await _client.createDraft(
+      <String, dynamic>{
+        'title': title,
+        'draft_type': draftType,
+        'project_id': projectId,
+        'content': content,
+        'source_task_id': sourceTaskId,
+        'source_agent_run_id': sourceAgentRunId,
+        'approval_requirement': approvalRequirement,
+      }..removeWhere((key, value) => value == null),
+    );
     await refreshWorkflowRecords(projectId: projectId);
   }
 
-  Future<void> reviseDraft(String draftId, String content, {String? author, String? changeReason}) async {
+  Future<void> reviseDraft(
+    String draftId,
+    String content, {
+    String? author,
+    String? changeReason,
+  }) async {
     final draft = drafts.firstWhere((entry) => entry.draftId == draftId);
-    await _client.reviseDraft(
-      draftId,
-      <String, dynamic>{
-        'version': draft.currentRevision,
-        'content': content,
-        'author': author ?? 'manual',
-        'change_reason': changeReason ?? 'revision',
-      },
-    );
+    await _client.reviseDraft(draftId, <String, dynamic>{
+      'version': draft.currentRevision,
+      'content': content,
+      'author': author ?? 'manual',
+      'change_reason': changeReason ?? 'revision',
+    });
     await refreshWorkflowRecords(projectId: draft.projectId);
   }
 
@@ -620,21 +750,23 @@ class GaiaAppController extends ChangeNotifier {
     String previewSummary = '',
     String approvedContentHash = '',
   }) async {
-    await _client.createApproval(<String, dynamic>{
-      'title': title,
-      'project_id': projectId,
-      'description': description,
-      'request_type': requestType,
-      'source_task_id': sourceTaskId,
-      'source_draft_id': sourceDraftId,
-      'requesting_source': requestingSource,
-      'proposed_action': proposedAction,
-      'exact_target_description': exactTargetDescription,
-      'write_boundary': writeBoundary,
-      'risk_level': riskLevel,
-      'preview_summary': previewSummary,
-      'approved_content_hash': approvedContentHash,
-    }..removeWhere((key, value) => value == null));
+    await _client.createApproval(
+      <String, dynamic>{
+        'title': title,
+        'project_id': projectId,
+        'description': description,
+        'request_type': requestType,
+        'source_task_id': sourceTaskId,
+        'source_draft_id': sourceDraftId,
+        'requesting_source': requestingSource,
+        'proposed_action': proposedAction,
+        'exact_target_description': exactTargetDescription,
+        'write_boundary': writeBoundary,
+        'risk_level': riskLevel,
+        'preview_summary': previewSummary,
+        'approved_content_hash': approvedContentHash,
+      }..removeWhere((key, value) => value == null),
+    );
     await refreshWorkflowRecords(projectId: projectId);
   }
 
@@ -643,13 +775,31 @@ class GaiaAppController extends ChangeNotifier {
     await refreshWorkflowRecords();
   }
 
-  Future<void> approveRequest(String approvalId, {required int version, String reviewer = 'manual', String decisionReason = 'approved for manual use'}) async {
-    await _client.approveApproval(approvalId, <String, dynamic>{'version': version, 'reviewer': reviewer, 'decision_reason': decisionReason});
+  Future<void> approveRequest(
+    String approvalId, {
+    required int version,
+    String reviewer = 'manual',
+    String decisionReason = 'approved for manual use',
+  }) async {
+    await _client.approveApproval(approvalId, <String, dynamic>{
+      'version': version,
+      'reviewer': reviewer,
+      'decision_reason': decisionReason,
+    });
     await refreshWorkflowRecords();
   }
 
-  Future<void> rejectRequest(String approvalId, {required int version, String reviewer = 'manual', String decisionReason = 'rejected'}) async {
-    await _client.rejectApproval(approvalId, <String, dynamic>{'version': version, 'reviewer': reviewer, 'decision_reason': decisionReason});
+  Future<void> rejectRequest(
+    String approvalId, {
+    required int version,
+    String reviewer = 'manual',
+    String decisionReason = 'rejected',
+  }) async {
+    await _client.rejectApproval(approvalId, <String, dynamic>{
+      'version': version,
+      'reviewer': reviewer,
+      'decision_reason': decisionReason,
+    });
     await refreshWorkflowRecords();
   }
 
@@ -706,18 +856,46 @@ class GaiaAppController extends ChangeNotifier {
     await refreshPlanningWorkspace(projectId: selectedProjectId);
   }
 
-  Future<void> submitWorkPackageForReview(String workPackageId, int revisionNumber, {String actor = 'manual'}) async {
-    await _client.submitWorkPackageForReview(workPackageId, revisionNumber: revisionNumber, actor: actor);
+  Future<void> submitWorkPackageForReview(
+    String workPackageId,
+    int revisionNumber, {
+    String actor = 'manual',
+  }) async {
+    await _client.submitWorkPackageForReview(
+      workPackageId,
+      revisionNumber: revisionNumber,
+      actor: actor,
+    );
     await refreshPlanningWorkspace(projectId: selectedProjectId);
   }
 
-  Future<void> approveWorkPackage(String workPackageId, int revisionNumber, {String actor = 'manual', String? humanNote}) async {
-    await _client.approveWorkPackage(workPackageId, revisionNumber: revisionNumber, actor: actor, humanNote: humanNote);
+  Future<void> approveWorkPackage(
+    String workPackageId,
+    int revisionNumber, {
+    String actor = 'manual',
+    String? humanNote,
+  }) async {
+    await _client.approveWorkPackage(
+      workPackageId,
+      revisionNumber: revisionNumber,
+      actor: actor,
+      humanNote: humanNote,
+    );
     await refreshPlanningWorkspace(projectId: selectedProjectId);
   }
 
-  Future<void> rejectWorkPackage(String workPackageId, int revisionNumber, {String actor = 'manual', String? humanNote}) async {
-    await _client.rejectWorkPackage(workPackageId, revisionNumber: revisionNumber, actor: actor, humanNote: humanNote);
+  Future<void> rejectWorkPackage(
+    String workPackageId,
+    int revisionNumber, {
+    String actor = 'manual',
+    String? humanNote,
+  }) async {
+    await _client.rejectWorkPackage(
+      workPackageId,
+      revisionNumber: revisionNumber,
+      actor: actor,
+      humanNote: humanNote,
+    );
     await refreshPlanningWorkspace(projectId: selectedProjectId);
   }
 
@@ -726,7 +904,8 @@ class GaiaAppController extends ChangeNotifier {
     int revisionNumber, {
     String approvedBy = 'manual',
     String nextManualAction = 'Copy the approved Codex prompt into Codex.',
-    String rollbackReference = 'Return to the recorded baseline commit or last approved revision.',
+    String rollbackReference =
+        'Return to the recorded baseline commit or last approved revision.',
   }) async {
     await _client.handoffWorkPackage(
       workPackageId,
@@ -775,7 +954,10 @@ class GaiaAppController extends ChangeNotifier {
     await refreshPlanningWorkspace(projectId: selectedProjectId);
   }
 
-  Future<void> expireWorkPackage(String workPackageId, {String reason = 'manual expiry'}) async {
+  Future<void> expireWorkPackage(
+    String workPackageId, {
+    String reason = 'manual expiry',
+  }) async {
     await _client.expireWorkPackage(workPackageId, reason: reason);
     await refreshPlanningWorkspace(projectId: selectedProjectId);
   }
@@ -820,19 +1002,18 @@ class GaiaAppController extends ChangeNotifier {
     String reviewNotes = '',
     bool enabled = true,
   }) async {
-    await _client.reviewPermissionManifest(
-      manifestId,
-      <String, dynamic>{
-        'version': version,
-        'reviewer': reviewer,
-        'review_notes': reviewNotes,
-        'enabled': enabled,
-      },
-    );
+    await _client.reviewPermissionManifest(manifestId, <String, dynamic>{
+      'version': version,
+      'reviewer': reviewer,
+      'review_notes': reviewNotes,
+      'enabled': enabled,
+    });
     await refreshOutputWorkspaceRecords();
   }
 
-  Future<Map<String, dynamic>> validatePermissionManifest(String manifestId) async {
+  Future<Map<String, dynamic>> validatePermissionManifest(
+    String manifestId,
+  ) async {
     return await _client.validatePermissionManifest(manifestId);
   }
 
@@ -867,17 +1048,32 @@ class GaiaAppController extends ChangeNotifier {
     await refreshOutputWorkspaceRecords();
   }
 
-  Future<void> executeAction(String actionId, {bool confirm = false, String operator = 'manual'}) async {
+  Future<void> executeAction(
+    String actionId, {
+    bool confirm = false,
+    String operator = 'manual',
+  }) async {
     await _client.executeAction(actionId, confirm: confirm, operator: operator);
     await refreshOutputWorkspaceRecords();
   }
 
-  Future<void> rollbackAction(String actionId, {bool confirm = false, String operator = 'manual'}) async {
-    await _client.rollbackAction(actionId, confirm: confirm, operator: operator);
+  Future<void> rollbackAction(
+    String actionId, {
+    bool confirm = false,
+    String operator = 'manual',
+  }) async {
+    await _client.rollbackAction(
+      actionId,
+      confirm: confirm,
+      operator: operator,
+    );
     await refreshOutputWorkspaceRecords();
   }
 
-  Future<void> cancelAction(String actionId, {String reason = 'cancelled'}) async {
+  Future<void> cancelAction(
+    String actionId, {
+    String reason = 'cancelled',
+  }) async {
     await _client.cancelAction(actionId, reason: reason);
     await refreshOutputWorkspaceRecords();
   }
@@ -952,53 +1148,68 @@ class GaiaAppController extends ChangeNotifier {
   Future<void> runFirstRunChecks() async {
     final checks = <FirstRunCheck>[];
     final repoRoot = Directory(settings.repositoryRootPath);
-    checks.add(FirstRunCheck(
-      label: 'Locate GAIA installation',
-      passed: repoRoot.existsSync() && _hasBackendProjectFiles(repoRoot),
-      details: repoRoot.path,
-    ));
-    checks.add(FirstRunCheck(
-      label: 'Python virtual environment',
-      passed: File(defaultPythonPath(repoRoot.path)).existsSync(),
-      details: defaultPythonPath(repoRoot.path),
-    ));
-    checks.add(FirstRunCheck(
-      label: 'Backend availability',
-      passed: await _canReachBackend(),
-      details: settings.backendUrl,
-    ));
-    checks.add(FirstRunCheck(
-      label: 'Configured projects',
-      passed: projects.isNotEmpty,
-      details: '${projects.length} projects',
-    ));
-    checks.add(FirstRunCheck(
-      label: 'MicroGrow access',
-      passed: projects.any((project) => project.projectId == 'microgrow-v1'),
-      details: 'microgrow-v1',
-    ));
-    checks.add(FirstRunCheck(
-      label: 'Ollama availability',
-      passed: models.any((status) => status.provider == 'ollama'),
-      details: models
-              .firstWhere(
-                (status) => status.provider == 'ollama',
-                orElse: () => ModelStatus(
-                  provider: 'ollama',
-                  available: false,
-                  modelName: null,
-                  endpointIdentity: null,
-                  details: 'Not checked',
-                ),
-              )
-              .details ??
-          'Not checked',
-    ));
-    checks.add(FirstRunCheck(
-      label: 'Read-only operating mode',
-      passed: projects.every((project) => project.access == 'read_only'),
-      details: 'No writable project endpoints are exposed.',
-    ));
+    checks.add(
+      FirstRunCheck(
+        label: 'Locate GAIA installation',
+        passed: repoRoot.existsSync() && _hasBackendProjectFiles(repoRoot),
+        details: repoRoot.path,
+      ),
+    );
+    checks.add(
+      FirstRunCheck(
+        label: 'Python virtual environment',
+        passed: File(defaultPythonPath(repoRoot.path)).existsSync(),
+        details: defaultPythonPath(repoRoot.path),
+      ),
+    );
+    checks.add(
+      FirstRunCheck(
+        label: 'Backend availability',
+        passed: await _canReachBackend(),
+        details: settings.backendUrl,
+      ),
+    );
+    checks.add(
+      FirstRunCheck(
+        label: 'Configured projects',
+        passed: projects.isNotEmpty,
+        details: '${projects.length} projects',
+      ),
+    );
+    checks.add(
+      FirstRunCheck(
+        label: 'MicroGrow access',
+        passed: projects.any((project) => project.projectId == 'microgrow-v1'),
+        details: 'microgrow-v1',
+      ),
+    );
+    checks.add(
+      FirstRunCheck(
+        label: 'Ollama availability',
+        passed: models.any((status) => status.provider == 'ollama'),
+        details:
+            models
+                .firstWhere(
+                  (status) => status.provider == 'ollama',
+                  orElse: () => ModelStatus(
+                    provider: 'ollama',
+                    available: false,
+                    modelName: null,
+                    endpointIdentity: null,
+                    details: 'Not checked',
+                  ),
+                )
+                .details ??
+            'Not checked',
+      ),
+    );
+    checks.add(
+      FirstRunCheck(
+        label: 'Read-only operating mode',
+        passed: projects.every((project) => project.access == 'read_only'),
+        details: 'No writable project endpoints are exposed.',
+      ),
+    );
     firstRunChecks = checks;
     notifyListeners();
   }
@@ -1204,6 +1415,8 @@ class GaiaAppController extends ChangeNotifier {
   String get backendCompatibilityLabel {
     return switch (backendCompatibilityState) {
       BackendCompatibilityState.compatible => 'Compatible',
+      BackendCompatibilityState.compatibleWithWarnings =>
+        'Compatible with warnings',
       BackendCompatibilityState.unknown => 'Unknown',
       BackendCompatibilityState.incompatible => 'Incompatible',
       BackendCompatibilityState.unreachable => 'Unreachable',
@@ -1213,6 +1426,9 @@ class GaiaAppController extends ChangeNotifier {
   Color get backendCompatibilityColor {
     return switch (backendCompatibilityState) {
       BackendCompatibilityState.compatible => const Color(0xFF2E7D32),
+      BackendCompatibilityState.compatibleWithWarnings => const Color(
+        0xFFE65100,
+      ),
       BackendCompatibilityState.unknown => const Color(0xFFEF6C00),
       BackendCompatibilityState.incompatible => const Color(0xFFC62828),
       BackendCompatibilityState.unreachable => const Color(0xFF616161),
@@ -1225,8 +1441,51 @@ class GaiaAppController extends ChangeNotifier {
   }
 
   bool _hasBackendProjectFiles(Directory root) {
-    return File('${root.path}${Platform.pathSeparator}pyproject.toml').existsSync() &&
-        File('${root.path}${Platform.pathSeparator}config${Platform.pathSeparator}projects.yaml').existsSync();
+    return File(
+          '${root.path}${Platform.pathSeparator}pyproject.toml',
+        ).existsSync() &&
+        File(
+          '${root.path}${Platform.pathSeparator}config${Platform.pathSeparator}projects.yaml',
+        ).existsSync();
+  }
+
+  Future<void> _refreshCompatibilityState() async {
+    final compatibility = await _client.integrationCompatibility();
+    integrationCompatibility = compatibility;
+
+    final status = _stringValue(
+      compatibility,
+      'status',
+      fallback: 'unknown',
+    ).toLowerCase();
+
+    switch (status) {
+      case 'compatible':
+        backendCompatibilityState = BackendCompatibilityState.compatible;
+        lastError = null;
+        break;
+      case 'compatible_with_warnings':
+        backendCompatibilityState =
+            BackendCompatibilityState.compatibleWithWarnings;
+        lastError = _compatibilitySummary(compatibility);
+        break;
+      case 'client_too_old':
+      case 'backend_too_old':
+      case 'contract_mismatch':
+        backendCompatibilityState = BackendCompatibilityState.incompatible;
+        lastError = _compatibilitySummary(compatibility);
+        break;
+      case 'unavailable':
+      case 'timeout':
+        backendCompatibilityState = BackendCompatibilityState.unreachable;
+        lastError = _compatibilitySummary(compatibility);
+        break;
+      case 'malformed_response':
+      default:
+        backendCompatibilityState = BackendCompatibilityState.unknown;
+        lastError = _compatibilitySummary(compatibility);
+        break;
+    }
   }
 
   Future<bool> _canReachBackend() async {
@@ -1247,7 +1506,11 @@ class GaiaAppController extends ChangeNotifier {
   }
 
   String maskPath(String path) {
-    final parts = path.replaceAll('\\', '/').split('/').where((part) => part.isNotEmpty).toList();
+    final parts = path
+        .replaceAll('\\', '/')
+        .split('/')
+        .where((part) => part.isNotEmpty)
+        .toList();
     if (parts.isEmpty) {
       return path;
     }
@@ -1257,19 +1520,58 @@ class GaiaAppController extends ChangeNotifier {
     return '.../${parts.sublist(parts.length - 2).join('/')}';
   }
 
-  BackendCompatibilityState _compatibilityFromVersion(String version) {
-    final parts = version.split('.');
-    if (parts.length < 2) {
-      return BackendCompatibilityState.unknown;
+  String _stringValue(
+    Map<String, dynamic> map,
+    String key, {
+    String fallback = '',
+  }) {
+    final value = map[key];
+    return value == null ? fallback : value.toString();
+  }
+
+  String _compatibilitySummary(Map<String, dynamic> compatibility) {
+    final status = _stringValue(compatibility, 'status', fallback: 'unknown');
+    final backendVersion = _stringValue(
+      compatibility,
+      'backend_version',
+      fallback: health?.version ?? 'unknown',
+    );
+    final contractVersion = _stringValue(
+      compatibility,
+      'integration_contract_version',
+      fallback: _stringValue(
+        compatibility,
+        'contract_version',
+        fallback: 'unknown',
+      ),
+    );
+    final capabilityVersion = _stringValue(
+      compatibility,
+      'capability_version',
+      fallback: 'unknown',
+    );
+    if (status == 'compatible') {
+      return 'GAIA compatibility check passed for backend $backendVersion (contract $contractVersion, capabilities $capabilityVersion).';
     }
-    final major = int.tryParse(parts[0]);
-    final minor = int.tryParse(parts[1]);
-    if (major == null || minor == null) {
-      return BackendCompatibilityState.unknown;
+    if (status == 'compatible_with_warnings') {
+      return 'GAIA compatibility check reported warnings for backend $backendVersion (contract $contractVersion, capabilities $capabilityVersion).';
     }
-    if (major == 0 && minor == 5) {
-      return BackendCompatibilityState.compatible;
+    return 'GAIA compatibility check reported $status for backend $backendVersion (contract $contractVersion, capabilities $capabilityVersion).';
+  }
+
+  @override
+  void notifyListeners() {
+    if (_disposed) {
+      return;
     }
-    return BackendCompatibilityState.incompatible;
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _activeAskClient?.close();
+    _activeAskClient = null;
+    super.dispose();
   }
 }

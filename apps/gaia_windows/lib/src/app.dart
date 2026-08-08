@@ -54,8 +54,8 @@ class _GaiaWindowsAppState extends State<GaiaWindowsApp> {
             darkTheme: _buildTheme(Brightness.dark),
             home: controller.initialized
                 ? controller.firstRunMode
-                    ? FirstRunScreen(controller: controller)
-                    : GaiaShell(controller: controller)
+                      ? FirstRunScreen(controller: controller)
+                      : GaiaShell(controller: controller)
                 : const _LoadingScreen(),
           );
         },
@@ -74,21 +74,29 @@ class _GaiaWindowsAppState extends State<GaiaWindowsApp> {
       scaffoldBackgroundColor: colorScheme.surface,
       appBarTheme: AppBarTheme(backgroundColor: colorScheme.surface),
       cardTheme: CardThemeData(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: brightness == Brightness.dark ? 0.5 : 0.7),
+        color: colorScheme.surfaceContainerHighest.withValues(
+          alpha: brightness == Brightness.dark ? 0.5 : 0.7,
+        ),
         elevation: 0,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: colorScheme.surface,
         selectedIconTheme: IconThemeData(color: colorScheme.primary),
-        selectedLabelTextStyle: TextStyle(color: colorScheme.primary, fontWeight: FontWeight.w600),
+        selectedLabelTextStyle: TextStyle(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
 
   Directory _defaultLogDirectory() {
-    final localAppData = Platform.environment['LOCALAPPDATA'] ?? Directory.current.path;
-    return Directory('$localAppData${Platform.pathSeparator}NewEarthAIEmployee${Platform.pathSeparator}gaia_windows${Platform.pathSeparator}logs');
+    final localAppData =
+        Platform.environment['LOCALAPPDATA'] ?? Directory.current.path;
+    return Directory(
+      '$localAppData${Platform.pathSeparator}NewEarthAIEmployee${Platform.pathSeparator}gaia_windows${Platform.pathSeparator}logs',
+    );
   }
 }
 
