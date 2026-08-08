@@ -36,6 +36,11 @@ from gaia.models import (
     WorkPackageRecord,
     WorkPackageRevisionRecord,
 )
+from gaia.programme_intelligence import (
+    ProgrammeIntelligenceService,
+    ProgrammeRoadmapPortfolio,
+    ReleaseTrainPortfolio,
+)
 from gaia.programme_registry import (
     ArchitectureEntityKind,
     ArchitectureEntityRecord,
@@ -79,6 +84,14 @@ class ProjectService:
             self.database,
             self.project_contract_service,
             self.architecture_registry_service,
+            self.dependency_graph_service,
+        )
+        self.programme_intelligence_service = ProgrammeIntelligenceService(
+            settings,
+            self.project_contract_service,
+            self.project_health_service,
+            self.recommendation_service,
+            self.work_package_service,
             self.dependency_graph_service,
         )
         self.scanner = DocumentScanner(settings.max_file_bytes)
@@ -493,3 +506,9 @@ class ProjectService:
 
     def change_impact(self, proposal: ChangeProposal | dict[str, object]) -> ChangeImpactResult:
         return self.change_impact_service.change_impact(proposal)
+
+    def programme_roadmap(self, *, change_impact_results: list[ChangeImpactResult] | None = None) -> ProgrammeRoadmapPortfolio:
+        return self.programme_intelligence_service.programme_roadmap(change_impact_results=change_impact_results)
+
+    def release_trains(self, *, change_impact_results: list[ChangeImpactResult] | None = None) -> ReleaseTrainPortfolio:
+        return self.programme_intelligence_service.release_trains(change_impact_results=change_impact_results)
