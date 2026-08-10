@@ -5,6 +5,7 @@ import sqlite3
 from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from gaia.conversation import AgentRunRecord
 from gaia.models import (
@@ -421,6 +422,36 @@ class Database:
                 normalized_payload_json TEXT NOT NULL,
                 FOREIGN KEY(work_package_id) REFERENCES work_packages(work_package_id),
                 FOREIGN KEY(revision_id) REFERENCES work_package_revisions(revision_id)
+            );
+            CREATE TABLE IF NOT EXISTS programme_packages (
+                package_id TEXT PRIMARY KEY,
+                schema_version INTEGER NOT NULL,
+                objective TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                package_fingerprint TEXT NOT NULL,
+                package_state TEXT NOT NULL,
+                current_revision_id TEXT,
+                current_revision_number INTEGER NOT NULL,
+                created_timestamp TEXT NOT NULL,
+                updated_timestamp TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS programme_package_revisions (
+                revision_id TEXT PRIMARY KEY,
+                package_id TEXT NOT NULL,
+                revision_number INTEGER NOT NULL,
+                previous_revision_id TEXT,
+                change_reason TEXT NOT NULL,
+                package_state_at_creation TEXT NOT NULL,
+                semantic_fingerprint TEXT NOT NULL,
+                content_fingerprint TEXT NOT NULL,
+                package_fingerprint TEXT NOT NULL,
+                created_timestamp TEXT NOT NULL,
+                provenance_json TEXT NOT NULL,
+                normalized_payload_json TEXT NOT NULL,
+                FOREIGN KEY(package_id) REFERENCES programme_packages(package_id),
+                UNIQUE(package_id, revision_number)
             );
             CREATE TABLE IF NOT EXISTS audit_events (
                 event_id TEXT PRIMARY KEY,
@@ -892,6 +923,10 @@ class Database:
                 "CREATE INDEX IF NOT EXISTS idx_work_package_approval_decisions_revision_id ON work_package_approval_decisions(revision_id)",
                 "CREATE INDEX IF NOT EXISTS idx_work_package_handoffs_package_id ON work_package_handoffs(work_package_id)",
                 "CREATE INDEX IF NOT EXISTS idx_work_package_outcomes_package_id ON work_package_outcomes(work_package_id)",
+                "CREATE INDEX IF NOT EXISTS idx_programme_packages_semantic_fingerprint ON programme_packages(semantic_fingerprint)",
+                "CREATE INDEX IF NOT EXISTS idx_programme_packages_package_state ON programme_packages(package_state)",
+                "CREATE INDEX IF NOT EXISTS idx_programme_package_revisions_package_id ON programme_package_revisions(package_id)",
+                "CREATE INDEX IF NOT EXISTS idx_programme_package_revisions_revision_number ON programme_package_revisions(package_id, revision_number DESC)",
             ]
         )
         self.connection.commit()
@@ -2228,6 +2263,141 @@ class Database:
             (work_package_id,),
         ).fetchall()
         return [WorkPackageOutcomeRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def insert_programme_package(self, package: Any) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO programme_packages(
+                    package_id, schema_version, objective, semantic_fingerprint,
+                    content_fingerprint, package_fingerprint, package_state,
+                    current_revision_id, current_revision_number, created_timestamp,
+                    updated_timestamp, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    package.programme_package_id,
+                    1,
+                    package.objective,
+                    package.semantic_fingerprint,
+                    package.content_fingerprint,
+                    package.package_fingerprint,
+                    package.package_state,
+                    package.current_revision_id,
+                    package.current_revision_number,
+                    package.created_timestamp.isoformat(),
+                    package.updated_timestamp.isoformat(),
+                    package.model_dump_json(),
+                ),
+            )
+
+    def insert_programme_package_revision(self, revision: Any) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO programme_package_revisions(
+                    revision_id, package_id, revision_number, previous_revision_id,
+                    change_reason, package_state_at_creation, semantic_fingerprint,
+                    content_fingerprint, package_fingerprint, created_timestamp,
+                    provenance_json, normalized_payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    revision.revision_id,
+                    revision.package_id,
+                    revision.revision_number,
+                    revision.previous_revision_id,
+                    revision.change_reason,
+                    revision.package_state_at_creation,
+                    revision.semantic_fingerprint,
+                    revision.content_fingerprint,
+                    revision.package_fingerprint,
+                    revision.created_timestamp.isoformat(),
+                    revision.provenance.model_dump_json(),
+                    revision.model_dump_json(),
+                ),
+            )
+
+    def get_programme_package(self, package_id: str) -> Any | None:
+        from gaia.programme_packages import ProgrammePackageRecord
+
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM programme_packages WHERE package_id = ?",
+            (package_id,),
+        ).fetchone()
+        return ProgrammePackageRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def get_programme_package_by_semantic(self, semantic_fingerprint: str) -> Any | None:
+        from gaia.programme_packages import ProgrammePackageRecord
+
+        row = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM programme_packages
+            WHERE semantic_fingerprint = ?
+            ORDER BY current_revision_number DESC, updated_timestamp DESC
+            LIMIT 1
+            """,
+            (semantic_fingerprint,),
+        ).fetchone()
+        return ProgrammePackageRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_programme_packages(self) -> list[Any]:
+        from gaia.programme_packages import ProgrammePackageRecord
+
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM programme_packages
+            ORDER BY updated_timestamp DESC, current_revision_number DESC, package_id DESC
+            """
+        ).fetchall()
+        return [ProgrammePackageRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def get_programme_package_revision(self, revision_id: str) -> Any | None:
+        from gaia.programme_packages import ProgrammePackageRevisionRecord
+
+        row = self.connection.execute(
+            "SELECT normalized_payload_json FROM programme_package_revisions WHERE revision_id = ?",
+            (revision_id,),
+        ).fetchone()
+        return ProgrammePackageRevisionRecord.model_validate_json(row["normalized_payload_json"]) if row else None
+
+    def list_programme_package_revisions(self, package_id: str) -> list[Any]:
+        from gaia.programme_packages import ProgrammePackageRevisionRecord
+
+        rows = self.connection.execute(
+            """
+            SELECT normalized_payload_json
+            FROM programme_package_revisions
+            WHERE package_id = ?
+            ORDER BY revision_number DESC, created_timestamp DESC, revision_id DESC
+            """,
+            (package_id,),
+        ).fetchall()
+        return [ProgrammePackageRevisionRecord.model_validate_json(row["normalized_payload_json"]) for row in rows]
+
+    def update_programme_package_state(
+        self,
+        package_id: str,
+        *,
+        package_state: str | None = None,
+        current_revision_id: str | None = None,
+        current_revision_number: int | None = None,
+        updated_timestamp: datetime | None = None,
+    ) -> None:
+        package = self.get_programme_package(package_id)
+        if package is None:
+            return
+        updated = package.model_copy(
+            update={
+                **({"package_state": package_state} if package_state is not None else {}),
+                **({"current_revision_id": current_revision_id} if current_revision_id is not None else {}),
+                **({"current_revision_number": current_revision_number} if current_revision_number is not None else {}),
+                **({"updated_timestamp": updated_timestamp} if updated_timestamp is not None else {}),
+            }
+        )
+        self.insert_programme_package(updated)
 
     def insert_audit_event(self, event: AuditEvent) -> None:
         with self.connection:
