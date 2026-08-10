@@ -151,6 +151,13 @@ class ProjectOfficerService:
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
+                capability_id="windows_programme_workspace",
+                version="0.9.0",
+                state="enabled",
+                summary="Windows Control Centre workspace for C6 programme intelligence review.",
+                authority_level="read_only",
+            ),
+            CapabilityDescriptor(
                 capability_id="dashboard_read_only_compatibility",
                 version="0.9.0",
                 state="enabled",

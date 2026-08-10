@@ -59,6 +59,7 @@ class GaiaAppController extends ChangeNotifier {
   Map<String, dynamic>? healthPortfolio;
   Map<String, dynamic>? changePortfolio;
   Map<String, dynamic>? recommendationPortfolio;
+  Map<String, dynamic>? programmeWorkspace;
   List<Map<String, dynamic>> projectHealthSnapshots = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> projectChangeFindings = <Map<String, dynamic>>[];
   List<Map<String, dynamic>> projectRecommendations = <Map<String, dynamic>>[];
@@ -166,6 +167,7 @@ class GaiaAppController extends ChangeNotifier {
         refreshAuditEvents(),
         refreshWorkflowRecords(),
         refreshOutputWorkspaceRecords(),
+        refreshProgrammeWorkspace(),
       ]);
       if (selectedProjectId == null && projects.isNotEmpty) {
         selectedProjectId = projects.first.projectId;
@@ -497,6 +499,17 @@ class GaiaAppController extends ChangeNotifier {
     }
     await refreshSelectedRecommendation();
     await refreshSelectedWorkPackage();
+    notifyListeners();
+  }
+
+  Future<void> refreshProgrammeWorkspace({String? projectId}) async {
+    try {
+      programmeWorkspace = await _client.programmeWorkspace(
+        projectId: projectId ?? selectedProjectId,
+      );
+    } catch (_) {
+      programmeWorkspace = null;
+    }
     notifyListeners();
   }
 
@@ -1324,6 +1337,7 @@ class GaiaAppController extends ChangeNotifier {
       return;
     }
     selectedProjectId = projectId;
+    unawaited(refreshProgrammeWorkspace(projectId: projectId));
     notifyListeners();
   }
 

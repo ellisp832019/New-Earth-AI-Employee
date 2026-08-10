@@ -9,10 +9,11 @@ from fastapi.responses import PlainTextResponse
 
 from gaia import __version__
 from gaia.agent import AgentService
+from gaia.change_impact import ChangeImpactChangeType, ChangeProposal, ChangeProposalTarget
 from gaia.config import Settings, load_settings
 from gaia.conversation import AskRequest
 from gaia.db import Database
-from gaia.models import HealthResponse
+from gaia.models import HealthResponse, ProjectRecommendation
 from gaia.output_workspace import (
     OutputActionCreateRequest,
     OutputWorkspaceError,
@@ -983,6 +984,181 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     def project_officer_change_portfolio() -> dict[str, object]:
         return project_officer_service.change_portfolio().model_dump(mode="json")
 
+    def _recommendation_change_type(recommendation_type: str) -> ChangeImpactChangeType:
+        return cast(
+            ChangeImpactChangeType,
+            {
+            "review_blocking_project_health_condition": "PROJECT_CONTRACT_CHANGE",
+            "review_uncommitted_project_changes": "REPOSITORY_RESTRUCTURE",
+            "verify_removal_of_configured_important_project_path": "REPOSITORY_RESTRUCTURE",
+            "refresh_project_evidence_before_relying_on_state": "PROJECT_CONTRACT_CHANGE",
+            "review_upstream_branch_divergence": "REPOSITORY_RESTRUCTURE",
+            "review_repository_head_change": "REPOSITORY_RESTRUCTURE",
+            "review_project_configuration_change": "PROJECT_CONTRACT_CHANGE",
+            "insufficient_evidence": "PROJECT_CONTRACT_CHANGE",
+            }.get(recommendation_type, "PROJECT_CONTRACT_CHANGE"),
+        )
+
+    def _proposal_from_recommendation(recommendation: ProjectRecommendation) -> ChangeProposal:
+        recommendation_dict = recommendation.model_dump(mode="json")
+        project_id = str(recommendation_dict["project_id"])
+        title = str(recommendation_dict.get("title") or f"{project_id} change impact review")
+        objective = str(
+            recommendation_dict.get("concise_summary")
+            or recommendation_dict.get("why_it_matters")
+            or recommendation_dict.get("rationale")
+            or title
+        )
+        blockers = recommendation_dict.get("blockers") or []
+        dependencies = recommendation_dict.get("dependencies") or []
+        evidence = recommendation_dict.get("evidence_references") or []
+        return ChangeProposal(
+            proposal_id=str(recommendation_dict["recommendation_id"]),
+            revision=1,
+            title=title,
+            origin_project=project_id,
+            objective=objective,
+            change_type=_recommendation_change_type(str(recommendation_dict.get("recommendation_type") or "")),
+            target_entities=[
+                ChangeProposalTarget(
+                    target_kind="project",
+                    target_id=project_id,
+                    label=str(recommendation_dict.get("project_name") or project_id),
+                )
+            ],
+            evidence=evidence,
+            blocked_by=[
+                str(item.get("blocker_description") or item.get("required_condition") or item)
+                for item in blockers
+                if item is not None
+            ],
+            depends_on=[str(item) for item in dependencies],
+            required_validation=[str(item) for item in recommendation_dict.get("source_snapshot_ids") or []],
+            rollback_concept=str(recommendation_dict.get("why_it_received_this_score") or title),
+            status="analysed",
+        )
+
+    def _programme_workspace_payload(project_id: str | None = None) -> dict[str, object]:
+        health_portfolio = service.project_health_portfolio()
+        change_portfolio = service.project_change_portfolio()
+        recommendation_portfolio = service.project_recommendation_portfolio()
+        roadmap_portfolio = service.programme_roadmap()
+        release_portfolio = service.release_trains()
+        package_portfolio = service.programme_packages()
+        graph = service.dependency_graph_service.build_graph()
+        cycles = service.dependency_graph_service.cycles()
+        unresolved = service.dependency_graph_service.unresolved_dependencies()
+        shared_dependencies = service.dependency_graph_service.shared_dependencies()
+        orphans = service.dependency_graph_service.orphans()
+        entities = service.architecture_registry_service.list_entities()
+        relationships = service.architecture_registry_service.list_relationships()
+        selected_project_id = project_id or (next(iter(sorted(resolved_settings.projects))) if resolved_settings.projects else None)
+        selected_project = resolved_settings.projects.get(selected_project_id) if selected_project_id else None
+        selected_health = project_officer_service.project_health(selected_project_id) if selected_project_id else None
+        selected_health_snapshots = project_officer_service.project_health_snapshots(selected_project_id) if selected_project_id else []
+        selected_change_findings = project_officer_service.change_findings(selected_project_id) if selected_project_id else []
+        selected_recommendations = project_officer_service.recommendations(project_id=selected_project_id, limit=10) if selected_project_id else []
+        selected_work_packages = project_officer_service.work_packages(project_id=selected_project_id, limit=20) if selected_project_id else []
+        selected_contract = service.project_contract_service.current_approved_contract(selected_project_id) if selected_project_id else None
+        project_dependencies = service.dependency_graph_service.project_dependencies(selected_project_id) if selected_project_id else []
+        project_dependents = service.dependency_graph_service.project_dependents(selected_project_id) if selected_project_id else []
+        analyses = [
+            service.analyse_change_impact(_proposal_from_recommendation(recommendation))
+            for recommendation in selected_recommendations[:5]
+        ]
+        trust_alerts = trust_service.list_trust_alerts()
+        provenance_manifests = trust_service.list_provenance_manifests()
+        selected_package = package_portfolio.programme_packages[0] if package_portfolio.programme_packages else None
+        summary = {
+            "project_count": len(resolved_settings.projects),
+            "health_status_counts": dict(health_portfolio.counts_by_status),
+            "change_severity_counts": dict(change_portfolio.counts_by_severity),
+            "recommendation_state_counts": dict(recommendation_portfolio.counts_by_state),
+            "roadmap_state_counts": dict(roadmap_portfolio.counts_by_state),
+            "release_train_readiness_counts": dict(release_portfolio.counts_by_readiness),
+            "package_state_counts": dict(package_portfolio.counts_by_state),
+            "architecture_entity_count": len(entities),
+            "architecture_relationship_count": len(relationships),
+            "cycle_count": len(cycles),
+            "unresolved_dependency_count": len(unresolved),
+            "shared_dependency_count": len(shared_dependencies),
+            "orphan_count": len(orphans),
+            "trust_alert_count": len(trust_alerts),
+            "provenance_manifest_count": len(provenance_manifests),
+            "stale_evidence_projects": list(health_portfolio.projects_without_snapshots),
+        }
+        return {
+            "generated_at": roadmap_portfolio.generated_at.isoformat(),
+            "selected_project_id": selected_project_id,
+            "selected_project": selected_project.model_dump(mode="json") if selected_project is not None else None,
+            "summary": summary,
+            "overview": {
+                "health_portfolio": health_portfolio.model_dump(mode="json"),
+                "change_portfolio": change_portfolio.model_dump(mode="json"),
+                "recommendation_portfolio": recommendation_portfolio.model_dump(mode="json"),
+                "roadmap_portfolio": roadmap_portfolio.model_dump(mode="json"),
+                "release_portfolio": release_portfolio.model_dump(mode="json"),
+                "package_portfolio": package_portfolio.model_dump(mode="json"),
+            },
+            "architecture_registry": {
+                "entities": [entity.model_dump(mode="json") for entity in entities],
+                "relationships": [relationship.model_dump(mode="json") for relationship in relationships],
+                "selected_entity_revisions": [
+                    revision.model_dump(mode="json")
+                    for revision in service.architecture_registry_service.list_entity_revisions(entities[0].entity_id)
+                ]
+                if entities
+                else [],
+                "selected_relationship_revisions": [
+                    revision.model_dump(mode="json")
+                    for revision in service.architecture_registry_service.list_relationship_revisions(relationships[0].relationship_id)
+                ]
+                if relationships
+                else [],
+            },
+            "dependency_graph": {
+                "snapshot": graph.model_dump(mode="json"),
+                "cycles": [cycle.model_dump(mode="json") for cycle in cycles],
+                "shared_dependencies": [item.model_dump(mode="json") for item in shared_dependencies],
+                "orphans": [item.model_dump(mode="json") for item in orphans],
+                "unresolved_findings": [item.model_dump(mode="json") for item in unresolved],
+                "project_dependencies": [item.model_dump(mode="json") for item in project_dependencies],
+                "project_dependents": [item.model_dump(mode="json") for item in project_dependents],
+            },
+            "impact_analysis": {
+                "analyses": [analysis.model_dump(mode="json") for analysis in analyses],
+                "selected_analysis": analyses[0].model_dump(mode="json") if analyses else None,
+                "selected_change_findings": [item.model_dump(mode="json") for item in selected_change_findings],
+            },
+            "change_proposals": {
+                "recommendations": [item.model_dump(mode="json") for item in selected_recommendations],
+                "selected_recommendation": selected_recommendations[0].model_dump(mode="json") if selected_recommendations else None,
+            },
+            "roadmap": roadmap_portfolio.model_dump(mode="json"),
+            "release_trains": release_portfolio.model_dump(mode="json"),
+            "programme_packages": package_portfolio.model_dump(mode="json"),
+            "decisions": {
+                "selected_work_packages": [item.model_dump(mode="json") for item in selected_work_packages],
+                "selected_health_snapshots": [item.model_dump(mode="json") for item in selected_health_snapshots],
+                "selected_contract": selected_contract.model_dump(mode="json") if selected_contract is not None else None,
+                "trust_alerts": trust_alerts,
+            },
+            "cross_project_evidence": {
+                "provenance_manifests": provenance_manifests,
+                "capabilities": trust_service.provenance.capability_payload(),
+                "contract_count": len(
+                    [item for item in resolved_settings.projects if service.project_contract_service.current_approved_contract(item) is not None]
+                ),
+                "selected_project_health": selected_health.model_dump(mode="json") if selected_health is not None else None,
+                "selected_project_change_findings": [item.model_dump(mode="json") for item in selected_change_findings],
+                "selected_project_recommendations": [item.model_dump(mode="json") for item in selected_recommendations],
+                "selected_project_work_packages": [item.model_dump(mode="json") for item in selected_work_packages],
+                "selected_project_dependencies": [item.model_dump(mode="json") for item in project_dependencies],
+                "selected_project_dependents": [item.model_dump(mode="json") for item in project_dependents],
+            },
+            "selected_package": selected_package.model_dump(mode="json") if selected_package is not None else None,
+        }
+
     @app.get("/integration/v1/project-officer/projects/{project_id}/changes/findings")
     def project_officer_change_findings(
         project_id: str,
@@ -1022,6 +1198,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         limit: int = Query(default=100, ge=1, le=500),
     ) -> list[dict[str, object]]:
         return [item.model_dump(mode="json") for item in project_officer_service.recent_change_findings(project_id=project_id, limit=limit)]
+
+    @app.get("/integration/v1/project-officer/programme/workspace", include_in_schema=False)
+    def project_officer_programme_workspace(project_id: str | None = None) -> dict[str, object]:
+        return _programme_workspace_payload(project_id)
 
     @app.get("/integration/v1/project-officer/recommendations/portfolio")
     def project_officer_recommendation_portfolio() -> dict[str, object]:
