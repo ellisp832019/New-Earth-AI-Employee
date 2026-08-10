@@ -208,7 +208,7 @@ class ProjectHealthService:
                 git_state=None,
                 status="blocked",
                 reason_codes=["project_disabled"],
-                explanations=["The project is disabled in the canonical registry."],
+                explanations=["The project is disabled in the local registry context."],
                 blocking_conditions=["Project is disabled."],
                 attention_conditions=[],
                 unknown_fields=["repository_state", "working_tree_state", "snapshot_freshness"],
@@ -217,7 +217,7 @@ class ProjectHealthService:
                         _build_reference(
                             "project_config",
                             project.project_id,
-                            "Canonical project registry record",
+                            "Local project registry record",
                             details={"enabled": project.enabled},
                         )
                     ]
@@ -237,8 +237,8 @@ class ProjectHealthService:
                 git_state=None,
                 status="blocked",
                 reason_codes=["canonical_path_invalid"],
-                explanations=["The configured project root is not a canonical absolute path."],
-                blocking_conditions=["Canonical path validation failed."],
+                explanations=["The configured project root is not a local absolute path."],
+                blocking_conditions=["Local path validation failed."],
                 attention_conditions=[],
                 unknown_fields=["repository_state", "working_tree_state", "snapshot_freshness"],
                 evidence_references=_compact_references(
@@ -246,7 +246,7 @@ class ProjectHealthService:
                         _build_reference(
                             "project_config",
                             project.project_id,
-                            "Canonical project registry record",
+                            "Local project registry record",
                             details={"root": canonical_root},
                         )
                     ]
@@ -275,7 +275,7 @@ class ProjectHealthService:
                         _build_reference(
                             "project_config",
                             project.project_id,
-                            "Canonical project registry record",
+                            "Local project registry record",
                             details={"root": canonical_root},
                         )
                     ]
@@ -304,7 +304,7 @@ class ProjectHealthService:
                         _build_reference(
                             "project_config",
                             project.project_id,
-                            "Canonical project registry record",
+                            "Local project registry record",
                             details={"root": canonical_root},
                         )
                     ]
@@ -343,7 +343,7 @@ class ProjectHealthService:
                         _build_reference(
                             "project_config",
                             project.project_id,
-                            "Canonical project registry record",
+                            "Local project registry record",
                             details={"repository_type": project.repository_type},
                         )
                     ]
@@ -440,7 +440,7 @@ class ProjectHealthService:
                 _build_reference(
                     "project_config",
                     project.project_id,
-                    "Canonical project registry record",
+                    "Local project registry record",
                     details={"config_fingerprint": project.config_fingerprint()},
                 ),
                 _build_reference(

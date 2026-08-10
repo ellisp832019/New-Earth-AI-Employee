@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
 from gaia.api import create_app
+from tests.governance_helpers import FakeGovernanceContextService, sample_governance_context
 
 
 def test_health(settings):
@@ -55,3 +56,20 @@ def test_agent_ask_api(settings):
 def test_unknown_project(settings):
     with TestClient(create_app(settings)) as client:
         assert client.get("/projects/missing").status_code == 404
+
+
+def test_governance_api_endpoints(settings):
+    app = create_app(settings)
+    app.state.service.governance_context_service = FakeGovernanceContextService(sample_governance_context())
+    with TestClient(app) as client:
+        response = client.get("/governance")
+        assert response.status_code == 200
+        assert response.json()["source"]["snapshot_id"] == "snapshot-001"
+
+        assert client.get("/governance/status").status_code == 200
+        assert client.get("/governance/findings").status_code == 200
+        assert client.get("/governance/project/sample").status_code == 200
+        assert client.get("/governance/snapshot").status_code == 200
+        brief = client.get("/governance/brief")
+        assert brief.status_code == 200
+        assert "Architecture Governance" in brief.json()["markdown"]

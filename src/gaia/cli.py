@@ -61,6 +61,7 @@ tasks_app = typer.Typer(help="GAIA task records")
 drafts_app = typer.Typer(help="GAIA draft records")
 approvals_app = typer.Typer(help="GAIA approval records")
 briefs_app = typer.Typer(help="GAIA daily brief records")
+governance_app = typer.Typer(help="NEOS governance context")
 permissions_app = typer.Typer(help="Permission manifests and output workspace controls")
 actions_app = typer.Typer(help="Permissioned GAIA output actions")
 receipts_app = typer.Typer(help="Execution receipts")
@@ -81,6 +82,7 @@ app.add_typer(tasks_app, name="tasks")
 app.add_typer(drafts_app, name="drafts")
 app.add_typer(approvals_app, name="approvals")
 app.add_typer(briefs_app, name="briefs")
+app.add_typer(governance_app, name="governance")
 app.add_typer(permissions_app, name="permissions")
 app.add_typer(actions_app, name="actions")
 app.add_typer(receipts_app, name="receipts")
@@ -327,6 +329,77 @@ def agent_runs_show(run_id: str, config: Path | None = typer.Option(None)) -> No
         console.print_json(json.dumps(run))
     finally:
         database.close()
+
+
+@governance_app.command("context")
+def governance_context(
+    project_id: str | None = typer.Option(None),
+    finding_id: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _service(config)
+    try:
+        _print_model(service.governance_context(project_id=project_id, finding_id=finding_id))
+    finally:
+        service.close()
+
+
+@governance_app.command("status")
+def governance_status(project_id: str | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        _print_model(service.governance_status(project_id=project_id))
+    finally:
+        service.close()
+
+
+@governance_app.command("findings")
+def governance_findings(project_id: str | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        _print_model(service.governance_findings(project_id=project_id))
+    finally:
+        service.close()
+
+
+@governance_app.command("project")
+def governance_project(project_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        _print_model(service.governance_project(project_id))
+    finally:
+        service.close()
+
+
+@governance_app.command("snapshot")
+def governance_snapshot(config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        _print_model(service.governance_snapshot())
+    finally:
+        service.close()
+
+
+@governance_app.command("brief")
+def governance_brief(project_id: str | None = typer.Option(None), config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        console.print(service.governance_brief(project_id=project_id).markdown)
+    finally:
+        service.close()
+
+
+@governance_app.command("work-package")
+def governance_work_package(
+    finding_id: str,
+    project_id: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _service(config)
+    try:
+        _print_model(service.governance_work_package_preview(finding_id, project_id=project_id))
+    finally:
+        service.close()
 
 
 @app.command()

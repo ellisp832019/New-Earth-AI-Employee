@@ -19,6 +19,12 @@ from gaia.dependency_graph import (
     DependencyGraphSnapshot,
 )
 from gaia.git_inspector import GitInspector
+from gaia.governance_context import (
+    GovernanceBrief,
+    GovernanceContext,
+    GovernanceContextService,
+    GovernanceWorkPackagePreview,
+)
 from gaia.models import (
     ProjectChangeComparison,
     ProjectChangeFinding,
@@ -108,7 +114,12 @@ class ProjectService:
             self.dependency_graph_service,
             self.programme_intelligence_service,
         )
+        self.governance_context_service = GovernanceContextService(settings, self, self.database)
         self.scanner = DocumentScanner(settings.max_file_bytes)
+
+    def close(self) -> None:
+        self.governance_context_service.close()
+        self.database.close()
 
     def get_project(self, project_id: str) -> ProjectConfig:
         try:
@@ -398,6 +409,32 @@ class ProjectService:
 
     def work_package_summary(self, work_package_id: str) -> dict[str, object]:
         return self.work_package_service.render_summary(work_package_id)
+
+    def governance_context(self, project_id: str | None = None, finding_id: str | None = None) -> GovernanceContext:
+        return self.governance_context_service.context(project_id=project_id, finding_id=finding_id)
+
+    def governance_status(self, project_id: str | None = None) -> GovernanceContext:
+        return self.governance_context(project_id=project_id)
+
+    def governance_findings(self, project_id: str | None = None) -> GovernanceContext:
+        return self.governance_context(project_id=project_id)
+
+    def governance_project(self, project_id: str) -> GovernanceContext:
+        return self.governance_context(project_id=project_id)
+
+    def governance_snapshot(self) -> GovernanceContext:
+        return self.governance_context()
+
+    def governance_brief(self, project_id: str | None = None) -> GovernanceBrief:
+        return self.governance_context_service.brief(project_id=project_id)
+
+    def governance_work_package_preview(
+        self,
+        finding_id: str,
+        *,
+        project_id: str | None = None,
+    ) -> GovernanceWorkPackagePreview:
+        return self.governance_context_service.work_package_preview(finding_id, project_id=project_id)
 
     def project_contract(self, project_id: str) -> ProjectContractRecord | None:
         return self.project_contract_service.get_project_contract(project_id)

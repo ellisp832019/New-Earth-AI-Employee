@@ -17,6 +17,7 @@ from gaia.conversation import (
     rank_evidence,
 )
 from gaia.db import Database
+from gaia.governance_context import GovernanceContextService
 from gaia.models import RepositorySnapshot
 from gaia.providers import ProviderRegistry
 from gaia.service import ProjectService
@@ -72,14 +73,25 @@ class AgentService:
             max_context_chars=12_000,
         )
         provider_status = await selection.provider.status()
-        if deterministic_only or not provider_status.available:
+        governance_mode = analysis.category == "governance"
+        governance_context = None
+        if governance_mode:
+            governance_service = GovernanceContextService(self.project_service.settings, self.project_service, self.database)
+            try:
+                governance_context = governance_service.context(project_id=project_id)
+                answer = governance_context.brief.markdown if governance_context.brief else governance_service.brief(project_id=project_id).markdown
+                model_response = None
+                warnings.extend(f"Governance limitation: {item}" for item in governance_context.limitations[:5])
+            finally:
+                governance_service.close()
+        elif deterministic_only or not provider_status.available:
             answer = self._deterministic_answer(project_id, question, analysis, snapshot, evidence, provider_status.details)
             model_response = None
         else:
             model_response = await selection.provider.generate(request)
             answer = model_response.content or self._deterministic_answer(project_id, question, analysis, snapshot, evidence, model_response.error)
         warnings.extend(_answer_warnings(answer))
-        confidence = classify_confidence(analysis, len(evidence), provider_status.available, deterministic_only)
+        confidence = classify_confidence(analysis, len(evidence), provider_status.available, deterministic_only or governance_mode)
         finished = datetime.now(UTC)
         structured_answer = {
             "answer": answer,

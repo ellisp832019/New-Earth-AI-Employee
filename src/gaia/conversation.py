@@ -15,6 +15,7 @@ QuestionCategory = Literal[
     "experimental",
     "incomplete",
     "planned",
+    "governance",
     "missing_docs",
     "risks",
     "next_step",
@@ -133,6 +134,7 @@ _CATEGORY_HINTS: list[tuple[QuestionCategory, tuple[str, ...], list[str]]] = [
     ("experimental", ("experimental",), ["experimental", "prototype"]),
     ("incomplete", ("incomplete", "missing", "unfinished"), ["missing", "incomplete"]),
     ("planned", ("planned", "future", "roadmap", "next version"), ["future version", "roadmap", "planned"]),
+    ("governance", ("governance context", "architecture governance", "neos-gov", "governance status"), ["governance", "neos-gov", "architecture governance"]),
     ("missing_docs", ("what documentation is missing", "missing documentation"), ["documentation", "guide"]),
     ("risks", ("risks", "blockers", "problems"), ["risk", "blocker"]),
     ("next_step", ("what should i build next", "next step", "next"), ["next", "should build"]),
@@ -184,6 +186,8 @@ def generate_search_queries(question: str, analysis: QuestionAnalysis) -> list[s
         queries += ["experimental", "prototype", "future version"]
     elif analysis.category == "planned":
         queries += ["roadmap", "future version", "planned"]
+    elif analysis.category == "governance":
+        queries += ["NEOS governance", "architecture governance", "governance status"]
     elif analysis.category == "codex_prompt":
         queries += ["roadmap", "validation", "read-only proof"]
     else:

@@ -66,7 +66,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         trust_service.seed_templates()
         trust_service.seed_retention_policies()
         yield
-        database.close()
+        service.close()
 
     app = FastAPI(
         title="GAIA Project-Control API",
@@ -85,6 +85,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             database_path=str(resolved_settings.database_path),
             fts5_available=database.fts5_available,
         )
+
+    @app.get("/governance")
+    def governance_context(project_id: str | None = None, finding_id: str | None = None) -> dict[str, object]:
+        return service.governance_context(project_id=project_id, finding_id=finding_id).model_dump(mode="json")
+
+    @app.get("/governance/status")
+    def governance_status(project_id: str | None = None) -> dict[str, object]:
+        return service.governance_status(project_id=project_id).model_dump(mode="json")
+
+    @app.get("/governance/findings")
+    def governance_findings(project_id: str | None = None) -> dict[str, object]:
+        return service.governance_findings(project_id=project_id).model_dump(mode="json")
+
+    @app.get("/governance/project/{project_id}")
+    def governance_project(project_id: str) -> dict[str, object]:
+        return service.governance_project(project_id).model_dump(mode="json")
+
+    @app.get("/governance/snapshot")
+    def governance_snapshot() -> dict[str, object]:
+        return service.governance_snapshot().model_dump(mode="json")
+
+    @app.get("/governance/brief")
+    def governance_brief(project_id: str | None = None) -> dict[str, object]:
+        return service.governance_brief(project_id=project_id).model_dump(mode="json")
 
     @app.get("/projects")
     def projects() -> list[dict[str, object]]:

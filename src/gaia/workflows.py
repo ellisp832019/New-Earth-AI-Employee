@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, field_validator
 from gaia.audit import AuditRecorder
 from gaia.config import Settings
 from gaia.db import Database
+from gaia.governance_context import GovernanceContextService
 from gaia.models import utc_now
 from gaia.service import ProjectService
 
@@ -1137,6 +1138,28 @@ class TaskWorkflowService:
             "Whether all pending approvals are still required.",
             "Whether the latest agent runs have been reviewed manually.",
         ]
+        governance_unknowns: list[str] = []
+        governance_summary_lines: list[str] = []
+        governance_markdown = ""
+        governance_service = GovernanceContextService(self.settings, self.project_service, self.database)
+        try:
+            governance_brief = governance_service.brief(project_id=project_id)
+            governance_summary_lines = [
+                f"Estate readiness: {governance_brief.estate_status}",
+                f"Snapshot ID: {governance_brief.snapshot_id or 'none'}",
+                f"Top reviews: {', '.join(governance_brief.recommended_human_reviews[:3]) if governance_brief.recommended_human_reviews else 'none'}",
+            ]
+            governance_markdown = governance_brief.markdown
+        except Exception as exc:
+            governance_unknowns.append(f"Governance source unavailable: {exc}")
+            governance_markdown = "\n".join(
+                [
+                    "## Architecture Governance",
+                    "",
+                    "- Governance source unavailable.",
+                    "- Using local GAIA brief only.",
+                ]
+            )
         warning_lines = [f"- {item}" for item in warnings] or ["- None"]
         markdown = "\n".join(
             [
@@ -1156,6 +1179,9 @@ class TaskWorkflowService:
                 "",
                 "## Unknowns",
                 *[f"- {item}" for item in unknowns],
+                *[f"- {item}" for item in governance_unknowns],
+                "",
+                governance_markdown,
             ]
         )
         brief = DailyBriefRecord(
@@ -1171,7 +1197,10 @@ class TaskWorkflowService:
             ],
             recommendations=recommendations,
             warnings=warnings,
-            unknowns=unknowns + [f"Documentation gaps: {', '.join(docs_gaps) if docs_gaps else 'none'}"],
+            unknowns=unknowns
+            + [f"Documentation gaps: {', '.join(docs_gaps) if docs_gaps else 'none'}"]
+            + governance_unknowns
+            + governance_summary_lines,
             markdown=markdown,
             source_task_ids=[task.task_id for task in tasks[:10]],
             source_approval_ids=[approval.approval_id for approval in approvals[:10]],

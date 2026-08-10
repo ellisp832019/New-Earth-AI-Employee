@@ -16,6 +16,8 @@ class Settings(BaseModel):
     database_path: Path = Path("data/gaia.db")
     signing_key_store: Path = Path("data/signing-keys")
     model_routing_path: Path = Path("config/model-routing.yaml")
+    neos_base_url: str = "http://127.0.0.1:8765"
+    neos_timeout_seconds: float = 3.0
     log_level: str = "INFO"
     api_host: str = "127.0.0.1"
     api_port: int = 8765
@@ -57,6 +59,8 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
         database_path=Path(_env("GAIA_DATABASE_PATH", "data/gaia.db")),
         signing_key_store=Path(_env("GAIA_SIGNING_KEY_STORE", "data/signing-keys")),
         model_routing_path=Path(_env("GAIA_MODEL_ROUTING_PATH", "config/model-routing.yaml")),
+        neos_base_url=_env("GAIA_NEOS_BASE_URL", "http://127.0.0.1:8765"),
+        neos_timeout_seconds=float(_env("GAIA_NEOS_TIMEOUT_SECONDS", "3.0")),
         log_level=_env("GAIA_LOG_LEVEL", "INFO"),
         api_host=_env("GAIA_API_HOST", "127.0.0.1"),
         api_port=int(_env("GAIA_API_PORT", "8765")),

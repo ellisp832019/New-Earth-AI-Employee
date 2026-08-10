@@ -22,13 +22,15 @@ GAIA v0.6.0 adds the reusable dashboard module, example dashboard host, stronger
 
 GAIA v0.8.0 adds cross-repository acceptance work, release closeout, and a safer platform for the next control milestones.
 
-GAIA v0.9 B1 adds the canonical multi-project registry and deterministic project-health model for GAIA, MicroGrow V1, and the New Earth Command Dashboard.
+GAIA v0.9 B1 adds a local multi-project registry/cache and deterministic project-health model for GAIA, MicroGrow V1, and the New Earth Command Dashboard. It is a consumer context, not the canonical engineering authority.
 
 GAIA v0.9 B2 adds snapshot comparison, change-intelligence findings, and deterministic drift detection on top of the B1 registry.
 
 GAIA v0.9 B3 adds deterministic recommendation ranking, explainable scoring, and dependency-aware prioritisation on top of B2 evidence.
 
 GAIA v0.9 B4 adds human-reviewable work-package building, revisioning, approval state tracking, deterministic handoff records, and Codex prompt preparation on top of B3 recommendations.
+
+GAIA Governance Context v1 consumes NEOS governance snapshots and findings, preserves source facts, and adds separate GAIA interpretation, prioritisation, review questions, and work-package previews without mutating the NEOS source record.
 
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
 Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).

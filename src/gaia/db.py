@@ -37,7 +37,7 @@ from gaia.programme_registry import (
 
 
 class Database:
-    SCHEMA_VERSION = 12
+    SCHEMA_VERSION = 13
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -88,6 +88,20 @@ class Database:
                 content_fingerprint TEXT NOT NULL,
                 provenance_reference TEXT,
                 audit_event_id TEXT
+            );
+            CREATE TABLE IF NOT EXISTS governance_snapshots (
+                cache_id TEXT PRIMARY KEY,
+                source_url TEXT NOT NULL,
+                project_id TEXT,
+                finding_id TEXT,
+                received_at TEXT NOT NULL,
+                source_timestamp TEXT,
+                governance_version TEXT,
+                neos_version TEXT,
+                snapshot_id TEXT,
+                source_hash TEXT,
+                compatibility_state TEXT NOT NULL,
+                payload_json TEXT NOT NULL
             );
             CREATE TABLE IF NOT EXISTS project_change_comparisons (
                 comparison_id TEXT PRIMARY KEY,
@@ -1147,6 +1161,74 @@ class Database:
                 snapshots.append(snapshot)
         return snapshots
 
+    def insert_governance_snapshot(self, snapshot: Any) -> None:
+        from gaia.governance_context import GovernanceCacheRecord
+
+        record = snapshot if isinstance(snapshot, GovernanceCacheRecord) else GovernanceCacheRecord.model_validate(snapshot)
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT OR REPLACE INTO governance_snapshots(
+                    cache_id, source_url, project_id, finding_id, received_at, source_timestamp,
+                    governance_version, neos_version, snapshot_id, source_hash, compatibility_state,
+                    payload_json
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    record.cache_id,
+                    record.source_url,
+                    record.project_id,
+                    record.finding_id,
+                    record.received_at.isoformat(),
+                    record.source_timestamp.isoformat() if record.source_timestamp else None,
+                    record.governance_version,
+                    record.neos_version,
+                    record.snapshot_id,
+                    record.source_hash,
+                    record.compatibility_state,
+                    record.model_dump_json(),
+                ),
+            )
+
+    def latest_governance_snapshot(self, source_url: str | None = None) -> Any | None:
+        from gaia.governance_context import GovernanceCacheRecord
+
+        if source_url is None:
+            row = self.connection.execute(
+                "SELECT payload_json FROM governance_snapshots ORDER BY received_at DESC, cache_id DESC LIMIT 1"
+            ).fetchone()
+        else:
+            row = self.connection.execute(
+                """
+                SELECT payload_json
+                FROM governance_snapshots
+                WHERE source_url = ?
+                ORDER BY received_at DESC, cache_id DESC
+                LIMIT 1
+                """,
+                (source_url,),
+            ).fetchone()
+        return GovernanceCacheRecord.model_validate_json(row["payload_json"]) if row else None
+
+    def list_governance_snapshots(self, source_url: str | None = None) -> list[Any]:
+        from gaia.governance_context import GovernanceCacheRecord
+
+        if source_url is None:
+            rows = self.connection.execute(
+                "SELECT payload_json FROM governance_snapshots ORDER BY received_at DESC, cache_id DESC"
+            ).fetchall()
+        else:
+            rows = self.connection.execute(
+                """
+                SELECT payload_json
+                FROM governance_snapshots
+                WHERE source_url = ?
+                ORDER BY received_at DESC, cache_id DESC
+                """,
+                (source_url,),
+            ).fetchall()
+        return [GovernanceCacheRecord.model_validate_json(row["payload_json"]) for row in rows]
+
     def insert_project_change_comparison(self, comparison: ProjectChangeComparison) -> None:
         with self.connection:
             self.connection.execute(
@@ -1637,11 +1719,25 @@ class Database:
         with self.connection:
             self.connection.execute(
                 """
-                INSERT OR REPLACE INTO architecture_entities(
+                INSERT INTO architecture_entities(
                     entity_id, identity_key, kind, name, owning_project_or_domain, repository,
                     source_reference, current_revision_id, current_revision_number, status,
                     freshness_state, provenance_json, content_fingerprint, normalized_payload_json
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(entity_id) DO UPDATE SET
+                    identity_key = excluded.identity_key,
+                    kind = excluded.kind,
+                    name = excluded.name,
+                    owning_project_or_domain = excluded.owning_project_or_domain,
+                    repository = excluded.repository,
+                    source_reference = excluded.source_reference,
+                    current_revision_id = excluded.current_revision_id,
+                    current_revision_number = excluded.current_revision_number,
+                    status = excluded.status,
+                    freshness_state = excluded.freshness_state,
+                    provenance_json = excluded.provenance_json,
+                    content_fingerprint = excluded.content_fingerprint,
+                    normalized_payload_json = excluded.normalized_payload_json
                 """,
                 (
                     entity.entity_id,
@@ -1790,11 +1886,23 @@ class Database:
         with self.connection:
             self.connection.execute(
                 """
-                INSERT OR REPLACE INTO architecture_relationships(
+                INSERT INTO architecture_relationships(
                     relationship_id, identity_key, relationship_type, source_entity_id,
                     target_entity_id, current_revision_id, current_revision_number, status,
                     freshness_state, provenance_json, content_fingerprint, normalized_payload_json
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(relationship_id) DO UPDATE SET
+                    identity_key = excluded.identity_key,
+                    relationship_type = excluded.relationship_type,
+                    source_entity_id = excluded.source_entity_id,
+                    target_entity_id = excluded.target_entity_id,
+                    current_revision_id = excluded.current_revision_id,
+                    current_revision_number = excluded.current_revision_number,
+                    status = excluded.status,
+                    freshness_state = excluded.freshness_state,
+                    provenance_json = excluded.provenance_json,
+                    content_fingerprint = excluded.content_fingerprint,
+                    normalized_payload_json = excluded.normalized_payload_json
                 """,
                 (
                     relationship.relationship_id,
