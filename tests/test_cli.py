@@ -1,6 +1,7 @@
 from typer.testing import CliRunner
 
 from gaia.cli import app
+from tests.governance_helpers import FakeGovernanceContextService, sample_governance_context
 
 
 def test_doctor_and_projects_list(settings_file):
@@ -41,3 +42,25 @@ def test_project_officer_commands(settings_file):
     result = runner.invoke(app, ["project-officer", "work-packages", "--config", str(settings_file)])
     assert result.exit_code == 0
     assert result.output
+
+
+def test_governance_commands(settings, settings_file, monkeypatch):
+    from gaia.db import Database
+    from gaia.service import ProjectService
+
+    service = ProjectService(settings, Database(settings.database_path))
+    service.governance_context_service = FakeGovernanceContextService(sample_governance_context())
+    monkeypatch.setattr("gaia.cli._service", lambda config=None: service)
+
+    runner = CliRunner()
+    result = runner.invoke(app, ["governance", "status", "--config", str(settings_file)])
+    assert result.exit_code == 0
+    assert "snapshot-001" in result.output
+
+    result = runner.invoke(app, ["governance", "brief", "--config", str(settings_file)])
+    assert result.exit_code == 0
+    assert "Architecture Governance" in result.output
+
+    result = runner.invoke(app, ["governance", "work-package", "finding-001", "--config", str(settings_file)])
+    assert result.exit_code == 0
+    assert "NEOS-GOV-001" in result.output

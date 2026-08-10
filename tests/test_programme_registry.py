@@ -135,6 +135,28 @@ def test_architecture_registry_bootstrap_and_relationship_filters(tmp_path: Path
         database.close()
 
 
+def test_architecture_registry_bootstrap_can_reopen_existing_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _init_repo(tmp_path / "project")
+    config = _write_settings(tmp_path, {"project": _project_settings(repo)})
+
+    first_service, first_database = _service_for(config, tmp_path, monkeypatch)
+    try:
+        first_entities = first_service.architecture_entities(project_id="project")
+        assert len(first_entities) == 1
+        first_entity_id = first_entities[0].entity_id
+    finally:
+        first_database.close()
+
+    second_service, second_database = _service_for(config, tmp_path, monkeypatch)
+    try:
+        second_entities = second_service.architecture_entities(project_id="project")
+        assert [entity.entity_id for entity in second_entities] == [first_entity_id]
+        assert second_entities[0].current_revision_id is not None
+        assert len(second_service.architecture_registry_service.list_entity_revisions(first_entity_id)) >= 1
+    finally:
+        second_database.close()
+
+
 def test_registry_validation_fails_closed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo = _init_repo(tmp_path / "project")
     config = _write_settings(tmp_path, {"project": _project_settings(repo)})
@@ -190,7 +212,7 @@ def test_schema_migrates_from_version_eleven_and_preserves_documents(tmp_path: P
 
     database = Database(db_path)
     try:
-        assert database.connection.execute("PRAGMA user_version").fetchone()[0] == 12
+        assert database.connection.execute("PRAGMA user_version").fetchone()[0] == 13
         row = database.connection.execute("SELECT relative_path FROM documents").fetchone()
         assert row[0] == "README.md"
         assert database.connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='project_contracts'").fetchone() is not None

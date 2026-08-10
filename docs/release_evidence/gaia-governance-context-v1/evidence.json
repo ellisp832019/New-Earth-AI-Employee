@@ -1,0 +1,29 @@
+{
+  "feature": "GAIA Governance Context v1",
+  "repository": "D:\\Dev\\Projects\\New-Earth-AI-Employee",
+  "branch": "feature/gaia-governance-context-v1",
+  "baseline": "fedd32838a78dda18d1b9d20da7a9b7671f865cd",
+  "authority_model": {
+    "platform_core": "declared/canonical architecture authority",
+    "neos": "observed/reconciled engineering authority",
+    "gaia": "downstream interpretation/prioritisation/work preparation"
+  },
+  "validation_observed": [
+    "python -m pip install -e \".[dev]\"",
+    "python -m pytest -q tests/test_governance_context.py tests/test_api.py::test_governance_api_endpoints tests/test_cli.py::test_governance_commands",
+    "python -m pytest -q tests/test_project_health.py tests/test_programme_registry.py tests/test_workflows.py::test_database_migration_preserves_existing_data",
+    "python -m pytest -q tests/test_programme_registry.py",
+    "python -m pytest -q",
+    "python -m ruff check src tests",
+    "python -m mypy src\\gaia",
+    "python -m gaia doctor",
+    "python -m gaia --help",
+    "powershell -ExecutionPolicy Bypass -File .\\scripts\\export_openapi_contract.ps1"
+  ],
+  "notes": [
+    "Current implementation remains uncommitted at the time of evidence capture.",
+    "C6 was not modified or merged.",
+    "Release evidence contains only observed results and reviewed documentation.",
+    "Validation was rerun after fixing the repeat-bootstrap foreign key regression."
+  ]
+}

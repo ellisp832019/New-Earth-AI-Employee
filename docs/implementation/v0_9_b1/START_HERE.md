@@ -1,10 +1,10 @@
 # GAIA v0.9 B1 Start Here
 
-GAIA v0.9 B1 implements the canonical multi-project registry and deterministic project-health snapshot model.
+GAIA v0.9 B1 implements a local multi-project registry/cache and deterministic project-health snapshot model.
 
 ## What shipped
 
-- canonical registry records for GAIA, MicroGrow V1, and the New Earth Command Dashboard;
+- local registry records for GAIA, MicroGrow V1, and the New Earth Command Dashboard;
 - read-only project metadata with isolated inspection boundaries;
 - deterministic project-health snapshots persisted in SQLite;
 - portfolio-style aggregation over the latest health state for enabled projects;
