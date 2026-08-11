@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'models.dart';
+import 'programme_models.dart';
 
 class GaiaIntegrationClient {
   GaiaIntegrationClient({
@@ -147,6 +148,285 @@ class GaiaIntegrationClient {
   }) async {
     return (await _getJson(
           '/integration/v1/project-officer/capabilities',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<GaiaProgrammeSummary> programmeSummary({
+    String? projectId,
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/programme/summary',
+              queryParameters: stringQuery({'project_id': projectId}),
+              allowStaleCache: allowStaleCache,
+            )
+            as Map<String, dynamic>;
+    return GaiaProgrammeSummary.fromJson(json);
+  }
+
+  Future<List<Map<String, dynamic>>> architectureEntities({
+    String? projectId,
+    String? kind,
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/architecture/entities',
+              queryParameters: stringQuery({
+                'project_id': projectId,
+                'kind': kind,
+              }),
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> architectureEntity(
+    String entityId, {
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/architecture/entities/$entityId',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> architectureRelationships({
+    String? sourceEntityId,
+    String? targetEntityId,
+    String? relationshipType,
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/architecture/relationships',
+              queryParameters: stringQuery({
+                'source_entity_id': sourceEntityId,
+                'target_entity_id': targetEntityId,
+                'relationship_type': relationshipType,
+              }),
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> architectureRelationship(
+    String relationshipId, {
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/architecture/relationships/$relationshipId',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> dependencyGraph({
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/dependencies/graph',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> dependencyFindings({
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/dependencies/findings',
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> dependencyCycles({
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/dependencies/cycles',
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> dependencySharedDependencies({
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/dependencies/shared',
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> dependencyOrphans({
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/dependencies/orphans',
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> dependencyProjectDependencies(
+    String projectId, {
+    bool transitive = false,
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/dependencies/projects/$projectId',
+              queryParameters: stringQuery({'transitive': transitive}),
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> dependencyProjectDependents(
+    String projectId, {
+    bool transitive = false,
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/dependencies/projects/$projectId/dependents',
+              queryParameters: stringQuery({'transitive': transitive}),
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> changeImpactSummary({
+    String? projectId,
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/change-impact/summary',
+          queryParameters: stringQuery({'project_id': projectId}),
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<List<Map<String, dynamic>>> changeImpactRecommendations({
+    String? projectId,
+    String? priorityTier,
+    String? lifecycleState,
+    bool blockedOnly = false,
+    int limit = 100,
+    int offset = 0,
+    bool allowStaleCache = true,
+  }) async {
+    final json =
+        await _getJson(
+              '/integration/v1/change-impact/recommendations',
+              queryParameters: stringQuery({
+                'project_id': projectId,
+                'priority_tier': priorityTier,
+                'lifecycle_state': lifecycleState,
+                'blocked_only': blockedOnly,
+                'limit': limit,
+                'offset': offset,
+              }),
+              allowStaleCache: allowStaleCache,
+            )
+            as List<dynamic>;
+    return json
+        .whereType<Map>()
+        .map((item) => item.cast<String, dynamic>())
+        .toList();
+  }
+
+  Future<Map<String, dynamic>> changeImpactRecommendation(
+    String recommendationId, {
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/change-impact/recommendations/$recommendationId',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> programmeRoadmap({
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/programme/roadmap',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> releaseTrains({
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/release-trains',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> programmePackages({
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/programme-packages',
+          allowStaleCache: allowStaleCache,
+        ))
+        as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> programmePackage(
+    String packageId, {
+    bool allowStaleCache = true,
+  }) async {
+    return (await _getJson(
+          '/integration/v1/programme-packages/$packageId',
           allowStaleCache: allowStaleCache,
         ))
         as Map<String, dynamic>;

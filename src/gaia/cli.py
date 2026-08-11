@@ -73,6 +73,11 @@ signing_app = typer.Typer(help="Local Ed25519 signing keys")
 trust_alerts_app = typer.Typer(help="Trust alerts and diagnostics")
 project_officer_app = typer.Typer(help="Project Officer planning surfaces")
 project_officer_work_package_app = typer.Typer(help="Work package lifecycle commands")
+programme_app = typer.Typer(help="Programme intelligence read surfaces")
+architecture_app = typer.Typer(help="Architecture registry read surfaces")
+impact_app = typer.Typer(help="Change-impact intelligence read surfaces")
+release_train_app = typer.Typer(help="Release-train read surfaces")
+programme_package_app = typer.Typer(help="Programme package read surfaces")
 app.add_typer(project_app, name="project")
 app.add_typer(projects_app, name="projects")
 app.add_typer(models_app, name="models")
@@ -94,6 +99,11 @@ app.add_typer(signing_app, name="signing")
 app.add_typer(trust_alerts_app, name="alerts")
 app.add_typer(project_officer_app, name="project-officer")
 project_officer_app.add_typer(project_officer_work_package_app, name="work-package")
+app.add_typer(programme_app, name="programme")
+app.add_typer(architecture_app, name="architecture")
+app.add_typer(impact_app, name="impact")
+app.add_typer(release_train_app, name="release-train")
+app.add_typer(programme_package_app, name="programme-package")
 console = Console()
 
 
@@ -174,6 +184,148 @@ def _render_ask_markdown(response: dict[str, object]) -> str:
         f"## Evidence\n\n{evidence_lines or '- None'}\n\n"
         f"## Warnings\n\n{warning_lines or '- None'}\n"
     )
+
+
+def _proposal_from_recommendation(recommendation: dict[str, object]) -> dict[str, object]:
+    project_id = str(recommendation.get("project_id") or "")
+    title = str(recommendation.get("title") or f"{project_id} change impact review")
+    objective = str(
+        recommendation.get("concise_summary")
+        or recommendation.get("why_it_matters")
+        or recommendation.get("rationale")
+        or title
+    )
+    recommendation_type = str(recommendation.get("recommendation_type") or "")
+    change_type = {
+        "review_blocking_project_health_condition": "PROJECT_CONTRACT_CHANGE",
+        "review_uncommitted_project_changes": "REPOSITORY_RESTRUCTURE",
+        "verify_removal_of_configured_important_project_path": "REPOSITORY_RESTRUCTURE",
+        "refresh_project_evidence_before_relying_on_state": "PROJECT_CONTRACT_CHANGE",
+        "review_upstream_branch_divergence": "REPOSITORY_RESTRUCTURE",
+        "review_repository_head_change": "REPOSITORY_RESTRUCTURE",
+        "review_project_configuration_change": "PROJECT_CONTRACT_CHANGE",
+        "insufficient_evidence": "PROJECT_CONTRACT_CHANGE",
+    }.get(recommendation_type, "PROJECT_CONTRACT_CHANGE")
+    return {
+        "proposal_id": str(recommendation.get("recommendation_id") or ""),
+        "revision": 1,
+        "title": title,
+        "origin_project": project_id,
+        "objective": objective,
+        "change_type": change_type,
+        "target_entities": [
+            {
+                "target_kind": "project",
+                "target_id": project_id,
+                "label": str(recommendation.get("project_name") or project_id),
+            }
+        ],
+        "evidence": recommendation.get("evidence_references") or [],
+        "blocked_by": [
+            str(item.get("blocker_description") or item.get("required_condition") or item)
+            for item in (recommendation.get("blockers") or [])
+            if item is not None
+        ],
+        "depends_on": [str(item) for item in (recommendation.get("dependencies") or [])],
+        "required_validation": [str(item) for item in (recommendation.get("source_snapshot_ids") or [])],
+        "rollback_concept": str(recommendation.get("why_it_received_this_score") or title),
+        "status": "analysed",
+    }
+
+
+def _programme_summary_payload(service: ProjectService, *, project_id: str | None = None) -> dict[str, object]:
+    health_portfolio = service.project_health_portfolio()
+    change_portfolio = service.project_change_portfolio()
+    recommendation_portfolio = service.project_recommendation_portfolio()
+    roadmap_portfolio = service.programme_roadmap()
+    release_portfolio = service.release_trains()
+    package_portfolio = service.programme_packages()
+    graph = service.dependency_graph()
+    entities = service.architecture_entities()
+    relationships = service.architecture_relationships()
+    cycles = service.dependency_graph_cycles()
+    unresolved = service.dependency_graph_findings()
+    shared_dependencies = service.dependency_graph_shared_dependencies()
+    orphans = service.dependency_graph_orphans()
+    trust_service = GAIATrustService(service.settings, service.database)
+    trust_alerts = trust_service.list_trust_alerts()
+    provenance_manifests = trust_service.list_provenance_manifests()
+    selected_project_id = project_id or (next(iter(sorted(service.settings.projects))) if service.settings.projects else None)
+    selected_project = service.settings.projects.get(selected_project_id) if selected_project_id else None
+    selected_health = service.project_health(selected_project_id) if selected_project_id else None
+    selected_recommendations = service.recommendation_queue(selected_project_id)[:5] if selected_project_id else []
+    selected_change_findings = service.latest_project_change_findings(selected_project_id) if selected_project_id else []
+    selected_work_packages = service.work_packages(project_id=selected_project_id, approval_state="under_review") if selected_project_id else []
+    selected_contract = service.current_project_contract(selected_project_id) if selected_project_id else None
+    analyses = [
+        service.analyse_change_impact(_proposal_from_recommendation(item.model_dump(mode="json")))
+        for item in selected_recommendations
+    ]
+    return {
+        "generated_at": roadmap_portfolio.generated_at.isoformat(),
+        "selected_project_id": selected_project_id,
+        "selected_project": selected_project.model_dump(mode="json") if selected_project is not None else None,
+        "summary": {
+            "project_count": len(service.settings.projects),
+            "health_status_counts": dict(health_portfolio.counts_by_status),
+            "change_severity_counts": dict(change_portfolio.counts_by_severity),
+            "recommendation_state_counts": dict(recommendation_portfolio.counts_by_state),
+            "roadmap_state_counts": dict(roadmap_portfolio.counts_by_state),
+            "release_train_readiness_counts": dict(release_portfolio.counts_by_readiness),
+            "package_state_counts": dict(package_portfolio.counts_by_state),
+            "architecture_entity_count": len(entities),
+            "architecture_relationship_count": len(relationships),
+            "cycle_count": len(cycles),
+            "unresolved_dependency_count": len(unresolved),
+            "shared_dependency_count": len(shared_dependencies),
+            "orphan_count": len(orphans),
+            "trust_alert_count": len(trust_alerts),
+            "provenance_manifest_count": len(provenance_manifests),
+            "stale_evidence_projects": list(health_portfolio.projects_without_snapshots),
+        },
+        "portfolio": {
+            "health_portfolio": health_portfolio.model_dump(mode="json"),
+            "change_portfolio": change_portfolio.model_dump(mode="json"),
+            "recommendation_portfolio": recommendation_portfolio.model_dump(mode="json"),
+            "roadmap_portfolio": roadmap_portfolio.model_dump(mode="json"),
+            "release_portfolio": release_portfolio.model_dump(mode="json"),
+            "package_portfolio": package_portfolio.model_dump(mode="json"),
+        },
+        "architecture_registry": {
+            "entities": [entity.model_dump(mode="json") for entity in entities],
+            "relationships": [relationship.model_dump(mode="json") for relationship in relationships],
+        },
+        "dependency_graph": {
+            "snapshot": graph.model_dump(mode="json"),
+            "cycles": [cycle.model_dump(mode="json") for cycle in cycles],
+            "shared_dependencies": [item.model_dump(mode="json") for item in shared_dependencies],
+            "orphans": [item.model_dump(mode="json") for item in orphans],
+            "unresolved_findings": [item.model_dump(mode="json") for item in unresolved],
+        },
+        "impact_analysis": {
+            "analyses": [analysis.model_dump(mode="json") for analysis in analyses],
+            "selected_analysis": analyses[0].model_dump(mode="json") if analyses else None,
+            "selected_change_findings": [item.model_dump(mode="json") for item in selected_change_findings],
+        },
+        "change_proposals": {
+            "recommendations": [item.model_dump(mode="json") for item in selected_recommendations],
+        },
+        "roadmap": roadmap_portfolio.model_dump(mode="json"),
+        "release_trains": release_portfolio.model_dump(mode="json"),
+        "programme_packages": package_portfolio.model_dump(mode="json"),
+        "decisions": {
+            "selected_work_packages": [item.model_dump(mode="json") for item in selected_work_packages],
+            "selected_contract": selected_contract.model_dump(mode="json") if selected_contract is not None else None,
+            "trust_alerts": [item.model_dump(mode="json") for item in trust_alerts],
+        },
+        "cross_project_evidence": {
+            "provenance_manifests": [item.model_dump(mode="json") for item in provenance_manifests],
+            "selected_project_health": selected_health.model_dump(mode="json") if selected_health is not None else None,
+            "selected_project_change_findings": [item.model_dump(mode="json") for item in selected_change_findings],
+            "selected_project_recommendations": [item.model_dump(mode="json") for item in selected_recommendations],
+            "selected_project_work_packages": [item.model_dump(mode="json") for item in selected_work_packages],
+        },
+    }
 
 
 @app.command()
@@ -456,6 +608,163 @@ def serve(
     """Start the local FastAPI service."""
     settings = load_settings(config)
     uvicorn.run(create_app(settings), host=host or settings.api_host, port=port or settings.api_port)
+
+
+@programme_app.command("overview")
+@programme_app.command("summary")
+def programme_overview(
+    project_id: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _service(config)
+    try:
+        console.print_json(json.dumps(_programme_summary_payload(service, project_id=project_id)))
+    finally:
+        service.close()
+
+
+@programme_app.command("roadmap")
+def programme_roadmap(config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        console.print_json(json.dumps(service.programme_roadmap().model_dump(mode="json")))
+    finally:
+        service.close()
+
+
+@architecture_app.command("list")
+def architecture_list(
+    project_id: str | None = typer.Option(None),
+    kind: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _service(config)
+    try:
+        console.print_json(
+            json.dumps(
+                [item.model_dump(mode="json") for item in service.architecture_entities(project_id=project_id, kind=kind)]
+            )
+        )
+    finally:
+        service.close()
+
+
+@architecture_app.command("relationships")
+def architecture_relationships(
+    source_entity_id: str | None = typer.Option(None),
+    target_entity_id: str | None = typer.Option(None),
+    relationship_type: str | None = typer.Option(None),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _service(config)
+    try:
+        console.print_json(
+            json.dumps(
+                [
+                    item.model_dump(mode="json")
+                    for item in service.architecture_relationships(
+                        source_entity_id=source_entity_id,
+                        target_entity_id=target_entity_id,
+                        relationship_type=relationship_type,
+                    )
+                ]
+            )
+        )
+    finally:
+        service.close()
+
+
+@architecture_app.command("graph")
+def architecture_graph(config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        console.print_json(json.dumps(service.dependency_graph().model_dump(mode="json")))
+    finally:
+        service.close()
+
+
+@impact_app.command("analyse")
+def impact_analyse(
+    project_id: str | None = typer.Option(None),
+    limit: int = typer.Option(5, min=1, max=20),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _service(config)
+    try:
+        recommendations = service.recommendation_queue(project_id)[:limit]
+        analyses = [service.analyse_change_impact(_proposal_from_recommendation(item.model_dump(mode="json"))) for item in recommendations]
+        console.print_json(json.dumps([item.model_dump(mode="json") for item in analyses]))
+    finally:
+        service.close()
+
+
+@impact_app.command("recommendations")
+def impact_recommendations(
+    project_id: str | None = typer.Option(None),
+    priority_tier: str | None = typer.Option(None),
+    lifecycle_state: str | None = typer.Option(None),
+    blocked_only: bool = typer.Option(False),
+    config: Path | None = typer.Option(None),
+) -> None:
+    service = _service(config)
+    try:
+        console.print_json(
+            json.dumps(
+                [
+                    item.model_dump(mode="json")
+                    for item in service.recommendation_queue(project_id)
+                    if (priority_tier is None or item.priority_tier == priority_tier)
+                    and (lifecycle_state is None or item.lifecycle_state == lifecycle_state)
+                    and (not blocked_only or item.lifecycle_state == "blocked")
+                ]
+            )
+        )
+    finally:
+        service.close()
+
+
+@release_train_app.command("list")
+def release_train_list(config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        console.print_json(json.dumps(service.release_trains().model_dump(mode="json")))
+    finally:
+        service.close()
+
+
+@release_train_app.command("show")
+def release_train_show(release_train_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        portfolio = service.release_trains()
+        for train in portfolio.release_trains:
+            if train.release_train_id == release_train_id:
+                console.print_json(json.dumps(train.model_dump(mode="json")))
+                return
+        raise typer.BadParameter("Release train not found")
+    finally:
+        service.close()
+
+
+@programme_package_app.command("list")
+def programme_package_list(config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        console.print_json(json.dumps(service.programme_packages().model_dump(mode="json")))
+    finally:
+        service.close()
+
+
+@programme_package_app.command("show")
+def programme_package_show(package_id: str, config: Path | None = typer.Option(None)) -> None:
+    service = _service(config)
+    try:
+        package = service.programme_package(package_id)
+        if package is None:
+            raise typer.BadParameter("Programme package not found")
+        console.print_json(json.dumps(package.model_dump(mode="json")))
+    finally:
+        service.close()
 
 
 @project_officer_app.command("capabilities")

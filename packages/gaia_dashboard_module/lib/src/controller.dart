@@ -24,6 +24,17 @@ enum GaiaProjectOfficerSummaryState {
   error,
 }
 
+enum GaiaProgrammeSummaryState {
+  loading,
+  ready,
+  empty,
+  stale,
+  unavailable,
+  incompatible,
+  partial,
+  error,
+}
+
 class GaiaDashboardController extends ChangeNotifier {
   GaiaDashboardController({required GaiaIntegrationClient client})
     : _client = client;
@@ -53,6 +64,13 @@ class GaiaDashboardController extends ChangeNotifier {
   bool dataStale = false;
   String? errorMessage;
   String? statusMessage;
+
+  GaiaProgrammeSummary? programmeSummary;
+  DateTime? lastProgrammeSummaryRefreshAt;
+  bool programmeSummaryStale = false;
+  GaiaProgrammeSummaryState programmeSummaryState =
+      GaiaProgrammeSummaryState.unavailable;
+  String? programmeSummaryError;
 
   Map<String, dynamic>? projectOfficerCapabilitiesPayload;
   Map<String, dynamic>? projectOfficerPortfolioPayload;
@@ -103,11 +121,73 @@ class GaiaDashboardController extends ChangeNotifier {
 
     await Future.wait<void>([
       _refreshLegacySurface(projectId: projectId),
+      _refreshProgrammeSummary(projectId: projectId),
       _refreshProjectOfficerSurface(projectId: projectId),
     ]);
 
     statusMessage = 'GAIA dashboard refreshed';
     notifyListeners();
+  }
+
+  Future<void> _refreshProgrammeSummary({String? projectId}) async {
+    programmeSummaryError = null;
+    programmeSummaryState = GaiaProgrammeSummaryState.loading;
+    programmeSummaryStale = false;
+    notifyListeners();
+
+    try {
+      final summary = await _client.programmeSummary(
+        projectId: projectId,
+        allowStaleCache: false,
+      );
+      programmeSummary = summary;
+      final counts = summary.summary;
+      final hasAnyContent =
+          counts.projectCount > 0 ||
+          counts.architectureEntityCount > 0 ||
+          counts.architectureRelationshipCount > 0 ||
+          counts.cycleCount > 0 ||
+          counts.unresolvedDependencyCount > 0 ||
+          counts.sharedDependencyCount > 0 ||
+          counts.orphanCount > 0 ||
+          counts.trustAlertCount > 0 ||
+          counts.provenanceManifestCount > 0 ||
+          counts.staleEvidenceProjects.isNotEmpty;
+      final hasStaleContent =
+          counts.staleEvidenceProjects.isNotEmpty ||
+          counts.unresolvedDependencyCount > 0 ||
+          counts.cycleCount > 0 ||
+          counts.orphanCount > 0;
+
+      if (!hasAnyContent) {
+        programmeSummaryState = GaiaProgrammeSummaryState.empty;
+      } else if (hasStaleContent) {
+        programmeSummaryState = GaiaProgrammeSummaryState.stale;
+        programmeSummaryStale = true;
+      } else {
+        programmeSummaryState = GaiaProgrammeSummaryState.ready;
+      }
+      lastProgrammeSummaryRefreshAt = DateTime.now();
+    } on GaiaClientError catch (error) {
+      if (error.statusCode == 404) {
+        programmeSummaryState = GaiaProgrammeSummaryState.unavailable;
+        programmeSummaryError =
+            'Programme summary unavailable on this GAIA backend.';
+      } else if (error.statusCode == 400 || error.statusCode == 409) {
+        programmeSummaryState = GaiaProgrammeSummaryState.incompatible;
+        programmeSummaryError = error.message;
+      } else {
+        programmeSummaryState = GaiaProgrammeSummaryState.error;
+        programmeSummaryError = error.toString();
+      }
+      programmeSummaryStale = true;
+    } catch (error) {
+      programmeSummaryState = GaiaProgrammeSummaryState.error;
+      programmeSummaryError = error.toString();
+      programmeSummaryStale = true;
+    } finally {
+      notifyListeners();
+    }
   }
 
   Future<void> _refreshLegacySurface({String? projectId}) async {
