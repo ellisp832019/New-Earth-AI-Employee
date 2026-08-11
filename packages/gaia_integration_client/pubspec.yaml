@@ -1,6 +1,6 @@
 name: gaia_integration_client
 description: Reusable GAIA integration client for dashboard and local tools
-version: 0.9.0
+version: 0.10.0
 publish_to: "none"
 
 environment:

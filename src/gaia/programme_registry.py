@@ -510,7 +510,7 @@ class ProjectContractService:
             status="approved",
             authority_level=cast(ProjectContractAuthorityLevel, project.access),
             owner=str(project.metadata.get("owner")) if project.metadata.get("owner") is not None else None,
-            version="0.9.0",
+            version="0.10.0",
             release_channel="released",
             documentation_roots=_documentation_roots(project),
             evidence_freshness_policy={

@@ -162,9 +162,9 @@ void main() {
       if (path == '/integration/v1/project-officer/capabilities') {
         return http.Response(
           jsonEncode({
-            'api_version': '0.9.0',
+            'api_version': '0.10.0',
             'contract_version': 'gaia-v3',
-            'capability_version': '0.9.0',
+            'capability_version': '0.10.0',
             'capabilities': [
               'project_officer_portfolio',
               'project_officer_work_packages',
@@ -172,7 +172,7 @@ void main() {
             'capability_catalog': [
               {
                 'capability_id': 'project_officer_portfolio',
-                'version': '0.9.0',
+                'version': '0.10.0',
                 'state': 'enabled',
                 'summary':
                     'Inspect the portfolio of project-health and planning evidence.',
