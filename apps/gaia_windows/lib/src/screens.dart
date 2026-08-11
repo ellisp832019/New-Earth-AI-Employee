@@ -7,6 +7,7 @@ import 'package:gaia_integration_client/gaia_integration_client.dart';
 
 import 'controller.dart';
 import 'models.dart';
+import 'programme_workspace.dart';
 import 'settings_store.dart';
 import 'widgets.dart';
 
@@ -24,6 +25,11 @@ class _GaiaShellState extends State<GaiaShell> {
     _Destination('Home', Icons.home_outlined, Icons.home),
     _Destination('Projects', Icons.folder_outlined, Icons.folder),
     _Destination('Project Officer', Icons.cases_outlined, Icons.cases),
+    _Destination(
+      'Programme Intelligence',
+      Icons.route_outlined,
+      Icons.route,
+    ),
     _Destination('Ask GAIA', Icons.chat_bubble_outline, Icons.chat_bubble),
     _Destination('Evidence', Icons.fact_check_outlined, Icons.fact_check),
     _Destination('Snapshots', Icons.camera_alt_outlined, Icons.camera_alt),
@@ -132,42 +138,44 @@ class _GaiaShellState extends State<GaiaShell> {
       case 2:
         return ProjectOfficerWorkspaceScreen(controller: controller);
       case 3:
-        return AskScreen(controller: controller);
+        return ProgrammeIntelligenceWorkspaceScreen(controller: controller);
       case 4:
-        return EvidenceScreen(controller: controller);
+        return AskScreen(controller: controller);
       case 5:
-        return SnapshotsScreen(controller: controller);
+        return EvidenceScreen(controller: controller);
       case 6:
-        return ReportsScreen(controller: controller);
+        return SnapshotsScreen(controller: controller);
       case 7:
-        return AgentRunsScreen(controller: controller);
+        return ReportsScreen(controller: controller);
       case 8:
-        return TasksScreen(controller: controller);
+        return AgentRunsScreen(controller: controller);
       case 9:
-        return DraftsScreen(controller: controller);
+        return TasksScreen(controller: controller);
       case 10:
-        return ApprovalsScreen(controller: controller);
+        return DraftsScreen(controller: controller);
       case 11:
-        return PermissionsScreen(controller: controller);
+        return ApprovalsScreen(controller: controller);
       case 12:
-        return ActionsScreen(controller: controller);
+        return PermissionsScreen(controller: controller);
       case 13:
-        return ReceiptsScreen(controller: controller);
+        return ActionsScreen(controller: controller);
       case 14:
-        return TrustCentreScreen(controller: controller);
+        return ReceiptsScreen(controller: controller);
       case 15:
-        return EmbeddedWorkspaceScreen(controller: controller);
+        return TrustCentreScreen(controller: controller);
       case 16:
-        return IntegrationScreen(controller: controller);
+        return EmbeddedWorkspaceScreen(controller: controller);
       case 17:
-        return DailyBriefScreen(controller: controller);
+        return IntegrationScreen(controller: controller);
       case 18:
-        return VscodeOpsScreen(controller: controller);
+        return DailyBriefScreen(controller: controller);
       case 19:
-        return AuditScreen(controller: controller);
+        return VscodeOpsScreen(controller: controller);
       case 20:
-        return SettingsScreen(controller: controller);
+        return AuditScreen(controller: controller);
       case 21:
+        return SettingsScreen(controller: controller);
+      case 22:
         return AboutScreen(controller: controller);
       default:
         return HomeScreen(controller: controller);

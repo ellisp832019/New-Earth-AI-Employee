@@ -21,6 +21,7 @@ abstract class GaiaBackendApi {
   Future<Map<String, dynamic>> projectChangePortfolio();
   Future<List<Map<String, dynamic>>> projectChangeFindings(String projectId);
   Future<Map<String, dynamic>> projectRecommendationPortfolio();
+  Future<Map<String, dynamic>> programmeWorkspace({String? projectId});
   Future<List<Map<String, dynamic>>> projectRecommendations(String projectId);
   Future<List<Map<String, dynamic>>> generateProjectRecommendations(String projectId);
   Future<List<Map<String, dynamic>>> recommendationQueue({String? projectId});
@@ -276,6 +277,15 @@ class GaiaApiClient implements GaiaBackendApi {
   @override
   Future<Map<String, dynamic>> projectRecommendationPortfolio() async {
     return (await _getJson('/portfolio/recommendations')) as Map<String, dynamic>;
+  }
+
+  @override
+  Future<Map<String, dynamic>> programmeWorkspace({String? projectId}) async {
+    final json = await _getJson(
+      '/integration/v1/project-officer/programme/workspace',
+      queryParameters: projectId == null ? null : {'project_id': projectId},
+    ) as Map;
+    return json.cast<String, dynamic>();
   }
 
   @override
