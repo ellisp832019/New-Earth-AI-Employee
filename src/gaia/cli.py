@@ -25,6 +25,7 @@ from gaia.output_workspace import (
     PermissionManifestCreateRequest,
     PermissionManifestDecisionRequest,
 )
+from gaia.programme_registry import ArchitectureEntityKind, ArchitectureRelationshipType
 from gaia.project_officer import (
     ProjectOfficerHandoffRequest,
     ProjectOfficerLifecycleRequest,
@@ -186,6 +187,16 @@ def _render_ask_markdown(response: dict[str, object]) -> str:
     )
 
 
+def _object_list(value: object | None) -> list[object]:
+    return value if isinstance(value, list) else []
+
+
+def _stringify_blocker(item: object) -> str:
+    if isinstance(item, dict):
+        return str(item.get("blocker_description") or item.get("required_condition") or item)
+    return str(item)
+
+
 def _proposal_from_recommendation(recommendation: dict[str, object]) -> dict[str, object]:
     project_id = str(recommendation.get("project_id") or "")
     title = str(recommendation.get("title") or f"{project_id} change impact review")
@@ -220,14 +231,10 @@ def _proposal_from_recommendation(recommendation: dict[str, object]) -> dict[str
                 "label": str(recommendation.get("project_name") or project_id),
             }
         ],
-        "evidence": recommendation.get("evidence_references") or [],
-        "blocked_by": [
-            str(item.get("blocker_description") or item.get("required_condition") or item)
-            for item in (recommendation.get("blockers") or [])
-            if item is not None
-        ],
-        "depends_on": [str(item) for item in (recommendation.get("dependencies") or [])],
-        "required_validation": [str(item) for item in (recommendation.get("source_snapshot_ids") or [])],
+        "evidence": _object_list(recommendation.get("evidence_references")),
+        "blocked_by": [_stringify_blocker(item) for item in _object_list(recommendation.get("blockers"))],
+        "depends_on": [str(item) for item in _object_list(recommendation.get("dependencies"))],
+        "required_validation": [str(item) for item in _object_list(recommendation.get("source_snapshot_ids"))],
         "rollback_concept": str(recommendation.get("why_it_received_this_score") or title),
         "status": "analysed",
     }
@@ -316,10 +323,10 @@ def _programme_summary_payload(service: ProjectService, *, project_id: str | Non
         "decisions": {
             "selected_work_packages": [item.model_dump(mode="json") for item in selected_work_packages],
             "selected_contract": selected_contract.model_dump(mode="json") if selected_contract is not None else None,
-            "trust_alerts": [item.model_dump(mode="json") for item in trust_alerts],
+            "trust_alerts": trust_alerts,
         },
         "cross_project_evidence": {
-            "provenance_manifests": [item.model_dump(mode="json") for item in provenance_manifests],
+            "provenance_manifests": provenance_manifests,
             "selected_project_health": selected_health.model_dump(mode="json") if selected_health is not None else None,
             "selected_project_change_findings": [item.model_dump(mode="json") for item in selected_change_findings],
             "selected_project_recommendations": [item.model_dump(mode="json") for item in selected_recommendations],
@@ -635,7 +642,7 @@ def programme_roadmap(config: Path | None = typer.Option(None)) -> None:
 @architecture_app.command("list")
 def architecture_list(
     project_id: str | None = typer.Option(None),
-    kind: str | None = typer.Option(None),
+    kind: ArchitectureEntityKind | None = typer.Option(None),
     config: Path | None = typer.Option(None),
 ) -> None:
     service = _service(config)
@@ -653,7 +660,7 @@ def architecture_list(
 def architecture_relationships(
     source_entity_id: str | None = typer.Option(None),
     target_entity_id: str | None = typer.Option(None),
-    relationship_type: str | None = typer.Option(None),
+    relationship_type: ArchitectureRelationshipType | None = typer.Option(None),
     config: Path | None = typer.Option(None),
 ) -> None:
     service = _service(config)

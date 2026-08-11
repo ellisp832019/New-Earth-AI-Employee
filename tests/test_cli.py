@@ -106,9 +106,51 @@ def test_programme_commands(settings, monkeypatch, tmp_path):
         assert result.exit_code == 0
         assert "Shared Library" in result.output
 
+        result = runner.invoke(
+            app,
+            ["architecture", "list", "--kind", "package", "--config", str(config)],
+        )
+        assert result.exit_code == 0
+        assert "Shared Library" in result.output
+
+        result = runner.invoke(
+            app,
+            ["architecture", "list", "--kind", "invalid-kind", "--config", str(config)],
+        )
+        assert result.exit_code != 0
+        assert "Invalid value" in result.output
+
         result = runner.invoke(app, ["architecture", "graph", "--config", str(config)])
         assert result.exit_code == 0
         assert "node_count" in result.output
+
+        result = runner.invoke(
+            app,
+            [
+                "architecture",
+                "relationships",
+                "--relationship-type",
+                "DEPENDS_ON",
+                "--config",
+                str(config),
+            ],
+        )
+        assert result.exit_code == 0
+        assert "DEPENDS_ON" in result.output
+
+        result = runner.invoke(
+            app,
+            [
+                "architecture",
+                "relationships",
+                "--relationship-type",
+                "INVALID",
+                "--config",
+                str(config),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "Invalid value" in result.output
 
         result = runner.invoke(app, ["impact", "analyse", "--config", str(config)])
         assert result.exit_code == 0
