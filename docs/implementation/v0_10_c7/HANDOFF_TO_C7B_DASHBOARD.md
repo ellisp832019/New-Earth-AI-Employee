@@ -1,8 +1,16 @@
 # Handoff to C7B Dashboard
 
-## Final GAIA SHA
+## C7A Merge-Pin Rule
 
-- `dc6f6ba1c186a461d3d5627e5d3af75625cda6fe`
+- C7A validated implementation head before merge: `06c8d210470486fe95e08184729912adfb9782ca`
+- This SHA is for evidence and traceability only.
+- PR #30 must be merged before C7B begins.
+- After PR #30 is merged, C7B must determine the exact resulting C7A merge commit on GAIA `main`.
+- The New Earth Dashboard must pin both GAIA Git dependencies to that exact merged-`main` SHA.
+- Do not pin a floating branch.
+- Do not use `main` as an unpinned Git ref.
+- Do not continue using the old `dc6f6ba1c186a461d3d5627e5d3af75625cda6fe` pre-repair SHA as the authoritative C7B consumer pin.
+- The C7B Dashboard worktree must verify that the selected SHA exists on GAIA `main` before changing `pubspec` dependencies.
 
 ## Available GAIA Public Surfaces
 
@@ -13,7 +21,7 @@
 
 ## Dashboard Consumer Requirements
 
-- consume the reviewed GAIA SHA above;
+- consume the reviewed merged GAIA SHA determined after PR #30 is merged;
 - use the public read-only programme contract;
 - keep the Dashboard repository read-only in C7A;
 - do not use floating branch references;
@@ -42,5 +50,7 @@
 ## Dependency Ordering
 
 1. Merge the GAIA C7A PR.
-2. Pin the Dashboard worktree to the reviewed GAIA SHA above.
-3. Implement the Dashboard read-only programme summary integration in its own branch.
+2. Determine the exact merged-main GAIA SHA after PR #30 lands.
+3. Verify that SHA exists on GAIA `main` before updating Dashboard pins.
+4. Pin the Dashboard worktree to that merged-main SHA.
+5. Implement the Dashboard read-only programme summary integration in its own branch.
