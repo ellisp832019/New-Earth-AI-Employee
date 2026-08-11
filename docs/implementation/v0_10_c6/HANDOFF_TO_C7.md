@@ -27,4 +27,11 @@
 - no Codex execution;
 - no direct repository mutation;
 - no Dashboard or MicroGrow edits;
-- no soak test completed for the full 10-minute target.
+- the required 10-minute Windows soak was completed and passed;
+- recorded soak duration was `00:10:00.1552832`;
+- process-level result was `PASS`;
+- final live Windows validation passed.
+
+## Closure
+
+C6 is fully closed for handoff to C7.
