@@ -1,20 +1,23 @@
 # Cross-Repository Impact
 
-## Required Now
+## GAIA C7A
 
-- `New-Earth-AI-Employee / GAIA`
+- GAIA C7A merged main: `3a7d316f66aabf9cd677200c55fd5be05a4d6afe`
+- GAIA PR: `#30`
 
-## Required After C7A
+## Dashboard C7B
 
-- `New_Earth_Command_Dashboard`
+- Dashboard C7B merged main: `67bb0057322ae0d5d7514bdaba5e29258ec3efda`
+- Dashboard PR: `#17`
 
-## Not Needed for C7A
+## Boundary
+
+- The Dashboard consumes GAIA only through the supported integration-client and dashboard-module boundary.
+- The Dashboard remains read-only and fail-closed for unavailable or incompatible GAIA responses.
+
+## Not Needed for C7
 
 - MicroGrow
 - NEOS
 - New Earth Platform Core
 - Command Centre
-
-## Dashboard Handoff Direction
-
-The downstream Dashboard work should pin to the reviewed C7A GAIA SHA and consume the public read-only programme summary surfaces only.

@@ -1,21 +1,31 @@
-# GAIA v0.10 C7A Start Here
+# GAIA v0.10 C7 Closeout Start Here
 
 ## Scope
 
-C7A establishes the public, read-only programme surfaces for GAIA:
+C7 established the public, read-only programme surfaces for GAIA and
+the downstream Dashboard consumer integration.
 
-- public programme API routes;
-- public CLI read commands;
-- integration-client programme models and methods;
-- reusable dashboard-module programme summary surface.
+## Status
 
-## What Was Added
+- C7A is complete and merged.
+- C7B is complete and merged.
+- C7 cross-repository acceptance is complete.
+- C8 is the next phase.
+
+## C7A Deliverables
 
 - `/integration/v1/programme/summary` and related public read routes;
 - `gaia programme`, `gaia architecture`, `gaia impact`, `gaia release-train`, and `gaia programme-package` CLI groups;
 - `GaiaIntegrationClient` programme and dependency methods;
 - `GaiaProgrammeSummaryView` for the dashboard module;
 - refreshed OpenAPI contract export.
+
+## C7B Deliverables
+
+- the Dashboard pins both GAIA git dependencies to the merged C7A SHA;
+- the Dashboard exposes the read-only programme intelligence surface;
+- the Dashboard preserves fail-closed unavailable and incompatible states;
+- the Dashboard keeps execution-sensitive actions in the standalone GAIA Control Centre.
 
 ## Safety Boundary
 

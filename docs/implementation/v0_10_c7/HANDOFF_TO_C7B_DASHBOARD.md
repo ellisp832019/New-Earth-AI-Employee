@@ -54,3 +54,11 @@
 3. Verify that SHA exists on GAIA `main` before updating Dashboard pins.
 4. Pin the Dashboard worktree to that merged-main SHA.
 5. Implement the Dashboard read-only programme summary integration in its own branch.
+
+## Closeout Note
+
+C7B is now complete.
+
+- Dashboard PR `#17` is merged.
+- The merged Dashboard main SHA is `67bb0057322ae0d5d7514bdaba5e29258ec3efda`.
+- This document is now historical and fulfilled.
