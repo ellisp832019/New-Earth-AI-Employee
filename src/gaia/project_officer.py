@@ -58,9 +58,9 @@ class ProjectOfficerOutcomeRequest(BaseModel):
 
 
 class ProjectOfficerCapabilityCatalog(BaseModel):
-    api_version: str = "0.9.0"
+    api_version: str = "0.10.0"
     contract_version: str = "gaia-v3"
-    capability_version: str = "0.9.0"
+    capability_version: str = "0.10.0"
     capabilities: list[str] = Field(default_factory=list)
     capability_catalog: list[CapabilityDescriptor] = Field(default_factory=list)
     degraded_features: list[str] = Field(default_factory=list)
@@ -82,84 +82,84 @@ class ProjectOfficerService:
         descriptors = [
             CapabilityDescriptor(
                 capability_id="project_officer_portfolio",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Inspect the portfolio of project-health and planning evidence.",
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_project_health",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Inspect project-health snapshots and history.",
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_change_intelligence",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Inspect change findings, comparisons and portfolio drift.",
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_recommendations",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Inspect deterministic recommendations, score breakdowns and blockers.",
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_work_packages",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Inspect work packages, revisions, approvals, handoffs and outcomes.",
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_lifecycle_review",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Submit exact revisions for human review without executing work.",
                 authority_level="gaia_local_state",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_lifecycle_approval",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Approve or reject exact revisions as GAIA-local state changes.",
                 authority_level="gaia_local_state",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_lifecycle_handoff",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Record the exact handoff evidence for a manually approved revision.",
                 authority_level="manual_handoff_only",
             ),
             CapabilityDescriptor(
                 capability_id="project_officer_lifecycle_outcome",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Record a permitted human-reported work-package outcome.",
                 authority_level="gaia_local_state",
             ),
             CapabilityDescriptor(
                 capability_id="windows_project_officer_workspace",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Windows Control Centre workspace for B5 review and handoff flows.",
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
                 capability_id="windows_programme_workspace",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Windows Control Centre workspace for C6 programme intelligence review.",
                 authority_level="read_only",
             ),
             CapabilityDescriptor(
                 capability_id="dashboard_read_only_compatibility",
-                version="0.9.0",
+                version="0.10.0",
                 state="enabled",
                 summary="Dashboard integration remains read-only and backward compatible.",
                 authority_level="read_only",

@@ -137,7 +137,7 @@ void main() {
     controller.backendCompatibilityState = BackendCompatibilityState.compatible;
     controller.health = HealthResponse(
       status: 'ok',
-      version: '0.9.0',
+      version: '0.10.0',
       databasePath: 'data/gaia.db',
       fts5Available: true,
     );
@@ -178,7 +178,7 @@ void main() {
     controller.backendCompatibilityState = BackendCompatibilityState.compatible;
     controller.health = HealthResponse(
       status: 'ok',
-      version: '0.9.0',
+      version: '0.10.0',
       databasePath: 'data/gaia.db',
       fts5Available: true,
     );
@@ -219,7 +219,7 @@ void main() {
     controller.backendCompatibilityState = BackendCompatibilityState.compatible;
     controller.health = HealthResponse(
       status: 'ok',
-      version: '0.9.0',
+      version: '0.10.0',
       databasePath: 'data/gaia.db',
       fts5Available: true,
     );
@@ -299,7 +299,7 @@ void main() {
                   'status': 'compatible',
                   'backend_version': '0.8.0',
                   'integration_contract_version': 'gaia-v3',
-                  'capability_version': '0.9.0',
+                  'capability_version': '0.10.0',
                 }),
                 200,
               );

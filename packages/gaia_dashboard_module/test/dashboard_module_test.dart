@@ -267,7 +267,7 @@ MockClient _dashboardMockClient({
         return _jsonResponse({
           'backend_product_version': '0.8.0',
           'minimum_supported_api_version': '0.8.0',
-          'maximum_tested_api_version': '0.9.0',
+          'maximum_tested_api_version': '0.10.0',
           'integration_contract_version': 'gaia-v2',
           'client_package_version': '0.8.0',
           'backend_version': '0.8.0',
@@ -382,7 +382,7 @@ MockClient _dashboardMockClient({
           );
         }
         return _jsonResponse({
-          'capability_version': '0.9.0',
+          'capability_version': '0.10.0',
           'capabilities': projectOfficerEnabled
               ? ['project_officer_portfolio', 'project_officer_work_packages']
               : ['legacy_only'],
