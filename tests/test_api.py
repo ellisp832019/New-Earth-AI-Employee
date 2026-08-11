@@ -73,3 +73,28 @@ def test_governance_api_endpoints(settings):
         brief = client.get("/governance/brief")
         assert brief.status_code == 200
         assert "Architecture Governance" in brief.json()["markdown"]
+
+
+def test_public_programme_api_surfaces_and_schema_excludes_internal_workspace(settings):
+    with TestClient(create_app(settings)) as client:
+        summary = client.get("/integration/v1/programme/summary")
+        assert summary.status_code == 200
+        payload = summary.json()
+        assert payload["selected_project_id"] == "sample"
+        assert "summary" in payload
+        assert payload["summary"]["trust_alert_count"] >= 0
+        assert payload["summary"]["provenance_manifest_count"] >= 0
+        assert "stale_evidence_projects" in payload["summary"]
+
+        assert client.get("/integration/v1/programme/overview").status_code == 200
+        assert client.get("/integration/v1/architecture/entities").status_code == 200
+        assert client.get("/integration/v1/architecture/relationships").status_code == 200
+        assert client.get("/integration/v1/dependencies/graph").status_code == 200
+        assert client.get("/integration/v1/dependencies/findings").status_code == 200
+        assert client.get("/integration/v1/change-impact/summary").status_code == 200
+        assert client.get("/integration/v1/change-impact/recommendations").status_code == 200
+        assert client.get("/integration/v1/release-trains").status_code == 200
+        assert client.get("/integration/v1/programme-packages").status_code == 200
+
+        openapi = client.get("/openapi.json").json()
+        assert "/integration/v1/project-officer/programme/workspace" not in openapi["paths"]

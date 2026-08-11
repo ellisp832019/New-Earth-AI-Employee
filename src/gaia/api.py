@@ -1183,6 +1183,181 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "selected_package": selected_package.model_dump(mode="json") if selected_package is not None else None,
         }
 
+    def _public_programme_summary_payload(project_id: str | None = None) -> dict[str, object]:
+        payload = _programme_workspace_payload(project_id)
+        return {
+            "generated_at": payload["generated_at"],
+            "selected_project_id": payload["selected_project_id"],
+            "selected_project": payload["selected_project"],
+            "summary": payload["summary"],
+            "portfolio": payload["overview"],
+            "architecture_registry": payload["architecture_registry"],
+            "dependency_graph": payload["dependency_graph"],
+            "impact_analysis": payload["impact_analysis"],
+            "change_proposals": payload["change_proposals"],
+            "roadmap": payload["roadmap"],
+            "release_trains": payload["release_trains"],
+            "programme_packages": payload["programme_packages"],
+            "decisions": payload["decisions"],
+            "cross_project_evidence": payload["cross_project_evidence"],
+        }
+
+    @app.get("/integration/v1/programme/summary")
+    @app.get("/integration/v1/programme/overview")
+    def programme_summary(project_id: str | None = None) -> dict[str, object]:
+        return _public_programme_summary_payload(project_id)
+
+    @app.get("/integration/v1/architecture/entities")
+    def architecture_entities(
+        project_id: str | None = None,
+        kind: str | None = None,
+    ) -> list[dict[str, object]]:
+        return [
+            entity.model_dump(mode="json")
+            for entity in service.architecture_entities(
+                project_id=project_id,
+                kind=kind,  # type: ignore[arg-type]
+            )
+        ]
+
+    @app.get("/integration/v1/architecture/entities/{entity_id}")
+    def architecture_entity(entity_id: str) -> dict[str, object]:
+        entity = service.architecture_entity(entity_id)
+        if entity is None:
+            raise HTTPException(status_code=404, detail="Architecture entity not found")
+        return entity.model_dump(mode="json")
+
+    @app.get("/integration/v1/architecture/relationships")
+    def architecture_relationships(
+        source_entity_id: str | None = None,
+        target_entity_id: str | None = None,
+        relationship_type: str | None = None,
+    ) -> list[dict[str, object]]:
+        return [
+            relationship.model_dump(mode="json")
+            for relationship in service.architecture_relationships(
+                source_entity_id=source_entity_id,
+                target_entity_id=target_entity_id,
+                relationship_type=relationship_type,  # type: ignore[arg-type]
+            )
+        ]
+
+    @app.get("/integration/v1/architecture/relationships/{relationship_id}")
+    def architecture_relationship(relationship_id: str) -> dict[str, object]:
+        relationship = service.architecture_relationship(relationship_id)
+        if relationship is None:
+            raise HTTPException(status_code=404, detail="Architecture relationship not found")
+        return relationship.model_dump(mode="json")
+
+    @app.get("/integration/v1/dependencies/graph")
+    def dependency_graph() -> dict[str, object]:
+        return service.dependency_graph().model_dump(mode="json")
+
+    @app.get("/integration/v1/dependencies/findings")
+    def dependency_findings() -> list[dict[str, object]]:
+        return [finding.model_dump(mode="json") for finding in service.dependency_graph_findings()]
+
+    @app.get("/integration/v1/dependencies/cycles")
+    def dependency_cycles() -> list[dict[str, object]]:
+        return [cycle.model_dump(mode="json") for cycle in service.dependency_graph_cycles()]
+
+    @app.get("/integration/v1/dependencies/shared")
+    def dependency_shared() -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in service.dependency_graph_shared_dependencies()]
+
+    @app.get("/integration/v1/dependencies/orphans")
+    def dependency_orphans() -> list[dict[str, object]]:
+        return [item.model_dump(mode="json") for item in service.dependency_graph_orphans()]
+
+    @app.get("/integration/v1/dependencies/projects/{project_id}")
+    def dependency_project_dependencies(
+        project_id: str,
+        transitive: bool = Query(default=False),
+    ) -> list[dict[str, object]]:
+        return [
+            item.model_dump(mode="json")
+            for item in service.project_dependency_graph(project_id, transitive=transitive)
+        ]
+
+    @app.get("/integration/v1/dependencies/projects/{project_id}/dependents")
+    def dependency_project_dependents(
+        project_id: str,
+        transitive: bool = Query(default=False),
+    ) -> list[dict[str, object]]:
+        return [
+            item.model_dump(mode="json")
+            for item in service.project_dependents_graph(project_id, transitive=transitive)
+        ]
+
+    @app.get("/integration/v1/change-impact/summary")
+    def change_impact_summary(project_id: str | None = None) -> dict[str, object]:
+        recommendation_portfolio = service.project_recommendation_portfolio()
+        selected_project_id = project_id or (next(iter(sorted(resolved_settings.projects))) if resolved_settings.projects else None)
+        selected_recommendations = [
+            recommendation
+            for recommendation in service.recommendation_queue(selected_project_id)
+            if selected_project_id is None or recommendation.project_id == selected_project_id
+        ]
+        analyses = [
+            service.analyse_change_impact(_proposal_from_recommendation(recommendation))
+            for recommendation in selected_recommendations[:5]
+        ]
+        selected_analysis = analyses[0] if analyses else None
+        return {
+            "generated_at": recommendation_portfolio.generated_at.isoformat(),
+            "selected_project_id": selected_project_id,
+            "recommendation_portfolio": recommendation_portfolio.model_dump(mode="json"),
+            "change_portfolio": service.project_change_portfolio().model_dump(mode="json"),
+            "recommendations": [item.model_dump(mode="json") for item in selected_recommendations],
+            "analyses": [analysis.model_dump(mode="json") for analysis in analyses],
+            "selected_analysis": selected_analysis.model_dump(mode="json") if selected_analysis is not None else None,
+        }
+
+    @app.get("/integration/v1/change-impact/recommendations")
+    def change_impact_recommendations(
+        project_id: str | None = None,
+        priority_tier: str | None = None,
+        lifecycle_state: str | None = None,
+        blocked_only: bool = False,
+        limit: int = Query(default=100, ge=1, le=500),
+        offset: int = Query(default=0, ge=0),
+    ) -> list[dict[str, object]]:
+        recommendations = project_officer_service.recommendations(
+            project_id=project_id,
+            priority_tier=priority_tier,
+            lifecycle_state=lifecycle_state,
+            blocked_only=blocked_only,
+            limit=limit,
+            offset=offset,
+        )
+        return [item.model_dump(mode="json") for item in recommendations]
+
+    @app.get("/integration/v1/change-impact/recommendations/{recommendation_id}")
+    def change_impact_recommendation(recommendation_id: str) -> dict[str, object]:
+        recommendation = project_officer_service.recommendation(recommendation_id)
+        if recommendation is None:
+            raise HTTPException(status_code=404, detail="Recommendation not found")
+        return recommendation.model_dump(mode="json")
+
+    @app.get("/integration/v1/programme/roadmap")
+    def programme_roadmap() -> dict[str, object]:
+        return service.programme_roadmap().model_dump(mode="json")
+
+    @app.get("/integration/v1/release-trains")
+    def release_trains() -> dict[str, object]:
+        return service.release_trains().model_dump(mode="json")
+
+    @app.get("/integration/v1/programme-packages")
+    def programme_packages() -> dict[str, object]:
+        return service.programme_packages().model_dump(mode="json")
+
+    @app.get("/integration/v1/programme-packages/{package_id}")
+    def programme_package(package_id: str) -> dict[str, object]:
+        package = service.programme_package(package_id)
+        if package is None:
+            raise HTTPException(status_code=404, detail="Programme package not found")
+        return package.model_dump(mode="json")
+
     @app.get("/integration/v1/project-officer/projects/{project_id}/changes/findings")
     def project_officer_change_findings(
         project_id: str,
