@@ -103,6 +103,15 @@ class AskResponse(BaseModel):
     structured: bool = True
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    runtime_provider: str | None = None
+    runtime_model: str | None = None
+    runtime_correlation_id: str | None = None
+    runtime_preflight_route: dict[str, Any] = Field(default_factory=dict)
+    runtime_execution_route: dict[str, Any] = Field(default_factory=dict)
+    runtime_route_reason: str | None = None
+    runtime_route_fallback_used: bool | None = None
+    runtime_execution_succeeded: bool = False
+    runtime_provenance: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentRunRecord(BaseModel):
@@ -137,8 +146,8 @@ _CATEGORY_HINTS: list[tuple[QuestionCategory, tuple[str, ...], list[str]]] = [
     ("governance", ("governance context", "architecture governance", "neos-gov", "governance status"), ["governance", "neos-gov", "architecture governance"]),
     ("missing_docs", ("what documentation is missing", "missing documentation"), ["documentation", "guide"]),
     ("risks", ("risks", "blockers", "problems"), ["risk", "blocker"]),
-    ("next_step", ("what should i build next", "next step", "next"), ["next", "should build"]),
     ("codex_prompt", ("codex prompt", "create the next codex prompt"), ["codex", "prompt"]),
+    ("next_step", ("what should i build next", "next step", "next"), ["next", "should build"]),
 ]
 
 _INJECTION_PATTERNS = (

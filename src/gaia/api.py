@@ -13,6 +13,7 @@ from gaia.change_impact import ChangeImpactChangeType, ChangeProposal, ChangePro
 from gaia.config import Settings, load_settings
 from gaia.conversation import AskRequest
 from gaia.db import Database
+from gaia.local_ai_runtime import LocalAIRuntimeClient
 from gaia.models import HealthResponse, ProjectRecommendation
 from gaia.output_workspace import (
     OutputActionCreateRequest,
@@ -54,8 +55,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     resolved_settings = settings or load_settings()
     database = Database(resolved_settings.database_path)
     service = ProjectService(resolved_settings, database)
-    provider_registry = ProviderRegistry(resolved_settings.model_routing)
-    agent_service = AgentService(service, database, provider_registry)
+    runtime_client = LocalAIRuntimeClient(resolved_settings.local_ai_runtime)
+    provider_registry = ProviderRegistry(resolved_settings.local_ai_runtime, runtime_client)
+    agent_service = AgentService(service, database, runtime_client)
     workflow_service = TaskWorkflowService(resolved_settings, database)
     output_service = OutputWorkspaceService(resolved_settings, database)
     trust_service = GAIATrustService(resolved_settings, database)
@@ -439,8 +441,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return [status.model_dump(mode="json") for status in await provider_registry.list_status()]
 
     @app.get("/models")
-    async def models() -> list[dict[str, object]]:
-        return [status.model_dump(mode="json") for status in await provider_registry.list_status()]
+    async def models() -> dict[str, object]:
+        try:
+            return (await runtime_client.models()).model_dump(mode="json")
+        except Exception as exc:
+            return {
+                "service": "new-earth-local-ai-runtime",
+                "version": __version__,
+                "models": [],
+                "degraded": True,
+                "details": str(exc),
+            }
 
     @app.post("/agent/ask")
     async def ask(request: AskRequest) -> dict[str, object]:

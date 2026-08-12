@@ -7,15 +7,15 @@ from typing import Any
 import yaml
 from pydantic import BaseModel, Field
 
+from gaia.local_ai_runtime import LocalAIRuntimeSettings, load_local_ai_runtime
 from gaia.models import ProjectConfig
-from gaia.routing import ModelRoutingSettings, load_model_routing
 
 
 class Settings(BaseModel):
     config_path: Path = Path("config/projects.yaml")
     database_path: Path = Path("data/gaia.db")
     signing_key_store: Path = Path("data/signing-keys")
-    model_routing_path: Path = Path("config/model-routing.yaml")
+    local_ai_runtime_path: Path = Path("config/model-routing.yaml")
     neos_base_url: str = "http://127.0.0.1:8765"
     neos_timeout_seconds: float = 3.0
     log_level: str = "INFO"
@@ -26,7 +26,15 @@ class Settings(BaseModel):
     max_git_output_bytes: int = 1_000_000
     git_timeout_seconds: int = 15
     projects: dict[str, ProjectConfig] = Field(default_factory=dict)
-    model_routing: ModelRoutingSettings = Field(default_factory=ModelRoutingSettings)
+    local_ai_runtime: LocalAIRuntimeSettings = Field(default_factory=LocalAIRuntimeSettings)
+
+    @property
+    def model_routing(self) -> LocalAIRuntimeSettings:
+        return self.local_ai_runtime
+
+    @property
+    def model_routing_path(self) -> Path:
+        return self.local_ai_runtime_path
 
 
 def _env(name: str, default: str) -> str:
@@ -54,11 +62,41 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
 
     _validate_project_roots(projects)
 
+    runtime_path = Path(
+        _env(
+            "GAIA_LOCAL_AI_RUNTIME_PATH",
+            _env("GAIA_MODEL_ROUTING_PATH", "config/model-routing.yaml"),
+        )
+    )
+    runtime_settings = load_local_ai_runtime(runtime_path)
+    runtime_url = os.getenv("GAIA_LOCAL_AI_RUNTIME_URL")
+    if runtime_url:
+        runtime_settings = runtime_settings.model_copy(update={"base_url": runtime_url})
+    runtime_api_version = os.getenv("GAIA_LOCAL_AI_RUNTIME_API_VERSION")
+    if runtime_api_version:
+        runtime_settings = runtime_settings.model_copy(update={"api_version": runtime_api_version})
+    runtime_timeout = os.getenv("GAIA_LOCAL_AI_RUNTIME_TIMEOUT_SECONDS")
+    if runtime_timeout:
+        runtime_settings = runtime_settings.model_copy(update={"request_timeout_seconds": float(runtime_timeout)})
+    runtime_connect_timeout = os.getenv("GAIA_LOCAL_AI_RUNTIME_CONNECTION_TIMEOUT_SECONDS")
+    if runtime_connect_timeout:
+        runtime_settings = runtime_settings.model_copy(update={"connection_timeout_seconds": float(runtime_connect_timeout)})
+    runtime_enabled = os.getenv("GAIA_LOCAL_AI_RUNTIME_ENABLED")
+    if runtime_enabled:
+        runtime_settings = runtime_settings.model_copy(
+            update={"enabled": runtime_enabled.lower() in {"1", "true", "yes", "on"}}
+        )
+    runtime_local_only = os.getenv("GAIA_LOCAL_AI_RUNTIME_REQUIRE_LOCAL_ONLY")
+    if runtime_local_only:
+        runtime_settings = runtime_settings.model_copy(
+            update={"require_local_only": runtime_local_only.lower() in {"1", "true", "yes", "on"}}
+        )
+
     return Settings(
         config_path=path,
         database_path=Path(_env("GAIA_DATABASE_PATH", "data/gaia.db")),
         signing_key_store=Path(_env("GAIA_SIGNING_KEY_STORE", "data/signing-keys")),
-        model_routing_path=Path(_env("GAIA_MODEL_ROUTING_PATH", "config/model-routing.yaml")),
+        local_ai_runtime_path=runtime_path,
         neos_base_url=_env("GAIA_NEOS_BASE_URL", "http://127.0.0.1:8765"),
         neos_timeout_seconds=float(_env("GAIA_NEOS_TIMEOUT_SECONDS", "3.0")),
         log_level=_env("GAIA_LOG_LEVEL", "INFO"),
@@ -69,7 +107,7 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
         max_git_output_bytes=int(_env("GAIA_MAX_GIT_OUTPUT_BYTES", "1000000")),
         git_timeout_seconds=int(_env("GAIA_GIT_TIMEOUT_SECONDS", "15")),
         projects=projects,
-        model_routing=load_model_routing(Path(_env("GAIA_MODEL_ROUTING_PATH", "config/model-routing.yaml"))),
+        local_ai_runtime=runtime_settings,
     )
 
 

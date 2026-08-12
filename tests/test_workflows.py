@@ -12,7 +12,7 @@ from gaia.agent import AgentService
 from gaia.api import create_app
 from gaia.cli import app
 from gaia.db import Database
-from gaia.providers import ProviderRegistry
+from gaia.local_ai_runtime import LocalAIRuntimeClient
 from gaia.service import ProjectService
 from gaia.workflows import (
     ApprovalCreateRequest,
@@ -34,8 +34,8 @@ def _workflow_service(settings) -> TaskWorkflowService:
 def _create_agent_run(settings) -> str:
     database = Database(settings.database_path)
     service = ProjectService(settings, database)
-    registry = ProviderRegistry(settings.model_routing)
-    agent = AgentService(service, database, registry)
+    runtime_client = LocalAIRuntimeClient(settings.local_ai_runtime)
+    agent = AgentService(service, database, runtime_client)
     try:
         response = asyncio.run(
             agent.ask(
