@@ -11,12 +11,18 @@ from gaia.conversation import (
     classify_confidence,
     classify_question,
     detect_prompt_injection,
+    draft_codex_prompt,
     generate_search_queries,
     rank_evidence,
 )
 from gaia.db import Database
 from gaia.governance_context import GovernanceContextService
-from gaia.local_ai_runtime import LocalAIRuntimeClient, LocalAIRuntimeUnavailable
+from gaia.local_ai_runtime import (
+    LocalAIRuntimeClient,
+    LocalAIRuntimeUnavailable,
+    RuntimeChatResponse,
+    RuntimeGenerateResponse,
+)
 from gaia.models import RepositorySnapshot
 from gaia.service import ProjectService
 
@@ -63,8 +69,10 @@ class AgentService:
         governance_context = None
         runtime_health = None
         runtime_status = None
-        runtime_route = None
+        runtime_preflight_route = None
+        runtime_execution_route = None
         runtime_response = None
+        runtime_execution_succeeded = False
         selected_model = model
         selected_provider = "deterministic"
         if governance_mode:
@@ -73,8 +81,19 @@ class AgentService:
                 governance_context = governance_service.context(project_id=project_id)
                 answer = governance_context.brief.markdown if governance_context.brief else governance_service.brief(project_id=project_id).markdown
                 warnings.extend(f"Governance limitation: {item}" for item in governance_context.limitations[:5])
+                selected_provider = "governance"
             finally:
                 governance_service.close()
+        elif analysis.category == "codex_prompt":
+            answer = self._deterministic_answer(
+                project_id,
+                question,
+                analysis,
+                snapshot,
+                evidence,
+                None,
+            )
+            deterministic_only = True
         else:
             try:
                 runtime_health = await self.runtime_client.health()
@@ -95,7 +114,7 @@ class AgentService:
             else:
                 try:
                     runtime_task = self._runtime_task(analysis)
-                    runtime_route = await self.runtime_client.route_explain(
+                    runtime_preflight_route = await self.runtime_client.route_explain(
                         task=runtime_task,
                         model=model,
                         correlation_id=None,
@@ -105,29 +124,30 @@ class AgentService:
                             "evidence_count": len(evidence),
                         },
                     )
-                    messages = self._runtime_messages(question, analysis, snapshot, evidence)
-                    runtime_response = await self.runtime_client.chat(
-                        messages=messages,
-                        task=runtime_task,
-                        model=runtime_route.selected_model,
-                        correlation_id=None,
-                        metadata={
-                            "project_id": project_id,
-                            "question_category": analysis.category,
-                            "snapshot_id": snapshot.snapshot_id,
-                            "evidence_count": len(evidence),
-                        },
+                    runtime_response = await self._runtime_execute(
+                        runtime_task,
+                        question=question,
+                        analysis=analysis,
+                        snapshot=snapshot,
+                        evidence=evidence,
+                        model=model or (runtime_preflight_route.selected_model if runtime_preflight_route else None),
+                        runtime_route=runtime_preflight_route,
                     )
-                    answer = runtime_response.content or self._deterministic_answer(
-                        project_id,
-                        question,
-                        analysis,
-                        snapshot,
-                        evidence,
-                        "Runtime returned an empty answer",
-                    )
-                    selected_model = runtime_response.model
-                    selected_provider = runtime_response.provider
+                    runtime_execution_route = runtime_response.route
+                    if runtime_response.content.strip():
+                        answer = runtime_response.content
+                        runtime_execution_succeeded = True
+                        selected_model = runtime_execution_route.selected_model
+                        selected_provider = runtime_execution_route.selected_provider
+                    else:
+                        answer = self._deterministic_answer(
+                            project_id,
+                            question,
+                            analysis,
+                            snapshot,
+                            evidence,
+                            "Runtime returned an empty answer",
+                        )
                 except LocalAIRuntimeUnavailable as exc:
                     warnings.append(str(exc))
                     answer = self._deterministic_answer(
@@ -149,8 +169,15 @@ class AgentService:
                         type(exc).__name__,
                     )
         warnings.extend(_answer_warnings(answer))
-        runtime_available = runtime_health is not None and runtime_health.status != "fail"
-        confidence = classify_confidence(analysis, len(evidence), runtime_available, deterministic_only or governance_mode)
+        provider_available_for_confidence = governance_mode or runtime_execution_succeeded or (
+            runtime_health is not None and runtime_health.status != "fail"
+        )
+        confidence = classify_confidence(
+            analysis,
+            len(evidence),
+            provider_available_for_confidence,
+            deterministic_only or (not runtime_execution_succeeded and not governance_mode),
+        )
         finished = datetime.now(UTC)
         structured_answer = {
             "answer": answer,
@@ -158,7 +185,9 @@ class AgentService:
             "evidence": [item.model_dump(mode="json") for item in evidence],
             "runtime_health": runtime_health.model_dump(mode="json") if runtime_health else None,
             "runtime_status": runtime_status.model_dump(mode="json") if runtime_status else None,
-            "runtime_route": runtime_route.model_dump(mode="json") if runtime_route else None,
+            "runtime_preflight_route": runtime_preflight_route.model_dump(mode="json") if runtime_preflight_route else None,
+            "runtime_execution_route": runtime_execution_route.model_dump(mode="json") if runtime_execution_route else None,
+            "runtime_route": runtime_execution_route.model_dump(mode="json") if runtime_execution_route else None,
             "runtime_response": runtime_response.model_dump(mode="json") if runtime_response else None,
             "warnings": warnings,
         }
@@ -180,7 +209,8 @@ class AgentService:
             prompt_injection_warnings=prompt_injection_warnings,
             usage={
                 "runtime": runtime_response.model_dump(mode="json") if runtime_response else None,
-                "runtime_route": runtime_route.model_dump(mode="json") if runtime_route else None,
+                "runtime_preflight_route": runtime_preflight_route.model_dump(mode="json") if runtime_preflight_route else None,
+                "runtime_execution_route": runtime_execution_route.model_dump(mode="json") if runtime_execution_route else None,
             },
         )
         self.database.insert_agent_run(run)
@@ -197,15 +227,18 @@ class AgentService:
             confidence=confidence,
             warnings=warnings,
             prompt_injection_warnings=prompt_injection_warnings,
-            deterministic_only=deterministic_only or not runtime_available,
+            deterministic_only=deterministic_only or (not runtime_execution_succeeded and not governance_mode),
             structured=True,
             started_at=start,
             finished_at=finished,
-            runtime_provider=runtime_response.provider if runtime_response else selected_provider,
-            runtime_model=runtime_response.model if runtime_response else selected_model,
+            runtime_provider=runtime_execution_route.selected_provider if runtime_execution_route else selected_provider,
+            runtime_model=runtime_execution_route.selected_model if runtime_execution_route else selected_model,
             runtime_correlation_id=runtime_response.correlation_id if runtime_response else None,
-            runtime_route_reason=runtime_route.reason if runtime_route else None,
-            runtime_route_fallback_used=runtime_route.fallback_used if runtime_route else None,
+            runtime_preflight_route=runtime_preflight_route.model_dump(mode="json") if runtime_preflight_route else {},
+            runtime_execution_route=runtime_execution_route.model_dump(mode="json") if runtime_execution_route else {},
+            runtime_route_reason=runtime_execution_route.reason if runtime_execution_route else None,
+            runtime_route_fallback_used=runtime_execution_route.fallback_used if runtime_execution_route else None,
+            runtime_execution_succeeded=runtime_execution_succeeded,
             runtime_provenance=runtime_response.provenance if runtime_response else {},
         )
 
@@ -288,10 +321,15 @@ class AgentService:
             ]
         )
         if analysis.category == "codex_prompt":
-            lines.append("")
-            lines.append(
-                "Runtime workload prepared for codex-style summarisation; "
-                "execution now flows through the Local AI Runtime boundary."
+            return draft_codex_prompt(
+                repository_path=str(snapshot.project_root),
+                branch=snapshot.git.branch or "unknown",
+                commit_sha=snapshot.git.commit_sha or "unknown",
+                working_tree="clean" if snapshot.git.is_clean else "dirty",
+                snapshot_id=snapshot.snapshot_id,
+                evidence=evidence,
+                objective=question,
+                exclusions=["MicroGrow writes", "shell execution", "model auto-downloads"],
             )
         return "\n".join(lines).strip()
 
@@ -319,10 +357,60 @@ class AgentService:
             },
         ]
 
+    def _runtime_generate_prompt(
+        self,
+        question: str,
+        analysis: QuestionAnalysis,
+        snapshot: RepositorySnapshot,
+        evidence: list[EvidenceItem],
+    ) -> str:
+        return (
+            f"{self._system_prompt()}\n\n"
+            f"{assemble_context(question, analysis, evidence, snapshot_id=snapshot.snapshot_id, project_id=snapshot.project_id)}\n\n"
+            "Provide a concise generation response grounded in the evidence above."
+        )
+
     def _runtime_task(self, analysis: QuestionAnalysis) -> str:
         if analysis.asks_for_prompt or analysis.category == "codex_prompt":
             return "generate"
         return "chat"
+
+    async def _runtime_execute(
+        self,
+        runtime_task: str,
+        *,
+        question: str,
+        analysis: QuestionAnalysis,
+        snapshot: RepositorySnapshot,
+        evidence: list[EvidenceItem],
+        model: str | None,
+        runtime_route: object | None,
+    ) -> RuntimeChatResponse | RuntimeGenerateResponse:
+        if runtime_task == "generate":
+            return await self.runtime_client.generate(
+                prompt=self._runtime_generate_prompt(question, analysis, snapshot, evidence),
+                task=runtime_task,
+                model=model,
+                correlation_id=None,
+                metadata={
+                    "project_id": snapshot.project_id,
+                    "question_category": analysis.category,
+                    "snapshot_id": snapshot.snapshot_id,
+                    "evidence_count": len(evidence),
+                },
+            )
+        return await self.runtime_client.chat(
+            messages=self._runtime_messages(question, analysis, snapshot, evidence),
+            task=runtime_task,
+            model=model,
+            correlation_id=None,
+            metadata={
+                "project_id": snapshot.project_id,
+                "question_category": analysis.category,
+                "snapshot_id": snapshot.snapshot_id,
+                "evidence_count": len(evidence),
+            },
+        )
 
 
 def _answer_warnings(answer: str) -> list[str]:
