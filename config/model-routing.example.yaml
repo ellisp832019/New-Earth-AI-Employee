@@ -1,5 +1,7 @@
-# Model integration is intentionally disabled in GAIA v0.1.
-model_routing:
-  enabled: false
-  default_provider: none
-  providers: {}
+local_ai_runtime:
+  enabled: true
+  base_url: "http://127.0.0.1:8787"
+  api_version: v1
+  request_timeout_seconds: 30
+  connection_timeout_seconds: 5
+  require_local_only: true

@@ -1,29 +1,15 @@
-# Ollama Setup on Windows
+# Legacy Ollama Notes
 
-## Install Ollama
+GAIA no longer uses Ollama as its canonical execution boundary.
 
-- Download Ollama from the official Ollama site.
-- Install it normally on Windows.
-- Start the Ollama service.
+If the Local AI Runtime is configured to route to an Ollama backend, follow the Local AI Runtime repository documentation and the Runtime configuration file in this repository. GAIA itself should only be pointed at the Runtime loopback endpoint.
 
-## Pull a model
+## What to do instead
 
-```powershell
-ollama pull llama3.1
-```
+- Configure `config\model-routing.yaml` for the Local AI Runtime boundary.
+- Verify `gaia doctor` and `gaia models status`.
+- Do not add direct `ollama` execution calls to GAIA code.
 
-## Configure GAIA
+## Historical reference
 
-Set `config\model-routing.yaml` so Ollama uses the model name you pulled.
-
-## Verify
-
-```powershell
-gaia doctor
-gaia models status
-```
-
-## Troubleshooting
-
-- If Ollama is not running, GAIA will use deterministic fallback behavior.
-- If the model is missing, configure the model name correctly or pull the model again.
+Older GAIA notes referred to direct Ollama setup. Those notes are retained only for historical context and should not be treated as the current GAIA execution model.

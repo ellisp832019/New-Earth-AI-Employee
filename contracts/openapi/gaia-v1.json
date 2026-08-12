@@ -6275,12 +6275,9 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "items": {
-                    "additionalProperties": true,
-                    "type": "object"
-                  },
+                  "additionalProperties": true,
                   "title": "Response Models Models Get",
-                  "type": "array"
+                  "type": "object"
                 }
               }
             },

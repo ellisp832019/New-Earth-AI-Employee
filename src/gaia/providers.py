@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Protocol
-from urllib.parse import urlparse
 
-import httpx
-
-from gaia.conversation import ModelRequest, ModelResponse, ModelStatus
-from gaia.routing import ModelRoutingSettings, OllamaProviderConfig
+from gaia.conversation import ModelRequest, ModelResponse, ModelStatus, assemble_context
+from gaia.local_ai_runtime import (
+    LocalAIRuntimeClient,
+    LocalAIRuntimeSettings,
+    LocalAIRuntimeUnavailable,
+)
 
 
 class ModelProvider(Protocol):
@@ -33,9 +34,9 @@ class MockModelProvider:
             "Use the evidence above and, if needed, request a fresh snapshot before making changes."
         )
         return ModelResponse(
-            provider="mock",
+            provider="deterministic",
             model_name=self.model_name,
-            endpoint_identity="local-mock",
+            endpoint_identity="local-deterministic",
             content=content,
             usage={"prompt_chars": len(request.system_prompt) + len(request.user_question)},
             warnings=[],
@@ -43,109 +44,90 @@ class MockModelProvider:
         )
 
     async def status(self) -> ModelStatus:
-        return ModelStatus(provider="mock", available=True, model_name=self.model_name, endpoint_identity="local-mock", details="Deterministic local provider")
-
-
-class OllamaModelProvider:
-    def __init__(self, config: OllamaProviderConfig) -> None:
-        self.config = config
-        parsed = urlparse(str(config.base_url))
-        if parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
-            raise ValueError("Ollama endpoint must default to loopback-only access")
-        self.base_url = str(config.base_url).rstrip("/")
-        self.model_name = config.model
-
-    async def status(self) -> ModelStatus:
-        if not self.config.enabled:
-            return ModelStatus(
-                provider="ollama",
-                available=False,
-                model_name=self.config.model or None,
-                endpoint_identity=self.base_url,
-                details="Ollama integration disabled",
-            )
-        try:
-            async with httpx.AsyncClient(timeout=self.config.connection_timeout_seconds) as client:
-                response = await client.get(f"{self.base_url}/api/tags")
-                response.raise_for_status()
-                payload = response.json()
-        except Exception as exc:
-            return ModelStatus(
-                provider="ollama",
-                available=False,
-                model_name=self.config.model or None,
-                endpoint_identity=self.base_url,
-                details=f"Unavailable: {type(exc).__name__}",
-            )
-        models = payload.get("models", []) if isinstance(payload, dict) else []
-        if self.config.model and not any(model.get("name") == self.config.model for model in models if isinstance(model, dict)):
-            return ModelStatus(
-                provider="ollama",
-                available=False,
-                model_name=self.config.model,
-                endpoint_identity=self.base_url,
-                details="Configured model not found",
-            )
         return ModelStatus(
-            provider="ollama",
+            provider="deterministic",
             available=True,
-            model_name=self.config.model or None,
-            endpoint_identity=self.base_url,
-            details="Ollama reachable",
+            model_name=self.model_name,
+            endpoint_identity="local-deterministic",
+            details="Deterministic local fallback",
         )
 
+
+class RuntimeExecutionProvider:
+    def __init__(self, client: LocalAIRuntimeClient) -> None:
+        self.client = client
+
     async def generate(self, request: ModelRequest) -> ModelResponse:
-        if not self.config.enabled:
-            return ModelResponse(
-                provider="ollama",
-                model_name=self.config.model or None,
-                endpoint_identity=self.base_url,
-                content="",
-                available=False,
-                error="Ollama integration disabled",
-            )
-        prompt = f"{request.system_prompt}\n\n{request.endpoint_identity}\n\n{request.user_question}\n\n{request.analysis.category}"
+        task = _canonical_task_name(request.analysis.category)
+        prompt = _render_prompt(request)
         try:
-            async with httpx.AsyncClient(timeout=httpx.Timeout(self.config.request_timeout_seconds)) as client:
-                response = await client.post(
-                    f"{self.base_url}/api/generate",
-                    json={
-                        "model": self.config.model,
-                        "prompt": prompt[: self.config.max_context_chars],
-                        "stream": False,
-                    },
-                )
-                response.raise_for_status()
-                payload = response.json()
-        except httpx.TimeoutException as exc:
+            route = await self.client.route_explain(task=task, model=request.model_name or None)
+            runtime_response = await self.client.generate(
+                prompt=prompt,
+                task=task,
+                model=route.selected_model,
+                correlation_id=request.endpoint_identity or None,
+                metadata={
+                    "analysis": request.analysis.model_dump(mode="json"),
+                    "evidence_count": len(request.evidence),
+                },
+            )
+        except LocalAIRuntimeUnavailable as exc:
             return ModelResponse(
-                provider="ollama",
-                model_name=self.config.model or None,
-                endpoint_identity=self.base_url,
+                provider="runtime",
+                model_name=request.model_name or None,
+                endpoint_identity=self.client.api_base,
                 content="",
                 available=False,
-                error=f"Timeout: {type(exc).__name__}",
+                error=str(exc),
             )
         except Exception as exc:
             return ModelResponse(
-                provider="ollama",
-                model_name=self.config.model or None,
-                endpoint_identity=self.base_url,
+                provider="runtime",
+                model_name=request.model_name or None,
+                endpoint_identity=self.client.api_base,
                 content="",
                 available=False,
                 error=type(exc).__name__,
             )
-        content = str(payload.get("response", "")) if isinstance(payload, dict) else ""
-        if len(content.encode("utf-8")) > self.config.max_response_bytes:
-            content = content.encode("utf-8")[: self.config.max_response_bytes].decode("utf-8", errors="ignore")
+        content = runtime_response.content or _render_prompt(request)
         return ModelResponse(
-            provider="ollama",
-            model_name=self.config.model or None,
-            endpoint_identity=self.base_url,
+            provider=runtime_response.provider,
+            model_name=runtime_response.model,
+            endpoint_identity=self.client.api_base,
             content=content,
-            usage=payload.get("prompt_eval_count", {}) if isinstance(payload, dict) else {},
-            available=True,
+            usage={
+                "correlation_id": runtime_response.correlation_id,
+                "route_reason": runtime_response.route.reason,
+                "fallback_used": runtime_response.route.fallback_used,
+                "selected_provider": runtime_response.route.selected_provider,
+                "selected_model": runtime_response.route.selected_model,
+            },
             warnings=[],
+            available=True,
+        )
+
+    async def status(self) -> ModelStatus:
+        try:
+            runtime_status = await self.client.status()
+            runtime_health = await self.client.health()
+        except Exception as exc:
+            return ModelStatus(
+                provider="runtime",
+                available=False,
+                model_name=None,
+                endpoint_identity=self.client.api_base,
+                details=str(exc),
+            )
+        details: str = runtime_health.status
+        if runtime_status.selected_default_model:
+            details = f"{details}; default={runtime_status.selected_default_model}"
+        return ModelStatus(
+            provider="runtime",
+            available=runtime_health.status != "fail",
+            model_name=runtime_status.selected_default_model,
+            endpoint_identity=runtime_status.api_base,
+            details=details,
         )
 
 
@@ -157,16 +139,42 @@ class ProviderSelection:
 
 
 class ProviderRegistry:
-    def __init__(self, routing: ModelRoutingSettings) -> None:
+    def __init__(self, routing: LocalAIRuntimeSettings, client: LocalAIRuntimeClient | None = None) -> None:
         self.routing = routing
         self.mock = MockModelProvider()
-        self.ollama = OllamaModelProvider(routing.providers.get("ollama", OllamaProviderConfig()))
+        self.runtime_client = client or LocalAIRuntimeClient(routing)
+        self.runtime = RuntimeExecutionProvider(self.runtime_client)
 
     def select(self, provider_name: str | None = None) -> ProviderSelection:
-        name = provider_name or self.routing.default_provider
-        if name == "ollama":
-            return ProviderSelection("ollama", self.ollama, self.ollama.model_name or None)
-        return ProviderSelection("mock", self.mock, self.mock.model_name)
+        name = (provider_name or "").strip().lower()
+        if name in {"mock", "deterministic", "none"}:
+            return ProviderSelection("deterministic", self.mock, self.mock.model_name)
+        return ProviderSelection("runtime", self.runtime, None)
 
     async def list_status(self) -> list[ModelStatus]:
-        return [await self.mock.status(), await self.ollama.status()]
+        return [await self.runtime.status(), await self.mock.status()]
+
+
+def _render_prompt(request: ModelRequest) -> str:
+    evidence_text = "\n".join(
+        f"- {item.source_path}: {item.snippet[:240]}" for item in request.evidence[:10]
+    ) or "- No evidence selected"
+    context = assemble_context(
+        request.user_question,
+        request.analysis,
+        request.evidence,
+        snapshot_id=request.endpoint_identity,
+        project_id="gaia",
+    )
+    return (
+        f"{request.system_prompt}\n\n"
+        "Evidence:\n"
+        f"{evidence_text}\n\n"
+        "Context:\n"
+        f"{context}\n\n"
+        "Answer the question with explicit fact/inference separation."
+    )
+
+
+def _canonical_task_name(task: str) -> str:
+    return task.strip().lower().replace("_", "-")

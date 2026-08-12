@@ -18,6 +18,7 @@ from gaia.agent import AgentService
 from gaia.api import create_app
 from gaia.config import load_settings
 from gaia.db import Database
+from gaia.local_ai_runtime import LocalAIRuntimeClient
 from gaia.models import WorkPackageOutcome
 from gaia.output_workspace import (
     OutputActionCreateRequest,
@@ -117,8 +118,9 @@ def _bundle(config: Path | None = None) -> tuple[ProjectService, Database, Provi
     settings = load_settings(config)
     database = Database(settings.database_path)
     service = ProjectService(settings, database)
-    registry = ProviderRegistry(settings.model_routing)
-    agent = AgentService(service, database, registry)
+    runtime_client = LocalAIRuntimeClient(settings.local_ai_runtime)
+    registry = ProviderRegistry(settings.local_ai_runtime, runtime_client)
+    agent = AgentService(service, database, runtime_client)
     return service, database, registry, agent
 
 
@@ -340,14 +342,15 @@ def doctor(config: Path | None = typer.Option(None, help="Path to project config
     """Check configuration, database, Git and registered project roots."""
     settings = load_settings(config)
     database = Database(settings.database_path)
-    registry = ProviderRegistry(settings.model_routing)
+    runtime_client = LocalAIRuntimeClient(settings.local_ai_runtime)
+    registry = ProviderRegistry(settings.local_ai_runtime, runtime_client)
     rows = []
     rows.append(("GAIA version", __version__, True))
     rows.append(("Configuration", str(settings.config_path), settings.config_path.exists()))
     rows.append(("Database", str(settings.database_path), True))
     rows.append(("SQLite FTS5", str(database.fts5_available), True))
     rows.append(("Git executable", shutil.which("git") or "not found", shutil.which("git") is not None))
-    rows.append(("Model routing", str(settings.model_routing_path), settings.model_routing_path.exists() or not settings.model_routing.enabled))
+    rows.append(("Local AI Runtime", str(settings.local_ai_runtime_path), settings.local_ai_runtime_path.exists() or not settings.local_ai_runtime.enabled))
     for project in settings.projects.values():
         rows.append((f"Project {project.project_id}", str(project.root), project.root.exists()))
     for status in asyncio.run(registry.list_status()):

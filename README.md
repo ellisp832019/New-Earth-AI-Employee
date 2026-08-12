@@ -32,6 +32,8 @@ GAIA v0.9 B4 adds human-reviewable work-package building, revisioning, approval 
 
 GAIA Governance Context v1 consumes NEOS governance snapshots and findings, preserves source facts, and adds separate GAIA interpretation, prioritisation, review questions, and work-package previews without mutating the NEOS source record.
 
+GAIA v0.10 begins the adoption of the canonical New Earth Local AI Runtime as the governed local execution boundary for AI workloads. GAIA continues to own evidence gathering, reasoning, workflow orchestration, prompts, approvals and employee-facing explanations, while the Runtime owns model execution, provider routing, embeddings and route provenance on loopback.
+
 Release notes and review materials for v0.2 live under [docs/releases](docs/releases/GAIA_V0_2_0_RELEASE_NOTES.md).
 Release notes for v0.3 live under [docs/releases](docs/releases/GAIA_V0_3_0_RELEASE_NOTES.md).
 Release notes for v0.4 live under [docs/releases](docs/releases/GAIA_V0_4_0_RELEASE_NOTES.md).

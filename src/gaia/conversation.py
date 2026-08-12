@@ -103,6 +103,12 @@ class AskResponse(BaseModel):
     structured: bool = True
     started_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     finished_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    runtime_provider: str | None = None
+    runtime_model: str | None = None
+    runtime_correlation_id: str | None = None
+    runtime_route_reason: str | None = None
+    runtime_route_fallback_used: bool | None = None
+    runtime_provenance: dict[str, Any] = Field(default_factory=dict)
 
 
 class AgentRunRecord(BaseModel):
