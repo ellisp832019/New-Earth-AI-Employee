@@ -24,6 +24,6 @@ The provider receives exactly one JSON request line and GAIA reads exactly one J
 
 The one-shot provider process has an approximately 1-second startup boundary, a 3-second request timeout, and a 5-second overall deadline. Retries are disabled. stdin, stdout, and stderr are closed in cleanup, and a still-running provider is terminated and then killed if necessary. Start, timeout, empty-response, malformed-response, and process failures become controlled GAIA client errors.
 
-Only `neos.health.read` is live-enabled. `neos.project.summary.read` remains recognized by the declarative client boundary but returns `MCP_OPERATION_NOT_ENABLED` if execution is attempted. No MCP write operation, approval workflow, network transport, URL endpoint, shell command, Command Centre change, Platform Core change, or NEOS change is present.
+Both declared read operations are now live-enabled through the same transport. `neos.project.summary.read` requires exactly one `project_id` argument matching the frozen NEOS project identifier shape; it is never interpreted as a path, URL, shell input, SQL fragment, or command. Provider truth such as partial, stale, unknown, unavailable, not-found, and error states is returned without fabrication. No MCP write operation, approval workflow, network transport, URL endpoint, shell command, Command Centre change, Platform Core change, or NEOS change is present.
 
-The next slice is MCP-02H: controlled GAIA MCP project-summary live invocation.
+The next slice is MCP-02I: GAIA MCP runtime policy enforcement.

@@ -31,7 +31,8 @@ _WRITE_LIKE_TOKENS = frozenset(
 )
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SHELL_TOKENS = re.compile(r"[\r\n;&|<>`]")
-_RECOGNIZED_STATUSES = frozenset({"success", "error", "rejected", "unknown", "unavailable", "partial", "not_implemented"})
+_PROJECT_ID = re.compile(r"^[a-z0-9][a-z0-9._-]+$")
+_RECOGNIZED_STATUSES = frozenset({"success", "error", "rejected", "unknown", "unavailable", "partial", "stale", "not_implemented"})
 
 
 class McpClientError(RuntimeError):
@@ -360,6 +361,16 @@ class McpClientRuntime:
             raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
         if not isinstance(correlation_id, str) or not correlation_id.strip() or not isinstance(operation_id, str) or not operation_id.strip():
             raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Correlation and operation IDs are required")
+        self._validate_operation(operation_id)
+        if arguments is not None and not isinstance(arguments, Mapping):
+            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Arguments must be an object")
+        request = McpClientRequest(correlation_id, operation_id, dict(arguments or {}))
+        self._validate_request_arguments(request)
+        return request
+
+    def _validate_operation(self, operation_id: str) -> None:
+        if self.bundle is None:
+            raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
         contract = self.bundle.operation_contract(operation_id)
         if operation_id not in EXPECTED_OPERATIONS or contract is None:
             if any(token in operation_id.lower().split(".") for token in _WRITE_LIKE_TOKENS):
@@ -371,13 +382,23 @@ class McpClientRuntime:
             raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Operation is not exposed by NEOS")
         if not self.bundle.operation_is_allowed(operation_id):
             raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Operation is not allowed for GAIA")
-        if arguments is not None and not isinstance(arguments, Mapping):
-            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Arguments must be an object")
-        return McpClientRequest(correlation_id, operation_id, dict(arguments or {}))
+
+    @staticmethod
+    def _validate_request_arguments(request: McpClientRequest) -> None:
+        if request.operation_id == "neos.health.read":
+            if request.arguments:
+                raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Health read accepts no arguments")
+            return
+        if request.operation_id == "neos.project.summary.read":
+            project_id = request.arguments.get("project_id")
+            if set(request.arguments) != {"project_id"} or not isinstance(project_id, str) or _PROJECT_ID.fullmatch(project_id) is None:
+                raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "A valid project_id is required")
 
     def execute(self, request: McpClientRequest) -> McpClientResponse:
         if self.bundle is None:
             raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
-        if request.operation_id != "neos.health.read":
-            raise McpClientError("MCP_OPERATION_NOT_ENABLED", "Only neos.health.read is live-enabled in MCP-02G")
+        if request.operation_id not in {"neos.health.read", "neos.project.summary.read"}:
+            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Operation is not live-enabled")
+        self._validate_operation(request.operation_id)
+        self._validate_request_arguments(request)
         return self.transport.execute(request)
