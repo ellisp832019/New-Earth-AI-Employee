@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import queue
 import re
+import subprocess
+import threading
+import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -27,6 +31,7 @@ _WRITE_LIKE_TOKENS = frozenset(
 )
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _SHELL_TOKENS = re.compile(r"[\r\n;&|<>`]")
+_RECOGNIZED_STATUSES = frozenset({"success", "error", "rejected", "unknown", "unavailable", "partial", "not_implemented"})
 
 
 class McpClientError(RuntimeError):
@@ -101,6 +106,8 @@ class McpClientResponse:
             raise McpClientError("MCP_CORRELATION_MISMATCH", "Response correlation does not match request")
         if operation_id != request.operation_id:
             raise McpClientError("MCP_CORRELATION_MISMATCH", "Response operation does not match request")
+        if status not in _RECOGNIZED_STATUSES:
+            raise McpClientError("MCP_RESPONSE_INVALID", "Response status is not recognized")
         error = value.get("error")
         if error is not None and not isinstance(error, dict):
             raise McpClientError("MCP_RESPONSE_INVALID", "Response error must be an object or null")
@@ -118,10 +125,101 @@ class McpClientResponse:
 
 
 class McpTransport(Protocol):
-    """Injectable future transport boundary; MCP-02F provides no live implementation."""
+    """Injectable transport boundary for deterministic tests and local stdio."""
 
     def execute(self, request: McpClientRequest) -> McpClientResponse:
         ...
+
+
+class McpStdioTransport:
+    """Run one trusted local provider command and close its process after one response."""
+
+    def __init__(self, config: McpClientConfig):
+        self.config = config
+
+    def execute(self, request: McpClientRequest) -> McpClientResponse:
+        executable = self.config.executable
+        if executable is None:
+            raise McpClientError("MCP_PROVIDER_NOT_CONFIGURED", "Provider executable is missing")
+        command = [executable, *self.config.arguments]
+        started_at = time.monotonic()
+        try:
+            process = subprocess.Popen(
+                command,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                shell=False,
+            )
+        except (OSError, ValueError) as exc:
+            raise McpClientError("MCP_PROVIDER_START_FAILED", "NEOS MCP provider could not be started") from exc
+
+        output: queue.Queue[str | BaseException] = queue.Queue(maxsize=1)
+
+        def read_response() -> None:
+            try:
+                if process.stdout is None:
+                    output.put(McpClientError("MCP_RESPONSE_INVALID", "Provider stdout is unavailable"))
+                    return
+                output.put(process.stdout.readline())
+            except BaseException as exc:  # noqa: BLE001 - marshal reader failure to caller
+                output.put(exc)
+
+        def drain_stderr() -> None:
+            if process.stderr is not None:
+                process.stderr.read(4096)
+
+        response_thread = threading.Thread(target=read_response, daemon=True)
+        stderr_thread = threading.Thread(target=drain_stderr, daemon=True)
+        response_thread.start()
+        stderr_thread.start()
+        try:
+            startup_elapsed = time.monotonic() - started_at
+            if startup_elapsed > self.config.startup_timeout_seconds or process.poll() is not None:
+                raise McpClientError("MCP_PROVIDER_START_FAILED", "NEOS MCP provider exited during startup")
+            if process.stdin is None:
+                raise McpClientError("MCP_PROVIDER_START_FAILED", "Provider stdin is unavailable")
+            try:
+                process.stdin.write(request.as_stdio_line())
+                process.stdin.flush()
+            except (OSError, ValueError) as exc:
+                raise McpClientError("MCP_PROVIDER_START_FAILED", "MCP request could not be sent") from exc
+            remaining = min(
+                self.config.request_timeout_seconds,
+                self.config.overall_deadline_seconds - (time.monotonic() - started_at),
+            )
+            if remaining <= 0:
+                raise McpClientError("MCP_REQUEST_TIMEOUT", "MCP overall deadline expired")
+            try:
+                line = output.get(timeout=remaining)
+            except queue.Empty as exc:
+                raise McpClientError("MCP_REQUEST_TIMEOUT", "NEOS MCP request timed out") from exc
+            if isinstance(line, BaseException):
+                if isinstance(line, McpClientError):
+                    raise line
+                raise McpClientError("MCP_RESPONSE_INVALID", "Provider response could not be read") from line
+            if not line:
+                raise McpClientError("MCP_RESPONSE_INVALID", "Provider returned an empty response")
+            return McpClientResponse.parse_stdio_line(line, request)
+        finally:
+            if process.stdin is not None:
+                process.stdin.close()
+            if process.poll() is None:
+                process.terminate()
+                try:
+                    process.wait(timeout=min(1.0, self.config.overall_deadline_seconds))
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+            if process.stdout is not None:
+                process.stdout.close()
+            if process.stderr is not None:
+                process.stderr.close()
+            response_thread.join(timeout=0.2)
+            stderr_thread.join(timeout=0.2)
 
 
 def _read_object(path: Path, code: str) -> dict[str, Any]:
@@ -244,11 +342,11 @@ class McpContractBundle:
 
 
 class McpClientRuntime:
-    """Bundle-backed MCP client skeleton. Live NEOS execution is deferred to MCP-02G."""
+    """Bundle-backed GAIA client with one-shot health-only live invocation."""
 
     def __init__(self, config: McpClientConfig, transport: McpTransport | None = None):
         self.config = config
-        self.transport = transport
+        self.transport = transport or McpStdioTransport(config)
         self.bundle: McpContractBundle | None = None
 
     def initialize(self) -> None:
@@ -278,4 +376,8 @@ class McpClientRuntime:
         return McpClientRequest(correlation_id, operation_id, dict(arguments or {}))
 
     def execute(self, request: McpClientRequest) -> McpClientResponse:
-        raise McpClientError("MCP_TRANSPORT_NOT_IMPLEMENTED", "Live NEOS MCP execution is deferred to MCP-02G")
+        if self.bundle is None:
+            raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
+        if request.operation_id != "neos.health.read":
+            raise McpClientError("MCP_OPERATION_NOT_ENABLED", "Only neos.health.read is live-enabled in MCP-02G")
+        return self.transport.execute(request)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +17,7 @@ from gaia.mcp.client import (
     McpClientError,
     McpClientResponse,
     McpClientRuntime,
+    McpTransport,
 )
 
 
@@ -54,8 +56,40 @@ def _bundle(tmp_path: Path, **changes: Any) -> Path:
     return root
 
 
-def _runtime(bundle: Path, **kwargs: Any) -> McpClientRuntime:
-    return McpClientRuntime(McpClientConfig(bundle, enabled=True, executable="neos", arguments=("--mcp-stdio",), **kwargs))
+def _runtime(bundle: Path, transport: McpTransport | None = None, **kwargs: Any) -> McpClientRuntime:
+    return McpClientRuntime(
+        McpClientConfig(bundle, enabled=True, executable="neos", arguments=("--mcp-stdio",), **kwargs),
+        transport=transport,
+    )
+
+
+class _FakeTransport:
+    def __init__(self, status: str = "success", result: Any = None, error: dict[str, Any] | None = None):
+        self.status = status
+        self.result = result
+        self.error = error
+        self.requests: list[Any] = []
+
+    def execute(self, request: Any) -> McpClientResponse:
+        self.requests.append(request)
+        return McpClientResponse(request.correlation_id, request.operation_id, self.status, self.result, self.error)
+
+
+def _provider_script(tmp_path: Path, response: str, *, delay: float = 0.0) -> Path:
+    script = tmp_path / "provider.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(
+        "import os\n"
+        "import sys\n"
+        "import time\n"
+        "sys.stderr.write('diagnostic only\\n')\n"
+        f"time.sleep({delay})\n"
+        "sys.stdin.readline()\n"
+        f"sys.stdout.write({response!r} + '\\n')\n"
+        "sys.stdout.flush()\n",
+        encoding="utf-8",
+    )
+    return script
 
 
 def test_disabled_by_default_and_explicit_enable(tmp_path: Path) -> None:
@@ -109,12 +143,84 @@ def test_response_parser_preserves_states_and_rejects_mismatch(tmp_path: Path) -
         McpClientResponse.parse({"status": "success"}, request)
 
 
-def test_transport_is_not_executed_and_safety_policy_is_explicit(tmp_path: Path) -> None:
-    runtime = _runtime(_bundle(tmp_path))
+def test_live_health_uses_fake_transport_and_preserves_request_and_health_truth(tmp_path: Path) -> None:
+    transport = _FakeTransport(result={"status": "degraded"})
+    runtime = _runtime(_bundle(tmp_path), transport=transport)
     runtime.initialize()
-    with pytest.raises(McpClientError, match="MCP_TRANSPORT_NOT_IMPLEMENTED"):
+    request = runtime.prepare_request("c1", "neos.health.read")
+    response = runtime.execute(request)
+    assert transport.requests[0].as_mapping() == {
+        "correlation_id": "c1",
+        "client_id": "gaia-mcp-client",
+        "operation_id": "neos.health.read",
+        "arguments": {},
+    }
+    assert response.result == {"status": "degraded"}
+
+
+@pytest.mark.parametrize("status", ["success", "unknown", "unavailable"])
+def test_health_states_are_preserved(tmp_path: Path, status: str) -> None:
+    runtime = _runtime(_bundle(tmp_path), transport=_FakeTransport(result={"status": status}))
+    runtime.initialize()
+    response = runtime.execute(runtime.prepare_request("c1", "neos.health.read"))
+    assert response.result == {"status": status}
+
+
+def test_controlled_neos_error_is_preserved_and_summary_is_live_disabled(tmp_path: Path) -> None:
+    runtime = _runtime(_bundle(tmp_path), transport=_FakeTransport(status="error", error={"code": "HEALTH_READ_FAILED"}))
+    runtime.initialize()
+    response = runtime.execute(runtime.prepare_request("c1", "neos.health.read"))
+    assert response.status == "error"
+    assert response.error == {"code": "HEALTH_READ_FAILED"}
+    with pytest.raises(McpClientError, match="MCP_OPERATION_NOT_ENABLED"):
+        runtime.execute(runtime.prepare_request("c2", "neos.project.summary.read"))
+
+
+def test_stdio_transport_sends_one_request_uses_stderr_only_as_diagnostic_and_cleans_up(tmp_path: Path) -> None:
+    response = json.dumps({"correlation_id": "c1", "operation_id": "neos.health.read", "status": "success", "result": {"status": "healthy"}})
+    script = _provider_script(tmp_path, response)
+    config = McpClientConfig(_bundle(tmp_path / "bundle"), enabled=True, executable=sys.executable, arguments=(str(script),))
+    runtime = McpClientRuntime(config)
+    runtime.initialize()
+    result = runtime.execute(runtime.prepare_request("c1", "neos.health.read"))
+    assert result.result == {"status": "healthy"}
+
+
+def test_stdio_failures_are_controlled_and_time_bounded(tmp_path: Path) -> None:
+    missing = McpClientConfig(_bundle(tmp_path / "missing"), enabled=True, executable=str(tmp_path / "missing.exe"))
+    runtime = McpClientRuntime(missing)
+    runtime.initialize()
+    with pytest.raises(McpClientError, match="MCP_PROVIDER_START_FAILED"):
         runtime.execute(runtime.prepare_request("c1", "neos.health.read"))
+
+    timeout_script = _provider_script(tmp_path / "timeout", json.dumps({}), delay=1.0)
+    timeout = McpClientConfig(
+        _bundle(tmp_path / "timeout-bundle"),
+        enabled=True,
+        executable=sys.executable,
+        arguments=(str(timeout_script),),
+        request_timeout_seconds=0.05,
+        overall_deadline_seconds=0.1,
+    )
+    timeout_runtime = McpClientRuntime(timeout)
+    timeout_runtime.initialize()
+    with pytest.raises(McpClientError, match="MCP_REQUEST_TIMEOUT"):
+        timeout_runtime.execute(timeout_runtime.prepare_request("c2", "neos.health.read"))
+
+
+def test_malformed_and_empty_stdio_responses_are_rejected(tmp_path: Path) -> None:
+    for index, response in enumerate(("not-json", "")):
+        script = _provider_script(tmp_path / f"response-{index}", response)
+        config = McpClientConfig(_bundle(tmp_path / f"bundle-{index}"), enabled=True, executable=sys.executable, arguments=(str(script),))
+        runtime = McpClientRuntime(config)
+        runtime.initialize()
+        with pytest.raises(McpClientError, match="MCP_RESPONSE_INVALID"):
+            runtime.execute(runtime.prepare_request(f"c{index}", "neos.health.read"))
+
+
+def test_transport_safety_and_no_retries_are_explicit(tmp_path: Path) -> None:
     with pytest.raises(McpClientError, match="MCP_PROVIDER_NOT_CONFIGURED"):
         McpClientRuntime(McpClientConfig(_bundle(tmp_path / "bad"), enabled=True)).initialize()
     with pytest.raises(McpClientError, match="MCP_PROVIDER_NOT_CONFIGURED"):
         McpClientRuntime(McpClientConfig(_bundle(tmp_path / "retry"), enabled=True, executable="neos", retries=True)).initialize()
+    assert McpClientConfig(_bundle(tmp_path / "timeouts"), executable="neos").overall_deadline_seconds == 5.0

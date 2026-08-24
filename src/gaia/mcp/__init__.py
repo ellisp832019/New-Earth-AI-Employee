@@ -12,6 +12,7 @@ from .client import (
     McpClientResponse,
     McpClientRuntime,
     McpContractBundle,
+    McpStdioTransport,
     McpTransport,
 )
 
@@ -27,5 +28,6 @@ __all__ = [
     "McpClientResponse",
     "McpClientRuntime",
     "McpContractBundle",
+    "McpStdioTransport",
     "McpTransport",
 ]
