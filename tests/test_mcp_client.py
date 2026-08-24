@@ -34,7 +34,9 @@ def _bundle(tmp_path: Path, **changes: Any) -> Path:
     files["contracts/identities/gaia.yaml"].update(changes.pop("gaia", {}))
     files["contracts/identities/neos.yaml"].update(changes.pop("neos", {}))
     files["contracts/tools/health.yaml"].update(changes.pop("health", {}))
+    files["contracts/tools/summary.yaml"].update(changes.pop("summary", {}))
     files["contracts/manifests/neos.yaml"].update(changes.pop("manifest", {}))
+    files["contracts/policies/allow.yaml"].update(changes.pop("policy", {}))
     for relative, value in files.items():
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -166,14 +168,57 @@ def test_health_states_are_preserved(tmp_path: Path, status: str) -> None:
     assert response.result == {"status": status}
 
 
-def test_controlled_neos_error_is_preserved_and_summary_is_live_disabled(tmp_path: Path) -> None:
-    runtime = _runtime(_bundle(tmp_path), transport=_FakeTransport(status="error", error={"code": "HEALTH_READ_FAILED"}))
+def test_controlled_neos_error_is_preserved_for_health_and_summary(tmp_path: Path) -> None:
+    transport = _FakeTransport(status="error", error={"code": "HEALTH_READ_FAILED"})
+    runtime = _runtime(_bundle(tmp_path), transport=transport)
     runtime.initialize()
     response = runtime.execute(runtime.prepare_request("c1", "neos.health.read"))
     assert response.status == "error"
     assert response.error == {"code": "HEALTH_READ_FAILED"}
-    with pytest.raises(McpClientError, match="MCP_OPERATION_NOT_ENABLED"):
-        runtime.execute(runtime.prepare_request("c2", "neos.project.summary.read"))
+    summary = runtime.prepare_request("c2", "neos.project.summary.read", {"project_id": "demo"})
+    assert runtime.execute(summary).error == {"code": "HEALTH_READ_FAILED"}
+
+
+def test_project_summary_requires_exact_valid_project_id(tmp_path: Path) -> None:
+    runtime = _runtime(_bundle(tmp_path), transport=_FakeTransport(result={"status": "success", "project_id": "demo"}))
+    runtime.initialize()
+    for arguments in (None, {}, {"project_id": ""}, {"project_id": "../secret"}, {"project_id": "demo", "extra": "x"}, {"project_id": 1}):
+        with pytest.raises(McpClientError, match="MCP_OPERATION_NOT_ALLOWED"):
+            runtime.prepare_request("c1", "neos.project.summary.read", arguments)
+    response = runtime.execute(runtime.prepare_request("c2", "neos.project.summary.read", {"project_id": "demo"}))
+    assert response.result == {"status": "success", "project_id": "demo"}
+
+
+def test_project_summary_requires_declaration_exposure_and_allowlist(tmp_path: Path) -> None:
+    for index, changes in enumerate((
+        {"summary": {"id": "neos.project.summary.other"}},
+        {"manifest": {"tool_ids": ["neos.health.read"]}},
+        {"policy": {"tool_ids": ["neos.health.read"]}},
+    )):
+        runtime = _runtime(_bundle(tmp_path / str(index), **changes), transport=_FakeTransport())
+        runtime.initialize()
+        with pytest.raises(McpClientError, match="MCP_OPERATION_NOT_ALLOWED"):
+            runtime.prepare_request("c1", "neos.project.summary.read", {"project_id": "demo"})
+
+
+@pytest.mark.parametrize("status", ["partial", "stale", "unknown", "unavailable"])
+def test_project_summary_truth_states_are_preserved(tmp_path: Path, status: str) -> None:
+    transport = _FakeTransport(status=status, result={"status": status})
+    runtime = _runtime(_bundle(tmp_path), transport=transport)
+    runtime.initialize()
+    response = runtime.execute(runtime.prepare_request("c1", "neos.project.summary.read", {"project_id": "demo"}))
+    assert response.status == status
+    assert response.result == {"status": status}
+
+
+def test_unknown_project_is_controlled_and_not_empty_success(tmp_path: Path) -> None:
+    transport = _FakeTransport(status="unknown", error={"code": "PROJECT_NOT_FOUND"})
+    runtime = _runtime(_bundle(tmp_path), transport=transport)
+    runtime.initialize()
+    response = runtime.execute(runtime.prepare_request("c1", "neos.project.summary.read", {"project_id": "missing"}))
+    assert response.status == "unknown"
+    assert response.result is None
+    assert response.error == {"code": "PROJECT_NOT_FOUND"}
 
 
 def test_stdio_transport_sends_one_request_uses_stderr_only_as_diagnostic_and_cleans_up(tmp_path: Path) -> None:
