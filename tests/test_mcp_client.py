@@ -15,6 +15,7 @@ from gaia.mcp.client import (
     EXPECTED_BUNDLE_ID,
     McpClientConfig,
     McpClientError,
+    McpClientRequest,
     McpClientResponse,
     McpClientRuntime,
     McpTransport,
@@ -123,7 +124,7 @@ def test_operations_are_declared_exposed_and_allowed(tmp_path: Path) -> None:
     summary = runtime.prepare_request("c2", "neos.project.summary.read", {"project_id": "demo"})
     assert health.as_mapping()["correlation_id"] == "c1"
     assert summary.as_mapping()["arguments"] == {"project_id": "demo"}
-    with pytest.raises(McpClientError, match="MCP_OPERATION_NOT_ALLOWED"):
+    with pytest.raises(McpClientError, match="MCP_OPERATION_UNSUPPORTED"):
         runtime.prepare_request("c3", "neos.unknown.read")
     with pytest.raises(McpClientError, match="MCP_WRITE_OPERATION_REJECTED"):
         runtime.prepare_request("c4", "neos.project.delete")
@@ -183,7 +184,7 @@ def test_project_summary_requires_exact_valid_project_id(tmp_path: Path) -> None
     runtime = _runtime(_bundle(tmp_path), transport=_FakeTransport(result={"status": "success", "project_id": "demo"}))
     runtime.initialize()
     for arguments in (None, {}, {"project_id": ""}, {"project_id": "../secret"}, {"project_id": "demo", "extra": "x"}, {"project_id": 1}):
-        with pytest.raises(McpClientError, match="MCP_OPERATION_NOT_ALLOWED"):
+        with pytest.raises(McpClientError, match="MCP_ARGUMENTS_INVALID"):
             runtime.prepare_request("c1", "neos.project.summary.read", arguments)
     response = runtime.execute(runtime.prepare_request("c2", "neos.project.summary.read", {"project_id": "demo"}))
     assert response.result == {"status": "success", "project_id": "demo"}
@@ -197,7 +198,7 @@ def test_project_summary_requires_declaration_exposure_and_allowlist(tmp_path: P
     )):
         runtime = _runtime(_bundle(tmp_path / str(index), **changes), transport=_FakeTransport())
         runtime.initialize()
-        with pytest.raises(McpClientError, match="MCP_OPERATION_NOT_ALLOWED"):
+        with pytest.raises(McpClientError, match="MCP_OPERATION_UNDECLARED|MCP_OPERATION_NOT_EXPOSED|MCP_OPERATION_NOT_ALLOWED"):
             runtime.prepare_request("c1", "neos.project.summary.read", {"project_id": "demo"})
 
 
@@ -219,6 +220,38 @@ def test_unknown_project_is_controlled_and_not_empty_success(tmp_path: Path) -> 
     assert response.status == "unknown"
     assert response.result is None
     assert response.error == {"code": "PROJECT_NOT_FOUND"}
+
+
+def test_policy_decision_is_deterministic_and_denied_requests_launch_no_provider(tmp_path: Path) -> None:
+    transport = _FakeTransport()
+    runtime = _runtime(_bundle(tmp_path), transport=transport)
+    runtime.initialize()
+    denied = McpClientRequest("c1", "neos.unknown.read", {})
+    decision = runtime.evaluate_policy(denied)
+    assert decision.decision == "DENY"
+    assert decision.reason_code == "MCP_OPERATION_UNSUPPORTED"
+    with pytest.raises(McpClientError, match="MCP_OPERATION_UNSUPPORTED"):
+        runtime.execute(denied)
+    with pytest.raises(McpClientError, match="MCP_ARGUMENTS_INVALID"):
+        runtime.execute(McpClientRequest("c2", "neos.project.summary.read", {"project_id": "bad/path"}))
+    assert transport.requests == []
+
+
+def test_tampered_write_contract_is_denied_semantically(tmp_path: Path) -> None:
+    runtime = _runtime(_bundle(tmp_path, summary={"mode": "write"}), transport=_FakeTransport())
+    runtime.initialize()
+    request = McpClientRequest("c1", "neos.project.summary.read", {"project_id": "demo"})
+    decision = runtime.evaluate_policy(request)
+    assert decision.decision == "DENY"
+    assert decision.reason_code == "MCP_OPERATION_NOT_READ_ONLY"
+
+
+def test_wrong_request_client_cannot_self_authorize(tmp_path: Path) -> None:
+    runtime = _runtime(_bundle(tmp_path), transport=_FakeTransport())
+    runtime.initialize()
+    decision = runtime.evaluate_policy(McpClientRequest("c1", "neos.health.read", {}, client_id="attacker"))
+    assert decision.decision == "DENY"
+    assert decision.reason_code == "MCP_CLIENT_NOT_AUTHORIZED"
 
 
 def test_stdio_transport_sends_one_request_uses_stderr_only_as_diagnostic_and_cleans_up(tmp_path: Path) -> None:

@@ -10,7 +10,7 @@ import time
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 import yaml
 
@@ -41,6 +41,20 @@ class McpClientError(RuntimeError):
     def __init__(self, code: str, message: str):
         super().__init__(f"{code}: {message}")
         self.code = code
+
+
+@dataclass(frozen=True)
+class McpPolicyDecision:
+    decision: Literal["ALLOW", "DENY"]
+    operation_id: str
+    reason_code: str
+    client_id: str
+    server_id: str
+    correlation_id: str | None = None
+
+    @property
+    def allowed(self) -> bool:
+        return self.decision == "ALLOW"
 
 
 @dataclass(frozen=True)
@@ -343,7 +357,7 @@ class McpContractBundle:
 
 
 class McpClientRuntime:
-    """Bundle-backed GAIA client with one-shot health-only live invocation."""
+    """Bundle-backed GAIA client with a central deny-by-default policy gate."""
 
     def __init__(self, config: McpClientConfig, transport: McpTransport | None = None):
         self.config = config
@@ -360,45 +374,59 @@ class McpClientRuntime:
         if self.bundle is None:
             raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
         if not isinstance(correlation_id, str) or not correlation_id.strip() or not isinstance(operation_id, str) or not operation_id.strip():
-            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Correlation and operation IDs are required")
-        self._validate_operation(operation_id)
+            raise McpClientError("MCP_ARGUMENTS_INVALID", "Correlation and operation IDs are required")
         if arguments is not None and not isinstance(arguments, Mapping):
-            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Arguments must be an object")
+            raise McpClientError("MCP_ARGUMENTS_INVALID", "Arguments must be an object")
         request = McpClientRequest(correlation_id, operation_id, dict(arguments or {}))
-        self._validate_request_arguments(request)
+        self._raise_if_denied(self.evaluate_policy(request))
         return request
 
-    def _validate_operation(self, operation_id: str) -> None:
-        if self.bundle is None:
-            raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
-        contract = self.bundle.operation_contract(operation_id)
-        if operation_id not in EXPECTED_OPERATIONS or contract is None:
-            if any(token in operation_id.lower().split(".") for token in _WRITE_LIKE_TOKENS):
-                raise McpClientError("MCP_WRITE_OPERATION_REJECTED", "Write-like operations are forbidden")
-            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Operation is not authorized")
-        if contract.get("read_only") is not True or contract.get("side_effects") is not False:
-            raise McpClientError("MCP_WRITE_OPERATION_REJECTED", "Operation is not read-only")
-        if not self.bundle.operation_is_exposed(operation_id):
-            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Operation is not exposed by NEOS")
-        if not self.bundle.operation_is_allowed(operation_id):
-            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Operation is not allowed for GAIA")
-
     @staticmethod
-    def _validate_request_arguments(request: McpClientRequest) -> None:
+    def _arguments_are_valid(request: McpClientRequest) -> bool:
         if request.operation_id == "neos.health.read":
-            if request.arguments:
-                raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Health read accepts no arguments")
-            return
+            return not request.arguments
         if request.operation_id == "neos.project.summary.read":
             project_id = request.arguments.get("project_id")
-            if set(request.arguments) != {"project_id"} or not isinstance(project_id, str) or _PROJECT_ID.fullmatch(project_id) is None:
-                raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "A valid project_id is required")
+            return set(request.arguments) == {"project_id"} and isinstance(project_id, str) and _PROJECT_ID.fullmatch(project_id) is not None
+        return False
+
+    @staticmethod
+    def _contract_is_read_only(contract: Mapping[str, Any]) -> bool:
+        if contract.get("read_only") is not True or contract.get("side_effects") is not False:
+            return False
+        mode = contract.get("mode", contract.get("access_mode"))
+        return mode in {None, "read_only"}
+
+    def evaluate_policy(self, request: McpClientRequest) -> McpPolicyDecision:
+        """Return the complete pre-launch decision without invoking the provider."""
+        client_id = request.client_id
+        if not self.config.enabled or self.bundle is None:
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_CLIENT_DISABLED", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        if client_id != EXPECTED_CLIENT_ID:
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_CLIENT_NOT_AUTHORIZED", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        if request.operation_id not in EXPECTED_OPERATIONS:
+            reason = "MCP_WRITE_OPERATION_REJECTED" if any(token in request.operation_id.lower().split(".") for token in _WRITE_LIKE_TOKENS) else "MCP_OPERATION_UNSUPPORTED"
+            return McpPolicyDecision("DENY", request.operation_id, reason, client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        contract = self.bundle.operation_contract(request.operation_id)
+        if contract is None:
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_OPERATION_UNDECLARED", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        if not self._contract_is_read_only(contract):
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_OPERATION_NOT_READ_ONLY", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        if any(token in request.operation_id.lower().split(".") for token in _WRITE_LIKE_TOKENS):
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_WRITE_OPERATION_REJECTED", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        if not self.bundle.operation_is_exposed(request.operation_id):
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_OPERATION_NOT_EXPOSED", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        if not self.bundle.operation_is_allowed(request.operation_id):
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_OPERATION_NOT_ALLOWED", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        if not self._arguments_are_valid(request):
+            return McpPolicyDecision("DENY", request.operation_id, "MCP_ARGUMENTS_INVALID", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+        return McpPolicyDecision("ALLOW", request.operation_id, "MCP_OPERATION_ALLOWED", client_id, EXPECTED_SERVER_ID, request.correlation_id)
+
+    @staticmethod
+    def _raise_if_denied(decision: McpPolicyDecision) -> None:
+        if not decision.allowed:
+            raise McpClientError(decision.reason_code, f"MCP policy denied {decision.operation_id}")
 
     def execute(self, request: McpClientRequest) -> McpClientResponse:
-        if self.bundle is None:
-            raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
-        if request.operation_id not in {"neos.health.read", "neos.project.summary.read"}:
-            raise McpClientError("MCP_OPERATION_NOT_ALLOWED", "Operation is not live-enabled")
-        self._validate_operation(request.operation_id)
-        self._validate_request_arguments(request)
+        self._raise_if_denied(self.evaluate_policy(request))
         return self.transport.execute(request)
