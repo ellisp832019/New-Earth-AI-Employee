@@ -30,4 +30,10 @@ Both declared read operations are now live-enabled through the same transport. `
 
 Every request passes one deterministic deny-by-default policy decision before transport launch. The decision requires the enabled client, verified bundle and baseline, canonical GAIA and NEOS identities, declared operation, canonical NEOS exposure, read-only semantics, bundle-loaded GAIA permission, supported operation, and operation-specific arguments. A denied request returns a controlled reason code and launches zero provider processes. GAIA does not self-authorize or self-approve; Platform Core remains the policy authority, and no GAIA policy file or audit database is created.
 
-The next slice is MCP-02J: GAIA MCP invocation and correlation audit records.
+## Invocation Records
+
+Each prepared denial and each executed allowed request creates an in-memory `McpInvocationRecord`. `correlation_id` is the primary end-to-end trace key; `record_id` is kept equal to it rather than introducing a second trace identity. Records preserve the ALLOW or DENY decision, policy reason, operation, provider-started state, invocation/result status, controlled error code, UTC timestamps, and monotonic duration.
+
+Records store only argument names and count, never argument values, prompts, secrets, credentials, environment variables, project contents, or raw stderr. A bounded record sink may be injected, but there is no audit database, event store, remote telemetry, or persistence dependency. Denials are recorded before transport launch; provider start failures and timeouts remain ALLOW policy decisions with controlled failure outcomes.
+
+The next slice is MCP-02K: Command Centre MCP runtime status.

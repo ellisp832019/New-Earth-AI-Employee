@@ -7,8 +7,9 @@ import re
 import subprocess
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, Protocol
 
@@ -55,6 +56,46 @@ class McpPolicyDecision:
     @property
     def allowed(self) -> bool:
         return self.decision == "ALLOW"
+
+
+@dataclass(frozen=True)
+class McpInvocationRecord:
+    record_id: str
+    correlation_id: str
+    operation_id: str
+    client_id: str
+    server_id: str
+    decision: Literal["ALLOW", "DENY"]
+    decision_reason: str
+    invocation_status: str
+    started_at: datetime
+    completed_at: datetime
+    duration_ms: float
+    result_status: str | None
+    error_code: str | None
+    provider_started: bool
+    argument_names: tuple[str, ...]
+    argument_count: int
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "record_id": self.record_id,
+            "correlation_id": self.correlation_id,
+            "operation_id": self.operation_id,
+            "client_id": self.client_id,
+            "server_id": self.server_id,
+            "decision": self.decision,
+            "decision_reason": self.decision_reason,
+            "invocation_status": self.invocation_status,
+            "started_at": self.started_at.isoformat(),
+            "completed_at": self.completed_at.isoformat(),
+            "duration_ms": self.duration_ms,
+            "result_status": self.result_status,
+            "error_code": self.error_code,
+            "provider_started": self.provider_started,
+            "argument_names": list(self.argument_names),
+            "argument_count": self.argument_count,
+        }
 
 
 @dataclass(frozen=True)
@@ -120,7 +161,7 @@ class McpClientResponse:
         if correlation_id != request.correlation_id:
             raise McpClientError("MCP_CORRELATION_MISMATCH", "Response correlation does not match request")
         if operation_id != request.operation_id:
-            raise McpClientError("MCP_CORRELATION_MISMATCH", "Response operation does not match request")
+            raise McpClientError("MCP_OPERATION_MISMATCH", "Response operation does not match request")
         if status not in _RECOGNIZED_STATUSES:
             raise McpClientError("MCP_RESPONSE_INVALID", "Response status is not recognized")
         error = value.get("error")
@@ -151,8 +192,10 @@ class McpStdioTransport:
 
     def __init__(self, config: McpClientConfig):
         self.config = config
+        self.last_provider_started = False
 
     def execute(self, request: McpClientRequest) -> McpClientResponse:
+        self.last_provider_started = False
         executable = self.config.executable
         if executable is None:
             raise McpClientError("MCP_PROVIDER_NOT_CONFIGURED", "Provider executable is missing")
@@ -171,6 +214,7 @@ class McpStdioTransport:
             )
         except (OSError, ValueError) as exc:
             raise McpClientError("MCP_PROVIDER_START_FAILED", "NEOS MCP provider could not be started") from exc
+        self.last_provider_started = True
 
         output: queue.Queue[str | BaseException] = queue.Queue(maxsize=1)
 
@@ -359,10 +403,54 @@ class McpContractBundle:
 class McpClientRuntime:
     """Bundle-backed GAIA client with a central deny-by-default policy gate."""
 
-    def __init__(self, config: McpClientConfig, transport: McpTransport | None = None):
+    def __init__(self, config: McpClientConfig, transport: McpTransport | None = None, record_sink: Callable[[McpInvocationRecord], None] | None = None):
         self.config = config
         self.transport = transport or McpStdioTransport(config)
+        self.record_sink = record_sink
+        self._records: list[McpInvocationRecord] = []
         self.bundle: McpContractBundle | None = None
+
+    @property
+    def invocation_records(self) -> tuple[McpInvocationRecord, ...]:
+        return tuple(self._records)
+
+    def _record(
+        self,
+        request: McpClientRequest,
+        decision: McpPolicyDecision,
+        invocation_status: str,
+        started_at: datetime,
+        monotonic_started: float,
+        result_status: str | None,
+        error_code: str | None,
+        provider_started: bool,
+    ) -> McpInvocationRecord:
+        completed_at = datetime.now(UTC)
+        record = McpInvocationRecord(
+            record_id=request.correlation_id,
+            correlation_id=request.correlation_id,
+            operation_id=request.operation_id,
+            client_id=request.client_id,
+            server_id=EXPECTED_SERVER_ID,
+            decision=decision.decision,
+            decision_reason=decision.reason_code,
+            invocation_status=invocation_status,
+            started_at=started_at,
+            completed_at=completed_at,
+            duration_ms=max(0.0, (time.monotonic() - monotonic_started) * 1000),
+            result_status=result_status,
+            error_code=error_code,
+            provider_started=provider_started,
+            argument_names=tuple(sorted(request.arguments)),
+            argument_count=len(request.arguments),
+        )
+        self._records.append(record)
+        if self.record_sink is not None:
+            self.record_sink(record)
+        return record
+
+    def _record_denial(self, request: McpClientRequest, decision: McpPolicyDecision, started_at: datetime, monotonic_started: float) -> None:
+        self._record(request, decision, "denied", started_at, monotonic_started, None, decision.reason_code, False)
 
     def initialize(self) -> None:
         if not self.config.enabled:
@@ -372,13 +460,23 @@ class McpClientRuntime:
 
     def prepare_request(self, correlation_id: str, operation_id: str, arguments: Mapping[str, Any] | None = None) -> McpClientRequest:
         if self.bundle is None:
-            raise McpClientError("MCP_CLIENT_DISABLED", "GAIA MCP client is not initialized")
+            request = McpClientRequest(correlation_id if isinstance(correlation_id, str) else "", operation_id if isinstance(operation_id, str) else "", dict(arguments) if isinstance(arguments, Mapping) else {})
+            started_at = datetime.now(UTC)
+            monotonic_started = time.monotonic()
+            decision = self.evaluate_policy(request)
+            self._record_denial(request, decision, started_at, monotonic_started)
+            self._raise_if_denied(decision)
         if not isinstance(correlation_id, str) or not correlation_id.strip() or not isinstance(operation_id, str) or not operation_id.strip():
             raise McpClientError("MCP_ARGUMENTS_INVALID", "Correlation and operation IDs are required")
         if arguments is not None and not isinstance(arguments, Mapping):
             raise McpClientError("MCP_ARGUMENTS_INVALID", "Arguments must be an object")
         request = McpClientRequest(correlation_id, operation_id, dict(arguments or {}))
-        self._raise_if_denied(self.evaluate_policy(request))
+        started_at = datetime.now(UTC)
+        monotonic_started = time.monotonic()
+        decision = self.evaluate_policy(request)
+        if not decision.allowed:
+            self._record_denial(request, decision, started_at, monotonic_started)
+        self._raise_if_denied(decision)
         return request
 
     @staticmethod
@@ -428,5 +526,18 @@ class McpClientRuntime:
             raise McpClientError(decision.reason_code, f"MCP policy denied {decision.operation_id}")
 
     def execute(self, request: McpClientRequest) -> McpClientResponse:
-        self._raise_if_denied(self.evaluate_policy(request))
-        return self.transport.execute(request)
+        started_at = datetime.now(UTC)
+        monotonic_started = time.monotonic()
+        decision = self.evaluate_policy(request)
+        if not decision.allowed:
+            self._record_denial(request, decision, started_at, monotonic_started)
+            self._raise_if_denied(decision)
+        try:
+            response = self.transport.execute(request)
+        except McpClientError as exc:
+            provider_started = bool(getattr(self.transport, "last_provider_started", exc.code not in {"MCP_PROVIDER_START_FAILED", "MCP_PROVIDER_NOT_CONFIGURED"}))
+            self._record(request, decision, "timeout" if exc.code == "MCP_REQUEST_TIMEOUT" else "failed", started_at, monotonic_started, None, exc.code, provider_started)
+            raise
+        error_code = response.error.get("code") if response.error and isinstance(response.error.get("code"), str) else None
+        self._record(request, decision, "completed", started_at, monotonic_started, response.status, error_code, bool(getattr(self.transport, "last_provider_started", True)))
+        return response
