@@ -59,10 +59,11 @@ def _bundle(tmp_path: Path, **changes: Any) -> Path:
     return root
 
 
-def _runtime(bundle: Path, transport: McpTransport | None = None, **kwargs: Any) -> McpClientRuntime:
+def _runtime(bundle: Path, transport: McpTransport | None = None, record_sink: Any = None, **kwargs: Any) -> McpClientRuntime:
     return McpClientRuntime(
         McpClientConfig(bundle, enabled=True, executable="neos", arguments=("--mcp-stdio",), **kwargs),
         transport=transport,
+        record_sink=record_sink,
     )
 
 
@@ -76,6 +77,16 @@ class _FakeTransport:
     def execute(self, request: Any) -> McpClientResponse:
         self.requests.append(request)
         return McpClientResponse(request.correlation_id, request.operation_id, self.status, self.result, self.error)
+
+
+class _ErrorTransport:
+    def __init__(self, code: str):
+        self.code = code
+        self.requests: list[Any] = []
+
+    def execute(self, request: Any) -> McpClientResponse:
+        self.requests.append(request)
+        raise McpClientError(self.code, "controlled test failure")
 
 
 def _provider_script(tmp_path: Path, response: str, *, delay: float = 0.0) -> Path:
@@ -137,7 +148,7 @@ def test_response_parser_preserves_states_and_rejects_mismatch(tmp_path: Path) -
     response = json.loads('{"correlation_id":"c1","operation_id":"neos.health.read","status":"partial","result":{"x":1},"error":{"code":"E"}}')
     parsed = McpClientResponse.parse(response, request)
     assert parsed and parsed.status == "partial" and parsed.error == {"code": "E"}
-    for key, code in (("correlation_id", "MCP_CORRELATION_MISMATCH"), ("operation_id", "MCP_CORRELATION_MISMATCH")):
+    for key, code in (("correlation_id", "MCP_CORRELATION_MISMATCH"), ("operation_id", "MCP_OPERATION_MISMATCH")):
         bad = response.copy()
         bad[key] = "wrong"
         with pytest.raises(McpClientError, match=code):
@@ -220,6 +231,76 @@ def test_unknown_project_is_controlled_and_not_empty_success(tmp_path: Path) -> 
     assert response.status == "unknown"
     assert response.result is None
     assert response.error == {"code": "PROJECT_NOT_FOUND"}
+
+
+def test_allowed_invocations_record_minimal_utc_metadata(tmp_path: Path) -> None:
+    runtime = _runtime(_bundle(tmp_path), transport=_FakeTransport(result={"status": "success"}))
+    runtime.initialize()
+    health = runtime.execute(runtime.prepare_request("health-corr", "neos.health.read"))
+    summary = runtime.execute(runtime.prepare_request("summary-corr", "neos.project.summary.read", {"project_id": "demo"}))
+    assert health.status == "success"
+    assert summary.status == "success"
+    records = runtime.invocation_records
+    assert len(records) == 2
+    assert records[0].correlation_id == "health-corr"
+    assert records[0].operation_id == "neos.health.read"
+    assert records[0].decision == "ALLOW"
+    assert records[0].provider_started is True
+    assert records[0].result_status == "success"
+    assert records[0].duration_ms >= 0
+    assert records[0].started_at.tzinfo is not None and records[0].started_at.utcoffset().total_seconds() == 0
+    assert records[1].argument_names == ("project_id",)
+    assert records[1].argument_count == 1
+    assert "demo" not in str(records[1].as_mapping())
+
+
+def test_denied_request_is_recorded_without_provider_launch(tmp_path: Path) -> None:
+    transport = _FakeTransport()
+    runtime = _runtime(_bundle(tmp_path), transport=transport)
+    runtime.initialize()
+    with pytest.raises(McpClientError, match="MCP_OPERATION_UNSUPPORTED"):
+        runtime.prepare_request("denied-corr", "neos.unknown.read")
+    record = runtime.invocation_records[-1]
+    assert record.decision == "DENY"
+    assert record.decision_reason == "MCP_OPERATION_UNSUPPORTED"
+    assert record.provider_started is False
+    assert transport.requests == []
+
+
+def test_transport_failures_are_recorded_without_changing_allow_decision(tmp_path: Path) -> None:
+    for code, status, started in (
+        ("MCP_PROVIDER_START_FAILED", "failed", False),
+        ("MCP_REQUEST_TIMEOUT", "timeout", True),
+        ("MCP_RESPONSE_INVALID", "failed", True),
+        ("MCP_CORRELATION_MISMATCH", "failed", True),
+        ("MCP_OPERATION_MISMATCH", "failed", True),
+    ):
+        runtime = _runtime(_bundle(tmp_path / code), transport=_ErrorTransport(code))
+        runtime.initialize()
+        with pytest.raises(McpClientError, match=code):
+            runtime.execute(runtime.prepare_request("failure-corr", "neos.health.read"))
+        record = runtime.invocation_records[-1]
+        assert record.decision == "ALLOW"
+        assert record.invocation_status == status
+        assert record.error_code == code
+        assert record.provider_started is started
+
+
+def test_controlled_provider_error_is_recorded_and_sink_is_bounded(tmp_path: Path) -> None:
+    captured: list[Any] = []
+    runtime = _runtime(
+        _bundle(tmp_path),
+        transport=_FakeTransport(status="unknown", error={"code": "PROJECT_NOT_FOUND"}),
+        record_sink=captured.append,
+    )
+    runtime.initialize()
+    runtime.execute(runtime.prepare_request("error-corr", "neos.project.summary.read", {"project_id": "missing"}))
+    record = runtime.invocation_records[-1]
+    assert record.result_status == "unknown"
+    assert record.error_code == "PROJECT_NOT_FOUND"
+    assert captured == [record]
+    assert "PROJECT_NOT_FOUND" in str(record.as_mapping())
+    assert "missing" not in str(record.as_mapping())
 
 
 def test_policy_decision_is_deterministic_and_denied_requests_launch_no_provider(tmp_path: Path) -> None:
