@@ -1,6 +1,6 @@
-# GAIA MCP Client Runtime Skeleton
+# GAIA MCP Client Runtime
 
-MCP-02F establishes the GAIA-owned, local-only consumer boundary for the frozen Platform Core MCP contract bundle. Platform Core owns identities, contracts, and policy declarations; NEOS owns the read-only provider; GAIA consumes the declarations. This slice does not change either repository and does not launch NEOS.
+MCP-02F established the GAIA-owned, local-only consumer boundary for the frozen Platform Core MCP contract bundle. MCP-02G adds the first bounded live read: `neos.health.read`. Platform Core owns identities, contracts, and policy declarations; NEOS owns the read-only provider; GAIA consumes the declarations. This slice changes GAIA only.
 
 ## Boundary
 
@@ -14,4 +14,16 @@ The client is disabled by default and requires explicit enablement. Enablement d
 
 Provider configuration is structured as an executable plus argument list. Shell execution, arbitrary shell strings, URLs, network MCP, listeners, retries, write operations, approval workflows, and Command Centre changes are unsupported. Startup, request, and overall deadline policy is approximately 1 second, 3 seconds, and 5 seconds respectively.
 
-The injectable transport seam currently fails closed with `MCP_TRANSPORT_NOT_IMPLEMENTED`. No live NEOS process, health read, or project-summary read is executed in MCP-02F. MCP-02G may add the controlled health-read invocation.
+## Live Health Read
+
+When the client is enabled and the bundle and declarations validate, GAIA launches the trusted configured provider directly with a structured argument vector. The current NEOS entry point is:
+
+`neos mcp-provider --bundle <installed-bundle> --enable`
+
+The provider receives exactly one JSON request line and GAIA reads exactly one JSON response line. The request preserves `correlation_id`, `operation_id`, and `arguments`; the response is validated for matching IDs, recognized status, and controlled result/error structure. Provider stderr is captured separately as bounded diagnostics and is never protocol data.
+
+The one-shot provider process has an approximately 1-second startup boundary, a 3-second request timeout, and a 5-second overall deadline. Retries are disabled. stdin, stdout, and stderr are closed in cleanup, and a still-running provider is terminated and then killed if necessary. Start, timeout, empty-response, malformed-response, and process failures become controlled GAIA client errors.
+
+Only `neos.health.read` is live-enabled. `neos.project.summary.read` remains recognized by the declarative client boundary but returns `MCP_OPERATION_NOT_ENABLED` if execution is attempted. No MCP write operation, approval workflow, network transport, URL endpoint, shell command, Command Centre change, Platform Core change, or NEOS change is present.
+
+The next slice is MCP-02H: controlled GAIA MCP project-summary live invocation.
