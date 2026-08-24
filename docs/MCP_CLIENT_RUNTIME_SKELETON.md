@@ -26,4 +26,8 @@ The one-shot provider process has an approximately 1-second startup boundary, a 
 
 Both declared read operations are now live-enabled through the same transport. `neos.project.summary.read` requires exactly one `project_id` argument matching the frozen NEOS project identifier shape; it is never interpreted as a path, URL, shell input, SQL fragment, or command. Provider truth such as partial, stale, unknown, unavailable, not-found, and error states is returned without fabrication. No MCP write operation, approval workflow, network transport, URL endpoint, shell command, Command Centre change, Platform Core change, or NEOS change is present.
 
-The next slice is MCP-02I: GAIA MCP runtime policy enforcement.
+## Runtime Policy
+
+Every request passes one deterministic deny-by-default policy decision before transport launch. The decision requires the enabled client, verified bundle and baseline, canonical GAIA and NEOS identities, declared operation, canonical NEOS exposure, read-only semantics, bundle-loaded GAIA permission, supported operation, and operation-specific arguments. A denied request returns a controlled reason code and launches zero provider processes. GAIA does not self-authorize or self-approve; Platform Core remains the policy authority, and no GAIA policy file or audit database is created.
+
+The next slice is MCP-02J: GAIA MCP invocation and correlation audit records.
