@@ -373,15 +373,33 @@ class McpContractBundle:
             raise McpClientError("MCP_BUNDLE_INVALID", "Bundle content root hash does not match")
 
     def _validate_identities(self) -> None:
-        client = next((item for item in self.contracts if item.get("client_id") == EXPECTED_CLIENT_ID), None)
-        if client is None or client.get("owner_system_id") != "gaia":
+        client = next((item for item in self.contracts if self._is_canonical_client_identity(item)), None)
+        if client is None:
             raise McpClientError("MCP_CLIENT_IDENTITY_INVALID", "Canonical GAIA client declaration is missing")
-        server = next((item for item in self.contracts if item.get("server_id") == EXPECTED_SERVER_ID), None)
-        if server is None or server.get("owner_system_id") != "neos" or server.get("transport") != EXPECTED_PROVIDER_TRANSPORT or server.get("bind_scope") != EXPECTED_PROVIDER_SCOPE:
+        server = next((item for item in self.contracts if self._is_canonical_server_identity(item)), None)
+        if server is None:
             raise McpClientError("MCP_SERVER_IDENTITY_INVALID", "Canonical NEOS server declaration is invalid")
         registry_clients = {item.get("client_id") for item in self.registry.get("clients", []) if isinstance(item, dict)}
         if EXPECTED_CLIENT_ID not in registry_clients:
             raise McpClientError("MCP_CLIENT_IDENTITY_INVALID", "GAIA client is not registered")
+
+    @staticmethod
+    def _is_canonical_client_identity(item: Any) -> bool:
+        return (
+            isinstance(item, dict)
+            and item.get("client_id") == EXPECTED_CLIENT_ID
+            and item.get("owner_system_id") == "gaia"
+        )
+
+    @staticmethod
+    def _is_canonical_server_identity(item: Any) -> bool:
+        return (
+            isinstance(item, dict)
+            and item.get("server_id") == EXPECTED_SERVER_ID
+            and item.get("owner_system_id") == "neos"
+            and item.get("transport") == EXPECTED_PROVIDER_TRANSPORT
+            and item.get("bind_scope") == EXPECTED_PROVIDER_SCOPE
+        )
 
     def operation_contract(self, operation_id: str) -> dict[str, Any] | None:
         return next((item for item in self.contracts if item.get("id") == operation_id and "operation" in item), None)
