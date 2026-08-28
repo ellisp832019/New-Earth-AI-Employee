@@ -22,7 +22,7 @@ from gaia.mcp.client import (
 )
 
 
-def _bundle(tmp_path: Path, **changes: Any) -> Path:
+def _bundle(tmp_path: Path, *, contract_order: tuple[str, ...] | None = None, omit_contracts: set[str] | None = None, **changes: Any) -> Path:
     root = tmp_path / "bundle"
     files: dict[str, dict[str, Any]] = {
         "contracts/identities/gaia.yaml": {"client_id": "gaia-mcp-client", "owner_system_id": "gaia"},
@@ -38,7 +38,10 @@ def _bundle(tmp_path: Path, **changes: Any) -> Path:
     files["contracts/tools/summary.yaml"].update(changes.pop("summary", {}))
     files["contracts/manifests/neos.yaml"].update(changes.pop("manifest", {}))
     files["contracts/policies/allow.yaml"].update(changes.pop("policy", {}))
+    omitted = omit_contracts or set()
     for relative, value in files.items():
+        if relative in omitted:
+            continue
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(yaml.safe_dump(value, sort_keys=False), encoding="utf-8")
@@ -48,7 +51,7 @@ def _bundle(tmp_path: Path, **changes: Any) -> Path:
     schema = root / "schemas/example.json"
     schema.parent.mkdir()
     schema.write_text("{}", encoding="utf-8")
-    contract_paths = list(files)
+    contract_paths = [path for path in (contract_order or tuple(files)) if path not in omitted]
     payloads = ["registry/mcp.yaml", "schemas/example.json", *contract_paths]
     hashes = {path: hashlib.sha256((root / path).read_bytes()).hexdigest() for path in payloads}
     (root / "hashes").mkdir()
@@ -126,6 +129,63 @@ def test_bundle_pins_and_identities_fail_closed(tmp_path: Path) -> None:
         _runtime(_bundle(tmp_path / "gaia", gaia={"client_id": "other"})).initialize()
     with pytest.raises(McpClientError, match="MCP_SERVER_IDENTITY_INVALID"):
         _runtime(_bundle(tmp_path / "neos", neos={"server_id": "other"})).initialize()
+
+
+def test_bundle_validates_when_capability_contract_precedes_server_identity(tmp_path: Path) -> None:
+    order = (
+        "contracts/tools/health.yaml",
+        "contracts/identities/gaia.yaml",
+        "contracts/identities/neos.yaml",
+        "contracts/tools/summary.yaml",
+        "contracts/manifests/neos.yaml",
+        "contracts/policies/allow.yaml",
+    )
+    runtime = _runtime(_bundle(tmp_path, contract_order=order))
+    runtime.initialize()
+    assert runtime.bundle is not None
+    assert runtime.bundle.contracts[0]["id"] == "neos.health.read"
+
+
+@pytest.mark.parametrize(
+    "changes, omit_contracts, code",
+    [
+        ({"neos": {"owner_system_id": "gaia"}}, None, "MCP_SERVER_IDENTITY_INVALID"),
+        ({"neos": {"transport": "http"}}, None, "MCP_SERVER_IDENTITY_INVALID"),
+        ({"neos": {"bind_scope": "global"}}, None, "MCP_SERVER_IDENTITY_INVALID"),
+        ({}, {"contracts/identities/neos.yaml"}, "MCP_SERVER_IDENTITY_INVALID"),
+    ],
+)
+def test_canonical_server_identity_validation_is_schema_based_and_fail_closed(
+    tmp_path: Path,
+    changes: dict[str, Any],
+    omit_contracts: set[str] | None,
+    code: str,
+) -> None:
+    runtime = _runtime(_bundle(tmp_path, omit_contracts=omit_contracts, **changes))
+    with pytest.raises(McpClientError, match=code):
+        runtime.initialize()
+
+
+def test_canonical_identities_still_validate_and_bundle_integrity_remains_enforced(tmp_path: Path) -> None:
+    runtime = _runtime(_bundle(tmp_path))
+    runtime.initialize()
+    assert runtime.bundle is not None
+    tampered = _bundle(tmp_path / "tampered")
+    (tampered / "contracts/tools/health.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "id": "neos.health.read",
+                "operation": "health.read",
+                "server_id": "neos-engineering-read-server",
+                "read_only": False,
+                "side_effects": False,
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(McpClientError, match="MCP_BUNDLE_INVALID"):
+        _runtime(tampered).initialize()
 
 
 def test_operations_are_declared_exposed_and_allowed(tmp_path: Path) -> None:
